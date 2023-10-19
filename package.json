@@ -1,0 +1,19 @@
+{
+  "name": "mj-image-favorites-downloader",
+  "version": "0.0.1",
+  "description": "An Midjourney image downloader webapp.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "adm-zip": "^0.5.10",
+    "axios": "^1.5.1",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "pngjs": "^7.0.0",
+    "sharp": "^0.32.6"
+  }
+}

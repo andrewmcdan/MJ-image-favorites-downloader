@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Selection</title>
+    <style>
+        .grid-container {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 10px;
+            padding: 10px;
+        }
+
+        .image-checkbox {
+            display: none;
+            /* Hide the checkboxes */
+        }
+
+        .image-container {
+            position: relative;
+            /* Set position to relative to allow absolute positioning of child elements */
+        }
+
+
+        .image-container.checked::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 30px;
+            /* Adjust the width to your preference */
+            height: 30px;
+            /* Adjust the height to your preference */
+            background: url('/checkmark.png') no-repeat center center;
+            background-size: contain;
+        }
+
+        .grid-container-image {
+            width: 100%;
+            height: auto;
+        }
+
+        .grid-container-image {
+            max-width: 400px;
+            max-height: 400px;
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #folder-list {
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 80%;
+            max-height: 80%;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .folder-item {
+            padding: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+
+        .folder-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        #destination-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #f9f9f9;
+            /* Background color to cover content underneath */
+            padding: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            /* Optional: shadow for a bit of depth */
+            z-index: 1000;
+            /* Ensure the container stays on top of other elements */
+        }
+
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            z-index: 2000;
+            /* Ensure the overlay is on top of other elements */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #loading-text {
+            font-size: 2em;
+            color: white;
+        }
+
+        .mark-container {
+            position: absolute;
+            top: 10px;
+            left: 20px;
+            display: flex;
+        }
+
+        .checkmark,
+        .x-mark {
+            cursor: grab;
+            width: 70px;
+            height: 70px;
+            margin: 0 50px;
+        }
+
+        .image-container.handled {
+            filter: grayscale(100%);
+        }
+
+        .image-container.handled .checkmark,
+        .image-container.handled .x-mark {
+            display: none;
+        }
+
+        .reset-button {
+            display: none;
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+        }
+
+        .image-container.handled .reset-button {
+            display: block;
+        }
+    </style>
+    <script>
+        window.addEventListener('load', () => {
+            const loadingOverlay = document.getElementById('loading-overlay');
+            loadingOverlay.style.display = 'none';
+        });
+    </script>
+    <script>
+        let imagesLoaded = 0;  // Counter for images that have finished loading
+        let totalImages = 0;  // Total number of images on the page
+
+        function updateLoadingPercentage() {
+            const percentage = ((imagesLoaded / totalImages) * 100).toFixed(0);  // Calculate percentage
+            document.getElementById('loading-percentage').textContent = percentage;  // Update display
+            if (imagesLoaded === totalImages) {  // Hide overlay when all images are loaded
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const images = document.querySelectorAll('img');  // Get all images on the page
+            totalImages = images.length;  // Set totalImages
+            if (totalImages === 0) {  // If there are no images, hide overlay immediately
+                document.getElementById('loading-overlay').style.display = 'none';
+            } else {
+                images.forEach(img => {
+                    img.addEventListener('load', () => {
+                        imagesLoaded++;  // Increment counter when an image finishes loading
+                        updateLoadingPercentage();  // Update display
+                    });
+                    // Trigger load event for cached images
+                    if (img.complete) {
+                        img.dispatchEvent(new Event('load'));
+                    }
+                });
+            }
+        });
+    </script>
+
+</head>
+
+<body>
+    <div id="loading-overlay">
+        <div id="loading-text">Loading <span id="loading-percentage">0</span>%</div>
+    </div>
+    <div id="overlay">
+        <div id="folder-list"></div>
+    </div>
+    <!-- <form action="/download" method="post" id="image-form"> -->
+        <div id="destination-container">
+            <label for="location">Save to:</label>
+            <input type="text" id="location" name="location" required>
+            <button type="submit" id="download-selected-button">Download Selected</button>
+            <button id="download-all-button">Download All Images (Including not shown)</button>
+        </div>
+    <!-- </form> -->
+
+        <div class="grid-container">
+            <% let index=0; %>
+                <% imageData.forEach((item)=> { %>
+                    <% item.image_paths.forEach((image)=> { %>
+                        <div class="image-container" id="container-<%= index %>">
+                            <img src="<%= image %>" alt="<%= item.full_command %>" loading="lazy" class="grid-container-image">
+                            <div class="mark-container">
+                                <img src="/checkmark.png" class="checkmark" onclick="handleCheck(<%= index %>)">
+                                <img src="/x-mark.png" class="x-mark" onclick="handleX(<%= index %>)">
+                            </div>
+                            <input type="hidden" name="images[]" value="<%= image %>" id="image-<%= index %>" class="image-checkbox">
+                            <button class="reset-button" onclick="handleReset(<%= index %>, this)" id="reset-<%= index %>">Reset</button>
+                        </div>
+                    <% index++; %>
+                <% }); %>
+            <% }); %>
+        </div>
+    <script>
+        function handleCheck(index) {
+            const container = document.getElementById('container-' + index);
+            if (container.classList.contains('handled')) return;
+
+            const imageUrl = document.getElementById('image-' + index).value;
+            fetch('/handle-check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ imageUrl }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        container.classList.add('handled');
+                        const resetButton = document.getElementById('reset-' + index);
+                        resetButton.style.display = 'block';
+                    }
+                });
+        }
+
+
+        function handleX(index) {
+            const container = document.getElementById('container-' + index);
+            if (container.classList.contains('handled')) return;
+
+            const imageUrl = document.getElementById('image-' + index).value;
+            fetch('/handle-x', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ imageUrl }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        container.classList.add('handled');
+                        const resetButton = document.getElementById('reset-' + index);
+                        resetButton.style.display = 'block';
+                    }
+                });
+        }
+
+        function handleReset(index,_this) {
+            const container = document.getElementById('container-' + index);
+            container.classList.remove('handled');
+            _this.style.display = 'none';
+            const imageUrl = document.getElementById('image-' + index).value;
+            fetch('/handle-reset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ imageUrl }),
+            });
+        }
+
+        // Function to show the overlay
+        function showOverlay() {
+            const overlay = document.getElementById('overlay');
+            overlay.style.display = 'flex';
+
+            // Fetch the list of available folders from the server
+            fetch('/available-folders')
+                .then(response => response.json())
+                .then(folders => {
+                    const folderList = document.getElementById('folder-list');
+                    folderList.innerHTML = '';  // Clear any existing list
+                    folders.forEach(folder => {
+                        const folderItem = document.createElement('div');
+                        folderItem.className = 'folder-item';
+                        folderItem.textContent = folder;
+                        folderItem.onclick = () => {
+                            document.getElementById('location').value = folder;
+                            overlay.style.display = 'none';  // Hide the overlay when a folder is selected
+                        };
+                        folderList.appendChild(folderItem);
+                    });
+                });
+        }
+
+        // Attach the showOverlay function to the "Save to" input field
+        document.getElementById('location').onclick = showOverlay;
+
+        document.getElementById('download-all-button').addEventListener('click', () => {
+            fetch('/download-all');
+        });
+
+        
+        document.getElementById('download-selected-button').addEventListener('click', async () => {
+            // TODO: all this code is useless. this should initiate a download of the selected images
+            // on the server side using the list of images that has already been sent to the server.
+            // once the images are downloaded, save a json file with the list of images and their
+            // file paths.
+            
+            let images = [];
+            const imageCheckboxes = document.querySelectorAll('.image-checkbox');
+            
+            let location = document.getElementById('location').value;
+            let res = await fetch('/download-selected', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ images: images , location: location}),
+            });
+            console.log(res);
+        });
+
+    </script>
+</body>
+
+</html>
