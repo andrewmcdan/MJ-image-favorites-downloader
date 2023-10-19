@@ -104,6 +104,12 @@ app.get('/download-all', (req, res) => {
     processAxiosQueue();
 });
 
+app.get('/handle-MJ-data/*', (req, res) => {
+    const data = req.body;
+    console.log({ data });
+    res.send('ok');
+});
+
 app.post('/handle-check', (req, res) => {
     const imageUrl = req.body.imageUrl;
     const imageInfo = findImageInfo(imageUrl);
