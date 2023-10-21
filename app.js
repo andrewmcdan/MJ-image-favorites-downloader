@@ -1,3 +1,22 @@
+/**
+ * This is a simple Express server that serves a dynamic page that displays a list of images.
+ * The images come from a list of JSON files that are contained in a directory called "zips".
+ * The images are hosted by CDN's and are not included in this repository.
+ * 
+ * Use MJ archive downloader extension to obtain the zips that contain the JSON files.
+ * Then place the zips in the zips directory.
+ * When this server is running, visit http://localhost:3000/images to view the images.
+ * On that page, click the checkmark or the X to decided weather to download the image or not.
+ * The click Download Selected to download the images that were checked on the server side to selected folder. 
+ * 
+ * TODO: 
+ * 1. Add ExifTool capability to add metadata to images
+ * 2. Add upscale capability to images using Ai-Upscale-Module
+ * 3. Parse the output folder and omit images that have already been processed
+ *      - This will require a database to store the image names, possibly just a json file
+ * 
+ */
+//
 const AdmZip = require('adm-zip');
 const fs = require('fs');
 const axios = require('axios');
