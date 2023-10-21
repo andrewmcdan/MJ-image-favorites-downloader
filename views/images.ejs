@@ -208,20 +208,20 @@
     <!-- </form> -->
 
         <div class="grid-container">
-            <% let index=0; %>
+            <% let index=0; let urlBase = "https://cdn.midjourney.com/"; let urlEnd = "_384_N.webp"; let googleUrlBase = "https://storage.googleapis.com/dream-machines-output/";%>
                 <% imageData.forEach((item)=> { %>
-                    <% item.image_paths.forEach((image)=> { %>
+                    <% for(let i = 0; i < 4; i++){ %>
                         <div class="image-container" id="container-<%= index %>">
-                            <img src="<%= image %>" alt="<%= item.full_command %>" loading="lazy" class="grid-container-image">
+                            <img src="<%= urlBase + item.id + '/0_' + i + urlEnd %>" alt="<%= item.full_command %>" loading="lazy" class="grid-container-image">
                             <div class="mark-container">
                                 <img src="/checkmark.png" class="checkmark" onclick="handleCheck(<%= index %>)">
                                 <img src="/x-mark.png" class="x-mark" onclick="handleX(<%= index %>)">
                             </div>
-                            <input type="hidden" name="images[]" value="<%= image %>" id="image-<%= index %>" class="image-checkbox">
+                            <input type="hidden" name="images[]" value="<%= googleUrlBase + item.id + '/0_' + i +'.png' %>" id="image-<%= index %>" class="image-checkbox">
                             <button class="reset-button" onclick="handleReset(<%= index %>, this)" id="reset-<%= index %>">Reset</button>
                         </div>
                     <% index++; %>
-                <% }); %>
+                <% } %>
             <% }); %>
         </div>
     <script>
