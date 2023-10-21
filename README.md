@@ -1,5 +1,5 @@
 # Midjourney Downloader
-This is a node.js webapp that helps you download all your images from Midjourney. 
+This is a node.js webapp that helps you download all your images from Midjourney. There are other ways to download Midjourney images, but I wanted a way to easily browse through all (or nearly all) of my images and select only the ones I want to download. Also, I wanted something reliable. 
 
 First step is to use [this chrome extension](https://github.com/andrewmcdan/midjourney-archive-chrome-extension) or [my fork](https://github.com/andrewmcdan/midjourney-archive-chrome-extension) (which has some added features) to get the json files with all the metadata.
 
