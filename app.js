@@ -1,4 +1,5 @@
-/**
+/** About this project:
+ * 
  * This is a simple Express server that serves a dynamic page that displays a list of images.
  * The images come from a list of JSON files that are contained in a directory called "zips".
  * The images are hosted by CDN's and are not included in this repository.
