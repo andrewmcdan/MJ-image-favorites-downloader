@@ -151,81 +151,53 @@
             display: block;
         }
     </style>
-    <script>
-        window.addEventListener('load', () => {
-            const loadingOverlay = document.getElementById('loading-overlay');
-            loadingOverlay.style.display = 'none';
-        });
-    </script>
-    <script>
-        let imagesLoaded = 0;  // Counter for images that have finished loading
-        let totalImages = 0;  // Total number of images on the page
-
-        function updateLoadingPercentage() {
-            const percentage = ((imagesLoaded / totalImages) * 100).toFixed(0);  // Calculate percentage
-            document.getElementById('loading-percentage').textContent = percentage;  // Update display
-            if (imagesLoaded === totalImages) {  // Hide overlay when all images are loaded
-                document.getElementById('loading-overlay').style.display = 'none';
-            }
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            const images = document.querySelectorAll('img');  // Get all images on the page
-            totalImages = images.length;  // Set totalImages
-            if (totalImages === 0) {  // If there are no images, hide overlay immediately
-                document.getElementById('loading-overlay').style.display = 'none';
-            } else {
-                images.forEach(img => {
-                    img.addEventListener('load', () => {
-                        imagesLoaded++;  // Increment counter when an image finishes loading
-                        updateLoadingPercentage();  // Update display
-                    });
-                    // Trigger load event for cached images
-                    if (img.complete) {
-                        img.dispatchEvent(new Event('load'));
-                    }
-                });
-            }
-        });
-    </script>
-
 </head>
 
 <body>
-    <div id="loading-overlay">
-        <div id="loading-text">Loading <span id="loading-percentage">0</span>%</div>
-    </div>
+
     <div id="overlay">
         <div id="folder-list"></div>
     </div>
     <!-- <form action="/download" method="post" id="image-form"> -->
-        <div id="destination-container">
-            <label for="location">Save to:</label>
-            <input type="text" id="location" name="location" required>
-            <button type="submit" id="download-selected-button">Download Selected</button>
-            <button id="download-all-button">Download All Images (Including not shown)</button>
-        </div>
+    <div id="destination-container">
+        <label for="location">Save to:</label>
+        <input type="text" id="location" name="location" required>
+        <button type="submit" id="download-selected-button">Download Selected</button>
+        <button id="download-all-button">Download All Images (Including not shown)</button>
+
+        <label for="userID">User ID to Download (Leave blank to download your data):</label>
+        <input type="text" id="userID" name="userID" required>
+        <button type="submit" id="andGo-button">Load Images</button>
+
+        <div><input type="checkbox" id="removeOnClick" name="removeOnClick" value="true" />Remove Image on Clicking
+            Checkmark or X</div>
+    </div>
     <!-- </form> -->
 
-        <div class="grid-container">
-            <% let index=0; let urlBase = "https://cdn.midjourney.com/"; let urlEnd = "_384_N.webp"; let googleUrlBase = "https://storage.googleapis.com/dream-machines-output/";%>
-                <% imageData.forEach((item)=> { %>
-                    <% for(let i = 0; i < 4; i++){ %>
-                        <div class="image-container" id="container-<%= index %>">
-                            <img src="<%= urlBase + item.id + '/0_' + i + urlEnd %>" alt="<%= item.full_command %>" loading="lazy" class="grid-container-image">
-                            <div class="mark-container">
-                                <img src="/checkmark.png" class="checkmark" onclick="handleCheck(<%= index %>)">
-                                <img src="/x-mark.png" class="x-mark" onclick="handleX(<%= index %>)">
-                            </div>
-                            <input type="hidden" name="images[]" value="<%= googleUrlBase + item.id + '/0_' + i +'.png' %>" id="image-<%= index %>" class="image-checkbox">
-                            <button class="reset-button" onclick="handleReset(<%= index %>, this)" id="reset-<%= index %>">Reset</button>
+    <div class="grid-container">
+        <% let index=0; let urlBase="https://cdn.midjourney.com/" ; let urlEnd="_384_N.webp" ; let
+            googleUrlBase="https://storage.googleapis.com/dream-machines-output/" ;%>
+            <% imageData.forEach((item)=> { %>
+                <% for(let i=0; i < 4; i++){ %>
+                    <div class="image-container" id="container-<%= index %>">
+                        <img src="<%= urlBase + item.id + '/0_' + i + urlEnd %>" alt="<%= item.full_command %>"
+                            loading="lazy" class="grid-container-image">
+                        <div class="mark-container">
+                            <img src="/checkmark.png" class="checkmark" onclick="handleCheck(<%= index %>)">
+                            <img src="/x-mark.png" class="x-mark" onclick="handleX(<%= index %>)">
                         </div>
+                        <input type="hidden" name="images[]" value="<%= googleUrlBase + item.id + '/0_' + i +'.png' %>"
+                            id="image-<%= index %>" class="image-checkbox">
+                        <button class="reset-button" onclick="handleReset(<%= index %>, this)"
+                            id="reset-<%= index %>">Reset</button>
+                    </div>
                     <% index++; %>
-                <% } %>
-            <% }); %>
-        </div>
+                        <% } %>
+                            <% }); %>
+    </div>
     <script>
         function handleCheck(index) {
+            const removeOnClick = document.getElementById('removeOnClick').checked;
             const container = document.getElementById('container-' + index);
             if (container.classList.contains('handled')) return;
 
@@ -243,12 +215,14 @@
                         container.classList.add('handled');
                         const resetButton = document.getElementById('reset-' + index);
                         resetButton.style.display = 'block';
+                        if (removeOnClick) container.remove();
                     }
                 });
         }
 
 
         function handleX(index) {
+            const removeOnClick = document.getElementById('removeOnClick').checked;
             const container = document.getElementById('container-' + index);
             if (container.classList.contains('handled')) return;
 
@@ -266,11 +240,12 @@
                         container.classList.add('handled');
                         const resetButton = document.getElementById('reset-' + index);
                         resetButton.style.display = 'block';
+                        if (removeOnClick) container.remove();
                     }
                 });
         }
 
-        function handleReset(index,_this) {
+        function handleReset(index, _this) {
             const container = document.getElementById('container-' + index);
             container.classList.remove('handled');
             _this.style.display = 'none';
@@ -315,26 +290,51 @@
             fetch('/download-all');
         });
 
-        
+
         document.getElementById('download-selected-button').addEventListener('click', async () => {
             // TODO: all this code is useless. this should initiate a download of the selected images
             // on the server side using the list of images that has already been sent to the server.
             // once the images are downloaded, save a json file with the list of images and their
             // file paths.
-            
+
             let images = [];
             const imageCheckboxes = document.querySelectorAll('.image-checkbox');
-            
+
             let location = document.getElementById('location').value;
             let res = await fetch('/download-selected', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ images: images , location: location}),
+                body: JSON.stringify({ images: images, location: location }),
             });
             console.log(res);
         });
+
+        //   window.addEventListener('content-script', function(event) {
+        //     console.log(event);  // Outputs: {greeting: 'hello from content script'}
+        //   });
+        //   window.postMessage({ type: 'FROM_PAGE', action:'ready' }, '*');
+
+        // var port = chrome.runtime.connect({ name: "content-script" });
+
+        // const waitSeconds = (s) => new Promise(resolve => setTimeout(resolve, 1000 * s));
+        // const loop = async () => {
+        //     while (true) {
+        //         await waitSeconds(3);
+        //         port.postMessage({ msg: 'totalJobs' }, (response) => {
+        //             console.log(response);
+        //         });
+        //         // window.postMessage({type: 'FROM_PAGE', msg: 'totalJobs' }, '*');
+        //         console.log('sent message');
+        //     }
+        // }
+        // loop();
+
+        document.getElementById("andGo-button").addEventListener("click", async () => {
+            window.dispatchEvent(new CustomEvent('main-script-event', {detail: 'andGo'}));
+        });
+        
 
     </script>
 </body>
