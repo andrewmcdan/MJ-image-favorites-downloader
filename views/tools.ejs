@@ -17,59 +17,99 @@ Tools page:
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f0f0f0;
+            background-color: #f2f2f2;
         }
 
         .container {
-            width: 90%;
-            /* Reduced width */
-            margin: 0 auto;
-            background-color: #fff;
-            padding: 20px;
-            box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.1);
             display: flex;
-            /* Added */
+            justify-content: left;
         }
 
-        .form-container div {
-            border: 1px solid rgb(153, 153, 153);
+        .form-container {
+            width: 400px;
+            background-color: #fff;
+            padding: 5px;
+            margin-top: 30px;
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
         }
 
-        .form-container,
-        .image-container {
-            width: 50%;
-            /* Added */
+        .form-container h1 {
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 20px;
         }
 
-        h1 {
-            color: #333;
-        }
-
-        label {
-            display: block;
+        .form-container p {
             margin-bottom: 10px;
         }
 
-        input[type="text"],
-        input[type="submit"] {
-            width: 90%;
-            padding: 10px;
-            margin-bottom: 20px;
+        .form-container label {
+            /* display: block; */
+            font-weight: bold;
+            margin-bottom: 5px;
         }
 
-        input[type="date"] {
-            width: 49%;
-            /* Adjusted width */
-            padding: 10px;
-            margin-bottom: 20px;
+        .form-container input[type="text"],
+        .form-container input[type="date"] {
+            width: 80%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 10px;
         }
 
-        #image-display {
-            width: 50%;
-            height: auto;
+        .form-container input[type="submit"],
+        .form-container button[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .form-container input[type="submit"]:hover,
+        .form-container button[type="submit"]:hover {
+            background-color: #45a049;
+        }
+
+        .form-container #time-remaining {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .image-container {
+            display: flex;
             position: fixed;
-            top: 10px;
+            top: 0px;
             right: 0px;
+            justify-content: center;
+            margin-top: 50px;
+            width: calc(100% - 450px);
+            max-height: calc(100% - 100px);
+        }
+
+        .image-container img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .image-container div {
+            object-fit: contain;
+            object-position: right;
+        }
+
+
+
+
+        .tool-wrapper{
+            margin: 10px;
+            border: 1px solid rgb(153, 153, 153);
+            border-radius: 5px;
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+            padding: 15px;
         }
     </style>
 </head>
@@ -77,47 +117,53 @@ Tools page:
 <body>
     <div class="container">
         <div class="form-container">
-            <h1>Tools</h1>
-            <p>Take an image UUID and show the image and all the metadata about with links to the page for the user the
-                generated it.</p>
-            <p>
-                <button type="submit" id="reloadExt">Reload Extension</button>
-            </p>
-            <div>
-                <label for="imageUUID">Image UUID:</label>
-                <input type="text" id="imageUUID" name="imageUUID">
-                <input type="submit" value="Submit" id="imageUUID-submit">
+            <h1>Tools</h1><button type="submit" id="reloadExt">Reload Extension</button>
+            <div class="tool-wrapper">
+                <p>Take an image UUID and show the image and all the metadata about with links to the page for the user that generated it.</p>
+                <div>
+                    <label for="imageUUID">Image UUID:</label>
+                    <input type="text" id="imageUUID" name="imageUUID">
+                    <input type="submit" value="Submit" id="imageUUID-submit">
+                </div>
             </div>
-            <p>Take a user UUID and provide information about that user. Leave blank to get your info.</p>
-            <div>
-                <label for="userUUID-info">User UUID:</label>
-                <input type="text" id="userUUID-info" name="userUUID-info">
-                <input type="submit" value="Submit" id="userUUID-info-submit">
+            <div class="tool-wrapper">
+                <p>Take a user UUID and provide information about that user. Leave blank to get your info.</p>
+                <div>
+                    <label for="userUUID-info">User UUID:</label>
+                    <input type="text" id="userUUID-info" name="userUUID-info">
+                    <input type="submit" value="Submit" id="userUUID-info-submit">
+                </div>
             </div>
-            <p>Take a user UUID and download their metadata. Defaults to the most recent day's data.</p>
-            <div>
-                <label for="userUUID">User UUID:</label>
-                <input type="text" id="userUUID" name="userUUID">
-                <input type="date" id="start-date" name="start-date">
-                <input type="date" id="end-date" name="end-date">
-                <input type="submit" value="Submit" id="userUUID-submit">
-                <label id="time-remaining"></label>
+            <div class="tool-wrapper">
+                <p>Take a user UUID and download their metadata. Defaults to the most recent day's data. Leave blank to get the long version (with specific dates) of your data or put your ID in to get the short version (but you must get all of it at once).</p>
+                <div>
+                    <label for="userUUID">User UUID:</label>
+                    <input type="text" id="userUUID" name="userUUID">
+                    <input type="date" id="start-date" name="start-date">
+                    <input type="date" id="end-date" name="end-date">
+                    <input type="submit" value="Submit" id="userUUID-submit">
+                    <label id="time-remaining"></label>
+                </div>
             </div>
-            <p>Take any UUID and determine if it is a user, an image upscale, or a grid.</p>
-            <div>
-                <label for="anyUUID">Any UUID:</label>
-                <input type="text" id="anyUUID" name="anyUUID">
-                <input type="submit" value="Submit" id="anyUUID-submit">
+            <div class="tool-wrapper">
+                <p>Take any UUID and determine if it is a user, an image upscale, or a grid.</p>
+                <div>
+                    <label for="anyUUID">Any UUID:</label>
+                    <input type="text" id="anyUUID" name="anyUUID">
+                    <input type="submit" value="Submit" id="anyUUID-submit"><br>
+                    <label id="anyUUID-result"></label>
+                </div>
             </div>
-            <p>Take any string that has a UUID in it and regex it to get just the UUID.</p>
-            <div>
-                <label for="anyString">Any String:</label>
-                <input type="text" id="anyString" name="anyString">
-                <button type="submit" value="Submit" id="anyString-submit">Extract UUID</button>
-                <input type="checkbox" id="auto-populate" name="auto-populate" /><label>Auto populate other
-                    fields</label>
-                <label for="anyString-result" id="uuid-result"></label>
-
+            <div class="tool-wrapper">
+                <p>Take any string that has a UUID in it and regex it to get just the UUID.</p>
+                <div>
+                    <label for="anyString">Any String:</label>
+                    <input type="text" id="anyString" name="anyString">
+                    <button type="submit" value="Submit" id="anyString-submit">Extract UUID</button><br>
+                    <input type="checkbox" id="auto-populate" name="auto-populate" />
+                    <label for="auto-populate">Auto populate other fields</label>
+                    <label for="anyString-result" id="uuid-result"></label>
+                </div>
             </div>
             <div id="result-area">
             </div>
@@ -125,7 +171,7 @@ Tools page:
         <div class="image-container">
             <!-- Add this div where you want the image to be displayed -->
             <div>
-                <img id="image-display" src="" alt="Dynamic Image">
+                <img id="image-display" src="" alt="Hover on a link to show the image. Scroll down to see the data.">
             </div>
         </div>
     </div>
@@ -179,6 +225,7 @@ Tools page:
         console.log({ imageUUID });
         let data = await getJobDataImage(imageUUID);
         console.log({ data });
+        data = rewriteIdsToUrls(data);
         document.getElementById("result-area").innerHTML = makeLinksClickable(objToHTML(data));
         setupHoverListeners();
     });
@@ -188,13 +235,18 @@ Tools page:
         timeRemainingLabel.innerHTML = "Job starting...";
 
         let userUUID = document.getElementById("userUUID").value;
-        if (userUUID == "") userUUID = await getUserID();
-
-        if (userUUID != await getUserID()) {
+        let data;
+        let doLongVersion = false;
+        if (userUUID == "") {
+            userUUID = await getUserID();
+            doLongVersion = true;
+        }
+        
+        if (userUUID != await getUserID() || doLongVersion) {
 
             let sDateVal = document.getElementById("start-date").value;
             let dateObj = {};
-            let data;
+            
             const updateTimeRemaining = async () => {
                 // wait for the job to start
                 let waitCount = 0;
@@ -215,8 +267,13 @@ Tools page:
                 // update the time remaining every second
                 while (true) {
                     await waitSeconds(1);
-                    let remainingTime = await getRemainingTime();
-                    if (remainingTime == -1) break; // job is done. stop updating.
+                    // let remainingTime = await getRemainingTime();
+                    // if (remainingTime == -1) break; // job is done. stop updating.
+                    jobStatus = await getJobStatus();
+                    if(jobStatus == 'done') {
+                        timeRemainingLabel.innerHTML = "Job complete";
+                        break;
+                    }
                     // convert remaining time to hours, minutes, seconds
                     let seconds = Math.floor(remainingTime / 1000);
                     let minutes = Math.floor(seconds / 60);
@@ -245,11 +302,11 @@ Tools page:
             } else {
                 data = await getJobDataUser(userUUID);
             }
-        }else{
+        } else {
             data = await getThisUserJobsData();
             data = rewriteIdsToUrls(data);
         }
-        console.log({ data });
+        // console.log({ data });
         // parse the data into a table
         document.getElementById("result-area").innerHTML = makeLinksClickable(objToHTML(data));
         setupHoverListeners();
@@ -264,10 +321,27 @@ Tools page:
         else document.getElementById("result-area").innerHTML = objToHTML(userData);
     });
 
-    let anyUUIDSubmit = document.getElementById("anyUUID-submit");
-    anyUUIDSubmit.addEventListener("click", function () {
+    document.getElementById("anyUUID-submit").addEventListener("click", async function () {
         let anyUUID = document.getElementById("anyUUID").value;
         console.log({ anyUUID });
+        let yourUserID = await getUserID();
+        if(anyUUID == yourUserID){
+            document.getElementById("anyUUID-result").innerHTML = "That's your UUID!";
+            let userData = await getUserData(anyUUID);
+            document.getElementById("result-area").innerHTML = objToHTML(userData);
+            return;
+        }
+        let jobType = await getIfJobUserOrImage(anyUUID);
+        console.log({ jobType });
+        switch(jobType.type){
+            case 'grid':
+                document.getElementById("anyUUID-result").innerHTML = "That's an image grid UUID!";
+                jobType.data = rewriteIdsToUrls(jobType.data);
+                document.getElementById("result-area").innerHTML = makeLinksClickable(objToHTML(jobType.data));
+                setupHoverListeners();
+                document.getElementById('image-display').src = "https://cdn.midjourney.com/" + jobType.data.id + "/grid_0.webp";
+                break;
+        }
     });
 
     // get a random number between 0 and 1000
@@ -292,13 +366,6 @@ Tools page:
             await waitSeconds(1);
         }
         console.log("Comm channel established");
-        // window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getUserID' }));
-        // window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: { msg: 'getUserData', uuid: "" } }));
-        // window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: { msg: 'getJobDataImage', uuid: "" } }));
-        // window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: { msg: 'getJobDataUser', uuid: "" } }));
-        // window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: { msg: 'getIfJobUserOrImage', uuid: "" } }));
-        // window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getTotalJobs' }));
-        // window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getRemainingTime' }));
     }
 
     function generateUUID() {
@@ -331,7 +398,7 @@ Tools page:
         return remainingTime;
     }
 
-    const getIfJobUserOrImage = async () => {
+    const getIfJobUserOrImage = async (uuid) => {
         let jobType = null;
         const setJobType = (e) => {
             jobType = e.detail.jobType;
@@ -443,7 +510,7 @@ Tools page:
             }
         }
         window.addEventListener(thisWindowListenerID + 'c', setJobData);
-        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getThisUserJobsData' } ));
+        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getThisUserJobsData' }));
         while (jobData == null) {
             await waitSeconds(1);
         }
@@ -477,41 +544,26 @@ Tools page:
     // built by ChatGPT
     const objToHTML = (obj) => {
         if (obj === null || obj === undefined) return '';
-
         let html = '<ul>';
-
         for (let key in obj) {
             html += `<li><strong>${key}:</strong> `;
-
-            if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
-                // Recurse into objects
-                html += objToHTML(obj[key]);
-            } else if (Array.isArray(obj[key])) {
-                // Build list for arrays
+            if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) html += objToHTML(obj[key]);
+            else if (Array.isArray(obj[key])) {
                 html += '<ul>';
                 obj[key].forEach(item => {
-                    if (typeof item === 'object') {
-                        // Recurse into objects within the array
-                        html += `<li>${objToHTML(item)}</li>`;
-                    } else {
-                        // Output value for primitives within the array
-                        html += `<li>${item}</li>`;
-                    }
+                    if (typeof item === 'object') html += `<li>${objToHTML(item)}</li>`;
+                    else html += `<li>${item}</li>`;
                 });
                 html += '</ul>';
-            } else {
-                // Output value for primitives
-                html += obj[key];
-            }
-
+            } else html += obj[key];
             html += '</li>';
         }
-
         html += '</ul>';
         return html;
     };
 
     function makeLinksClickable(html) {
+        console.log("Parsing HTML for links...");
         const urlRegex = /\b((http|https|ftp):\/\/[^\s/$.?#].[^\s<]*)\b/gi;
         const replaceUrls = (match, p1, offset) => {
             const before = html.slice(Math.max(0, offset - 2), offset);
@@ -522,13 +574,20 @@ Tools page:
         return html.replace(urlRegex, replaceUrls);
     }
 
-    const rewriteIdsToUrls = (data)=>{
-        for(let i = 0; i < data.length; i++){
-            if(data[i].parent_id == "" || data[i].parent_id == " ") continue;
-            if(data[i].job_type == 'v5_upscaler_4x') data[i].x4_upscale = "https://cdn.midjourney.com/" + data[i].id + "/0_0.png";
+    const rewriteIdsToUrls = (data) => {
+        console.log("Rewriting IDs to URLs...");
+        for (let i = 0; i < data.length; i++) {
+            if (data[i].parent_id == "" || data[i].parent_id == " ") continue;
+            if (data[i].job_type == 'v5_upscaler_4x') data[i].x4_upscale = "https://cdn.midjourney.com/" + data[i].id + "/0_0.png";
+            data[i].grid = "https://cdn.midjourney.com/" + data[i].parent_id + "/grid_0.webp";
             data[i].link2 = "https://storage.googleapis.com/dream-machines-output/" + data[i].parent_id + "/0_" + data[i].parent_grid + ".png";
             // data[i].parent_id = "https://cdn.midjourney.com/" + data[i].parent_id + "/0_" + data[i].parent_grid + ".png";
             data[i].link = "https://cdn.midjourney.com/" + data[i].parent_id + "/0_" + data[i].parent_grid + ".png";
+        }
+        if(data.hasOwnProperty('image_paths')){
+            if(data.image_paths.length == 4){
+                data.id = "https://cdn.midjourney.com/" + data.id + "/grid_0.webp";
+            }
         }
         return data;
     }
