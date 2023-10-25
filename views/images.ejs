@@ -199,31 +199,36 @@
         <div id="folder-list"></div>
     </div>
     <!-- <form action="/download" method="post" id="image-form"> -->
-        <div id="destination-container">
-            <label for="location">Save to:</label>
-            <input type="text" id="location" name="location" required>
-            <button type="submit" id="download-selected-button">Download Selected</button>
-            <button id="download-all-button">Download All Images (Including not shown)</button>
-        </div>
+    <div id="destination-container">
+        <label for="location">Save to:</label>
+        <input type="text" id="location" name="location" required>
+        <button type="submit" id="download-selected-button">Download Selected</button>
+        <button id="download-all-button">Download All Images (Including not shown)</button>
+    </div>
     <!-- </form> -->
 
-        <div class="grid-container">
-            <% let index=0; let urlBase = "https://cdn.midjourney.com/"; let urlEnd = "_384_N.webp"; let googleUrlBase = "https://storage.googleapis.com/dream-machines-output/";%>
-                <% imageData.forEach((item)=> { %>
-                    <% for(let i = 0; i < 4; i++){ %>
-                        <div class="image-container" id="container-<%= index %>">
-                            <img src="<%= urlBase + item.id + '/0_' + i + urlEnd %>" alt="<%= item.full_command %>" loading="lazy" class="grid-container-image">
-                            <div class="mark-container">
-                                <img src="/checkmark.png" class="checkmark" onclick="handleCheck(<%= index %>)">
-                                <img src="/x-mark.png" class="x-mark" onclick="handleX(<%= index %>)">
-                            </div>
-                            <input type="hidden" name="images[]" value="<%= googleUrlBase + item.id + '/0_' + i +'.png' %>" id="image-<%= index %>" class="image-checkbox">
-                            <button class="reset-button" onclick="handleReset(<%= index %>, this)" id="reset-<%= index %>">Reset</button>
+    <div class="grid-container">
+        <% let index=0; let urlBase="https://cdn.midjourney.com/" ; let urlEnd="_384_N.webp" ; let
+            googleUrlBase="https://storage.googleapis.com/dream-machines-output/" ;%>
+            <% imageData.forEach((item)=> { %>
+                <% for(let i=0; i < 4; i++){ %>
+                    <div class="image-container" id="container-<%= index %>">
+                        <img src="<%= urlBase + item.id + '/0_' + i + urlEnd %>" alt="<%= item.full_command %>"
+                            loading="lazy" class="grid-container-image">
+                        <div class="mark-container">
+                            <img src="/checkmark.png" class="checkmark" onclick="handleCheck(<%= index %>)">
+                            <img src="/x-mark.png" class="x-mark" onclick="handleX(<%= index %>)">
                         </div>
+                        <input type="hidden" name="images[]" value="<%= googleUrlBase + item.id + '/0_' + i +'.png' %>"
+                            id="image-<%= index %>" class="image-checkbox">
+                        <button class="reset-button" onclick="handleReset(<%= index %>, this)"
+                            id="reset-<%= index %>">Reset</button>
+                    </div>
                     <% index++; %>
-                <% } %>
-            <% }); %>
-        </div>
+                        <% } %>
+                            <% }); %>
+    </div>
+    <iframe id="hiddenFrame" name="hiddenFrame" width="0" height="0" style="display: none;"></iframe>
     <script>
         function handleCheck(index) {
             const container = document.getElementById('container-' + index);
@@ -270,7 +275,7 @@
                 });
         }
 
-        function handleReset(index,_this) {
+        function handleReset(index, _this) {
             const container = document.getElementById('container-' + index);
             container.classList.remove('handled');
             _this.style.display = 'none';
@@ -315,27 +320,149 @@
             fetch('/download-all');
         });
 
-        
+
         document.getElementById('download-selected-button').addEventListener('click', async () => {
             // TODO: all this code is useless. this should initiate a download of the selected images
             // on the server side using the list of images that has already been sent to the server.
             // once the images are downloaded, save a json file with the list of images and their
             // file paths.
-            
+
             let images = [];
             const imageCheckboxes = document.querySelectorAll('.image-checkbox');
-            
+
             let location = document.getElementById('location').value;
             let res = await fetch('/download-selected', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ images: images , location: location}),
+                body: JSON.stringify({ images: images, location: location }),
             });
             console.log(res);
         });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+        const getData = async () => {
+            let processedDays = 0;
+            let startDate = new Date("October 1, 2023 00:00:00");
+            // endDate = today
+            let endDate = new Date();
+            const totalDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+            // get current time 
+            const currentTime = new Date();
+
+            // Iterate through the dates and perform API calls
+            for (let currentDate = startDate; currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
+                //progressDaysMessage.innerText = `[${processedDays}/${totalDays}] Processing ${currentDate.toISOString().slice(0, 10)}...`;
+                const settings = { "batch": 0, "date": {} };
+                settings.date.year = currentDate.getFullYear();
+                settings.date.month = currentDate.getMonth() + 1;
+                settings.date.day = currentDate.getDate();
+
+                console.log(settings);
+
+                // Fetch the archive data
+                const hiddenFrame =  document.getElementById("hiddenFrame");
+                hiddenFrame.src = `https://www.midjourney.com/api/app/archive/day/?day=${settings.date.day}&month=${settings.date.month}&year=${settings.date.year}`;
+                let archiveResponse;
+                hiddenFrame.onload = () => {
+                    archiveResponse = hiddenFrame.contentWindow.document.body.innerText;
+                }
+                /*const archiveResponse = await fetch(`https://www.midjourney.com/api/app/archive/day/?day=${settings.date.day}&month=${settings.date.month}&year=${settings.date.year}`,{
+                    method: "GET",
+                    headers: { "Content-Type": "application/json",
+                    "Referer": "https://www.midjourney.com/",
+                    "Origin": "https://www.midjourney.com/",
+                    "Sec-Fetch-Dest": "empty",
+                    "Sec-Fetch-Mode": "",
+                    "access-control-allow-origin": "*",},
+                    timeout: 10000
+                });*/
+                if (archiveResponse.status === 403) {
+                    //progressContainer.classList.add("hidden");
+                    //form.classList.remove("hidden");
+                    //error.classList.remove("hidden")
+                    //error.innerText = "Received HTTP 403 Forbidden. It seems you're not logged into https://www.midjourney.com.";
+                    //throw new Error(error.innerText);
+                }
+                const archiveData = archiveResponse;
+
+                // Create a zip file for the current date
+                //zips.push(newZip(settings));
+
+                let processedJobs = 0;
+                let totalJobs = archiveData.length;
+
+                // Process each item in the archive data
+                for (const item of archiveData) {
+                    // const jobId = item.id;
+                    await waitSeconds(0.01);
+                    // get current time as currentTimeInLoop
+                    const currentTimeInLoop = new Date();
+                    // ge the difference between currentTime and currentTimeInLoop
+                    const timeDifference = currentTimeInLoop - currentTime;
+
+                    let estimatedTimeLeft;// = (timeDifference / processedJobs) * (totalJobs - processedJobs);
+
+                    estimatedTimeLeft = estimateRemainingTime(totalJobs, processedJobs, currentTime, currentTimeInLoop);
+
+                    // convert timeDifference to hours:minutes:seconds
+                    const timeDifferenceInHours = Math.floor(timeDifference / 1000 / 60 / 60);
+                    const timeDifferenceInMinutes = Math.floor(timeDifference / 1000 / 60) - (timeDifferenceInHours * 60);
+                    const timeDifferenceInSeconds = Math.floor(timeDifference / 1000) - (timeDifferenceInMinutes * 60);
+                    // display timeDifference in the console
+                    console.log(`Time difference: ${timeDifferenceInHours} hours, ${timeDifferenceInMinutes} minutes, ${timeDifferenceInSeconds} seconds`);
+
+                    // convert estimatedTimeLeft to hours:minutes:seconds
+                    const estimatedTimeLeftInHours = Math.floor(estimatedTimeLeft / 1000 / 60 / 60);
+                    const estimatedTimeLeftInMinutes = Math.floor(estimatedTimeLeft / 1000 / 60) - (estimatedTimeLeftInHours * 60);
+                    const estimatedTimeLeftInSeconds = Math.floor(estimatedTimeLeft / 1000) - (estimatedTimeLeftInMinutes * 60);
+                    // display estimatedTimeLeft in the console
+                    console.log(`Estimated time left: ${estimatedTimeLeftInHours} hours, ${estimatedTimeLeftInMinutes} minutes, ${estimatedTimeLeftInSeconds} seconds`);
+
+                    const jobId = item;
+
+                    //progressJobsMessage.innerText = `[${processedJobs}/${totalJobs}] Fetching ${jobId}...`;
+
+                    //timeRemaining.innerText = `Time remaining: ${estimatedTimeLeftInHours} hours, ${estimatedTimeLeftInMinutes} minutes, ${estimatedTimeLeftInSeconds} seconds`;
+
+                    // Fetch the job status data
+                    console.log({ jobId });
+                    const jobStatusResponse = await fetch("https://www.midjourney.com/api/app/job-status/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ jobIds: [jobId] }),
+                        timeout: 10000
+                    });
+                    if (jobStatusResponse.status !== 200) {
+                        console.log({ jobStatusResponse });
+                        continue;
+                    }
+                    const jobStatusData = await jobStatusResponse.json();
+
+                    console.log(jobStatusData);
+
+                    processedJobs++
+                }
+                processedDays++;
+            }
+
+
+        }
+        getData();
     </script>
 </body>
 

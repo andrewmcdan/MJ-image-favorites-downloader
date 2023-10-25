@@ -11,6 +11,7 @@
   "dependencies": {
     "adm-zip": "^0.5.10",
     "axios": "^1.5.1",
+    "bonjour": "^3.5.0",
     "ejs": "^3.1.9",
     "express": "^4.18.2",
     "pngjs": "^7.0.0",

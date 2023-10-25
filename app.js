@@ -28,6 +28,12 @@ const PNG = require('pngjs').PNG;
 const app = express();
 const port = 3000;
 
+// const bonjour = require('bonjour')();
+
+// bonjour.publish({ name: 'my-app', type: 'http', port: 3000 });
+
+// console.log('mDNS service advertised!');
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Serve static files from the "public" directory
