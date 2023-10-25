@@ -15,7 +15,7 @@
  * 2. Add upscale capability to images using Ai-Upscale-Module
  * 3. Parse the output folder and omit images that have already been processed
  *      - This will require a database to store the image names, possibly just a json file
- * 
+ * 4. add a page of general tools. ie. revering an image uuid to the original prompt / user (url, name, etc.)
  */
 //
 const AdmZip = require('adm-zip');
@@ -59,6 +59,10 @@ try {
 } catch (err) {
     console.log(err);
 }
+
+imageData.sort((a, b) => {
+    return new Date(a.enqueue_time) - new Date(b.enqueue_time);
+});
 
 function extractJsonData(zipFilePath) {
     const zip = new AdmZip(zipFilePath);
@@ -113,6 +117,33 @@ app.get('/images', (req, res) => {
     // reset checkArray and xArray on page load
     checkArray = [];
     xArray = [];
+});
+
+app.get('/tools', (req, res) => {
+    res.render('tools');
+});
+
+app.get('/show', (req, res) => {
+    res.render('show');
+});
+
+app.get('/show/:uuid/:source', (req, res) => {
+    const { uuid, source } = req.params;
+    const imageInfo = findImageInfo(uuid);
+    if (imageInfo) {
+        res.render('show', { imageInfo, source });
+    } else {
+        res.send('Image not found');
+    }
+});
+
+app.get('/randomUUID', (req, res) => {
+    const imageInfo = imageData[Math.floor(Math.random() * imageData.length)];
+    res.redirect(`/show/${imageInfo.id}`);
+});
+
+app.get('/database', (req, res) => { // TODO: add database page to show all images and whether they are downloaded or not
+    res.render('database', { imageData });
 });
 
 app.get('/available-folders', (req, res) => {
@@ -369,3 +400,7 @@ process.stdin.on('data', function (data) {
         console.log(JSON.stringify(checkArray, null, 2));
     }
 });
+
+// To get any users data:
+// https://www.midjourney.com/api/app/recent-jobs/?amount=50&dedupe=true&jobStatus=completed&jobType=grid&minRankingScore=0&orderBy=new&page=1&prompt=undefined&refreshApi=0&searchType=advanced&service=null&userId=c95cd495-477b-4f04-b2a9-47f456f9e42d
+//                                                        ^ no more than 50

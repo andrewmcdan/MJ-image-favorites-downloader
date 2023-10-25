@@ -1,0 +1,597 @@
+<!--
+Tools page:
+1. Take an image UUID and show the image and all the metadata about with links to the page for the user the generated it.    
+2. Take a user UUID and provide a download of all their metadata in JSON files.
+3. Take any UUID and determine if it is a user, an image upscale, or a grid.
+4. take any string that has a UUID in it and regex it to get just the UUID.
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tools</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f2f2f2;
+        }
+
+        .container {
+            display: flex;
+            justify-content: left;
+        }
+
+        .form-container {
+            width: 400px;
+            background-color: #fff;
+            padding: 5px;
+            margin-top: 30px;
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+        }
+
+        .form-container h1 {
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .form-container p {
+            margin-bottom: 10px;
+        }
+
+        .form-container label {
+            /* display: block; */
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .form-container input[type="text"],
+        .form-container input[type="date"] {
+            width: 80%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .form-container input[type="submit"],
+        .form-container button[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .form-container input[type="submit"]:hover,
+        .form-container button[type="submit"]:hover {
+            background-color: #45a049;
+        }
+
+        .form-container #time-remaining {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .image-container {
+            display: flex;
+            position: fixed;
+            top: 0px;
+            right: 0px;
+            justify-content: center;
+            margin-top: 50px;
+            width: calc(100% - 450px);
+            max-height: calc(100% - 100px);
+        }
+
+        .image-container img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .image-container div {
+            object-fit: contain;
+            object-position: right;
+        }
+
+
+
+
+        .tool-wrapper{
+            margin: 10px;
+            border: 1px solid rgb(153, 153, 153);
+            border-radius: 5px;
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+            padding: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="form-container">
+            <h1>Tools</h1><button type="submit" id="reloadExt">Reload Extension</button>
+            <div class="tool-wrapper">
+                <p>Take an image UUID and show the image and all the metadata about with links to the page for the user that generated it.</p>
+                <div>
+                    <label for="imageUUID">Image UUID:</label>
+                    <input type="text" id="imageUUID" name="imageUUID">
+                    <input type="submit" value="Submit" id="imageUUID-submit">
+                </div>
+            </div>
+            <div class="tool-wrapper">
+                <p>Take a user UUID and provide information about that user. Leave blank to get your info.</p>
+                <div>
+                    <label for="userUUID-info">User UUID:</label>
+                    <input type="text" id="userUUID-info" name="userUUID-info">
+                    <input type="submit" value="Submit" id="userUUID-info-submit">
+                </div>
+            </div>
+            <div class="tool-wrapper">
+                <p>Take a user UUID and download their metadata. Defaults to the most recent day's data. Leave blank to get the long version (with specific dates) of your data or put your ID in to get the short version (but you must get all of it at once).</p>
+                <div>
+                    <label for="userUUID">User UUID:</label>
+                    <input type="text" id="userUUID" name="userUUID">
+                    <input type="date" id="start-date" name="start-date">
+                    <input type="date" id="end-date" name="end-date">
+                    <input type="submit" value="Submit" id="userUUID-submit">
+                    <label id="time-remaining"></label>
+                </div>
+            </div>
+            <div class="tool-wrapper">
+                <p>Take any UUID and determine if it is a user, an image upscale, or a grid.</p>
+                <div>
+                    <label for="anyUUID">Any UUID:</label>
+                    <input type="text" id="anyUUID" name="anyUUID">
+                    <input type="submit" value="Submit" id="anyUUID-submit"><br>
+                    <label id="anyUUID-result"></label>
+                </div>
+            </div>
+            <div class="tool-wrapper">
+                <p>Take any string that has a UUID in it and regex it to get just the UUID.</p>
+                <div>
+                    <label for="anyString">Any String:</label>
+                    <input type="text" id="anyString" name="anyString">
+                    <button type="submit" value="Submit" id="anyString-submit">Extract UUID</button><br>
+                    <input type="checkbox" id="auto-populate" name="auto-populate" />
+                    <label for="auto-populate">Auto populate other fields</label>
+                    <label for="anyString-result" id="uuid-result"></label>
+                </div>
+            </div>
+            <div id="result-area">
+            </div>
+        </div>
+        <div class="image-container">
+            <!-- Add this div where you want the image to be displayed -->
+            <div>
+                <img id="image-display" src="" alt="Hover on a link to show the image. Scroll down to see the data.">
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    const setupHoverListeners = () => {
+        // Get all image links
+        var imageLinks = document.getElementsByClassName('image-link');
+        // Loop through all image links
+        for (var i = 0; i < imageLinks.length; i++) {
+            // Add mouseover event listener
+            imageLinks[i].addEventListener('mouseover', function () {
+                // Get image URL from href attribute
+                var imageUrl = this.getAttribute('href');
+                // Change the source of the dynamic image
+                document.getElementById('image-display').src = imageUrl;
+            });
+        }
+    }
+
+    document.getElementById("reloadExt").addEventListener("click", function () {
+        reloadExtension();
+        console.log("reloadExt clicked");
+    });
+
+    let anyStringSubmit = document.getElementById("anyString-submit");
+    anyStringSubmit.addEventListener("click", function () {
+        console.log("anyStringSubmit clicked");
+        let anyString = document.getElementById("anyString").value;
+        console.log({ anyString });
+        let uuidRegex = /([a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}?)/gmi;
+        let uuid = anyString.match(uuidRegex);
+        if (uuid.length == 0) {
+            console.log("No UUID found");
+            document.getElementById("uuid-result").innerHTML = "No UUID found";
+            return;
+        }
+        console.log(uuid[0]);
+        document.getElementById("uuid-result").innerHTML = "UUID: " + uuid[0];
+        let autoPop = document.getElementById("auto-populate").checked;
+        if (autoPop) {
+            document.getElementById("imageUUID").value = uuid[0];
+            document.getElementById("userUUID").value = uuid[0];
+            document.getElementById("anyUUID").value = uuid[0];
+            document.getElementById("userUUID-info").value = uuid[0];
+        }
+    });
+
+    document.getElementById("imageUUID-submit").addEventListener("click", async function () {
+        let imageUUID = document.getElementById("imageUUID").value;
+        console.log({ imageUUID });
+        let data = await getJobDataImage(imageUUID);
+        console.log({ data });
+        data = rewriteIdsToUrls(data);
+        document.getElementById("result-area").innerHTML = makeLinksClickable(objToHTML(data));
+        setupHoverListeners();
+    });
+
+    document.getElementById('userUUID-submit').addEventListener("click", async function () {
+        let timeRemainingLabel = document.getElementById("time-remaining");
+        timeRemainingLabel.innerHTML = "Job starting...";
+
+        let userUUID = document.getElementById("userUUID").value;
+        let data;
+        let doLongVersion = false;
+        if (userUUID == "") {
+            userUUID = await getUserID();
+            doLongVersion = true;
+        }
+        
+        if (userUUID != await getUserID() || doLongVersion) {
+
+            let sDateVal = document.getElementById("start-date").value;
+            let dateObj = {};
+            
+            const updateTimeRemaining = async () => {
+                // wait for the job to start
+                let waitCount = 0;
+                let jobStatus = await getJobStatus();
+                while (jobStatus == 'waiting' || jobStatus == 'done') {
+                    timeRemainingLabel.innerHTML = "Job in progress...";
+                    await waitSeconds(2);
+                    waitCount++;
+                    if (waitCount > 60) return; // wait for 2 minutes max
+                    jobStatus = await getJobStatus();
+                }
+                // wait for the job to start fetching image data
+                jobStatus = await getJobStatus();
+                while (!(jobStatus == 'fetching jobs')) {
+                    await waitSeconds(0.5);
+                    jobStatus = await getJobStatus();
+                }
+                // update the time remaining every second
+                while (true) {
+                    await waitSeconds(1);
+                    // let remainingTime = await getRemainingTime();
+                    // if (remainingTime == -1) break; // job is done. stop updating.
+                    jobStatus = await getJobStatus();
+                    if(jobStatus == 'done') {
+                        timeRemainingLabel.innerHTML = "Job complete";
+                        break;
+                    }
+                    // convert remaining time to hours, minutes, seconds
+                    let seconds = Math.floor(remainingTime / 1000);
+                    let minutes = Math.floor(seconds / 60);
+                    let hours = Math.floor(minutes / 60);
+                    minutes = minutes % 60;
+                    seconds = seconds % 60;
+                    if (minutes < 10) minutes = "0" + minutes;
+                    if (seconds < 10) seconds = "0" + seconds;
+                    if (minutes == 0) minutes = "00";
+                    if (seconds == 0) seconds = "00";
+                    hours = hours > 0 ? (hours + ":") : "";
+                    remainingTime = hours + minutes + ":" + seconds;
+                    timeRemainingLabel.innerHTML = "Time remaining: " + remainingTime;
+                }
+                timeRemainingLabel.innerHTML = "Job complete";
+            };
+            // initiate the time remaining update
+            updateTimeRemaining();
+            // initiate the job data request
+            if (sDateVal != "") {
+                dateObj.start = sDateVal;
+                dateObj.end = document.getElementById("end-date").value;
+                // console.log({ dateObj })
+                data = await getJobDataUser(userUUID, dateObj);
+                // data = await getJobDataUser(userUUID);
+            } else {
+                data = await getJobDataUser(userUUID);
+            }
+        } else {
+            data = await getThisUserJobsData();
+            data = rewriteIdsToUrls(data);
+        }
+        // console.log({ data });
+        // parse the data into a table
+        document.getElementById("result-area").innerHTML = makeLinksClickable(objToHTML(data));
+        setupHoverListeners();
+    });
+
+
+    document.getElementById("userUUID-info-submit").addEventListener("click", async function () {
+        let userUUID = document.getElementById("userUUID-info").value;
+        if (userUUID == "") userUUID = await getUserID();
+        let userData = await getUserData(userUUID);
+        if (userData.length == 0) document.getElementById("result-area").innerHTML = "No user data found";
+        else document.getElementById("result-area").innerHTML = objToHTML(userData);
+    });
+
+    document.getElementById("anyUUID-submit").addEventListener("click", async function () {
+        let anyUUID = document.getElementById("anyUUID").value;
+        console.log({ anyUUID });
+        let yourUserID = await getUserID();
+        if(anyUUID == yourUserID){
+            document.getElementById("anyUUID-result").innerHTML = "That's your UUID!";
+            let userData = await getUserData(anyUUID);
+            document.getElementById("result-area").innerHTML = objToHTML(userData);
+            return;
+        }
+        let jobType = await getIfJobUserOrImage(anyUUID);
+        console.log({ jobType });
+        switch(jobType.type){
+            case 'grid':
+                document.getElementById("anyUUID-result").innerHTML = "That's an image grid UUID!";
+                jobType.data = rewriteIdsToUrls(jobType.data);
+                document.getElementById("result-area").innerHTML = makeLinksClickable(objToHTML(jobType.data));
+                setupHoverListeners();
+                document.getElementById('image-display').src = "https://cdn.midjourney.com/" + jobType.data.id + "/grid_0.webp";
+                break;
+        }
+    });
+
+    // get a random number between 0 and 1000
+    let random = Math.floor(Math.random() * 1000);
+    // generate a UUID
+    let thisWindowListenerID = "main-script-event-" + generateUUID();
+
+    let channelReady = false;
+    window.addEventListener(thisWindowListenerID + 'c', function (event) {
+        console.log('message from content.js', event);
+        if (event.detail == 'ok') {
+            channelReady = true;
+        }
+    });
+
+
+
+    const waitForChannel = async () => {
+        console.log("Waiting for comm channel to content.js...");
+        while (!channelReady) {
+            window.dispatchEvent(new CustomEvent('main-script-initiator', { detail: thisWindowListenerID }));
+            await waitSeconds(1);
+        }
+        console.log("Comm channel established");
+    }
+
+    function generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    const waitSeconds = (s) => {
+        return new Promise(resolve => setTimeout(resolve, 1000 * s));
+    };
+    waitForChannel();
+
+
+    // need to setup an unload function that will send a message to the content script to remove the listener
+    // whenever the page is closed, the window is closed, or the tab is closed.
+
+    const getRemainingTime = async () => {
+        let remainingTime = null;
+        const setRemainingTime = (e) => {
+            remainingTime = e.detail.remainingTime;
+            window.removeEventListener(thisWindowListenerID + 'c', setRemainingTime);
+        }
+        window.addEventListener(thisWindowListenerID + 'c', setRemainingTime);
+        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getRemainingTime' }));
+        while (remainingTime == null) {
+            await waitSeconds(1);
+        }
+        return remainingTime;
+    }
+
+    const getIfJobUserOrImage = async (uuid) => {
+        let jobType = null;
+        const setJobType = (e) => {
+            jobType = e.detail.jobType;
+            window.removeEventListener(thisWindowListenerID + 'c', setJobType);
+        }
+        window.addEventListener(thisWindowListenerID + 'c', setJobType);
+        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: { msg: 'getIfJobUserOrImage', uuid: uuid } }));
+        while (jobType == null) {
+            await waitSeconds(1);
+        }
+        return jobType;
+    }
+
+    const getTotalJobs = async () => {
+        let totalJobs = null;
+        const setTotalJobs = (e) => {
+            if (e.detail.hasOwnProperty('totalJobs')) {
+                totalJobs = e.detail.totalJobs;
+                window.removeEventListener(thisWindowListenerID + 'c', setTotalJobs);
+            }
+        }
+        window.addEventListener(thisWindowListenerID + 'c', setTotalJobs);
+        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getTotalJobs' }));
+        while (totalJobs == null) {
+            await waitSeconds(1);
+        }
+        return totalJobs;
+    }
+
+    const getJobDataUser = async (uuid, dateObj = null) => {
+        let jobData = null;
+        if (dateObj == null || dateObj == undefined) {
+            dateObj = {};
+            dateObj.start = new Date() - 1000 * 60 * 60 * 24;
+            dateObj.end = new Date();
+        }
+        const setJobData = (e) => {
+            if (e.detail.hasOwnProperty("jobDataUser")) {
+                jobData = e.detail.jobDataUser;
+                window.removeEventListener(thisWindowListenerID + 'c', setJobData);
+            }
+        }
+        window.addEventListener(thisWindowListenerID + 'c', setJobData);
+        let newEvent = new CustomEvent(thisWindowListenerID + 'm', { detail: { msg: 'getJobDataUser', data: { uuid: uuid, startDate: dateObj.start, endDate: dateObj.end } } });
+        console.log({ newEvent });
+        window.dispatchEvent(newEvent);
+        while (jobData == null) {
+            await waitSeconds(1);
+        }
+        return jobData;
+    }
+
+    const getJobDataImage = async (uuid) => {
+        let jobData = null;
+        const setJobData = (e) => {
+            if (e.detail.hasOwnProperty("jobDataImage")) {
+                jobData = e.detail.jobDataImage;
+                window.removeEventListener(thisWindowListenerID + 'c', setJobData);
+            }
+        }
+        window.addEventListener(thisWindowListenerID + 'c', setJobData);
+        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: { msg: 'getJobDataImage', uuid: uuid } }));
+        while (jobData == null) {
+            await waitSeconds(1);
+        }
+        return jobData;
+    }
+
+    const getJobStatus = async () => {
+        console.log("getJobStatus called")
+        let jobStatus = null;
+        const setJobStatus = (e) => {
+            if (e.detail.hasOwnProperty("jobStatus")) {
+                jobStatus = e.detail.jobStatus;
+                window.removeEventListener(thisWindowListenerID + 'c', setJobStatus);
+            }
+        }
+        window.addEventListener(thisWindowListenerID + 'c', setJobStatus);
+        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getJobStatus' }));
+        console.log("getJobStatus dispatched")
+        while (jobStatus == null) {
+            await waitSeconds(1);
+        }
+        return jobStatus;
+    }
+
+    const getUserID = async () => {
+        let userID = "";
+        const setID = (e) => {
+            if (e.detail.hasOwnProperty("userID")) {
+                userID = e.detail.userID;
+                window.removeEventListener(thisWindowListenerID + 'c', setID);
+            }
+        }
+        window.addEventListener(thisWindowListenerID + 'c', setID);
+        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getUserID' }));
+        while (userID == "") {
+            await waitSeconds(1);
+        }
+        return userID;
+    }
+
+    const getThisUserJobsData = async () => {
+        let jobData = null;
+        const setJobData = (e) => {
+            if (e.detail.hasOwnProperty("thisUserJobsData")) {
+                jobData = e.detail.thisUserJobsData;
+                window.removeEventListener(thisWindowListenerID + 'c', setJobData);
+            }
+        }
+        window.addEventListener(thisWindowListenerID + 'c', setJobData);
+        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getThisUserJobsData' }));
+        while (jobData == null) {
+            await waitSeconds(1);
+        }
+        return jobData;
+    }
+
+    const getUserData = async (uuid) => {
+        let userData = null;
+        const setUserData = (e) => {
+            if (e.detail.hasOwnProperty("userData")) {
+                userData = e.detail.userData;
+                window.removeEventListener(thisWindowListenerID + 'c', setUserData);
+            }
+        }
+        window.addEventListener(thisWindowListenerID + 'c', setUserData);
+        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: { msg: 'getUserData', uuid: uuid } }));
+        while (userData == null) {
+            await waitSeconds(1);
+        }
+        return userData;
+    }
+
+    const reloadExtension = async () => {
+        window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'reloadExt' }));
+        console.log("reloadExt dispatched");
+        await waitSeconds(1);
+        // reload this page
+        window.location.reload();
+    }
+
+    // built by ChatGPT
+    const objToHTML = (obj) => {
+        if (obj === null || obj === undefined) return '';
+        let html = '<ul>';
+        for (let key in obj) {
+            html += `<li><strong>${key}:</strong> `;
+            if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) html += objToHTML(obj[key]);
+            else if (Array.isArray(obj[key])) {
+                html += '<ul>';
+                obj[key].forEach(item => {
+                    if (typeof item === 'object') html += `<li>${objToHTML(item)}</li>`;
+                    else html += `<li>${item}</li>`;
+                });
+                html += '</ul>';
+            } else html += obj[key];
+            html += '</li>';
+        }
+        html += '</ul>';
+        return html;
+    };
+
+    function makeLinksClickable(html) {
+        console.log("Parsing HTML for links...");
+        const urlRegex = /\b((http|https|ftp):\/\/[^\s/$.?#].[^\s<]*)\b/gi;
+        const replaceUrls = (match, p1, offset) => {
+            const before = html.slice(Math.max(0, offset - 2), offset);
+            const after = html.slice(offset + match.length, offset + match.length + 4);
+            if (before === '"> ' || before === '</' || after === '</a>') return match;
+            return `<a href="${match}" class="image-link" target="_blank">${match}</a>`;  // Otherwise, wrap the URL in an anchor tag
+        };
+        return html.replace(urlRegex, replaceUrls);
+    }
+
+    const rewriteIdsToUrls = (data) => {
+        console.log("Rewriting IDs to URLs...");
+        for (let i = 0; i < data.length; i++) {
+            if (data[i].parent_id == "" || data[i].parent_id == " ") continue;
+            if (data[i].job_type == 'v5_upscaler_4x') data[i].x4_upscale = "https://cdn.midjourney.com/" + data[i].id + "/0_0.png";
+            data[i].grid = "https://cdn.midjourney.com/" + data[i].parent_id + "/grid_0.webp";
+            data[i].link2 = "https://storage.googleapis.com/dream-machines-output/" + data[i].parent_id + "/0_" + data[i].parent_grid + ".png";
+            // data[i].parent_id = "https://cdn.midjourney.com/" + data[i].parent_id + "/0_" + data[i].parent_grid + ".png";
+            data[i].link = "https://cdn.midjourney.com/" + data[i].parent_id + "/0_" + data[i].parent_grid + ".png";
+        }
+        if(data.hasOwnProperty('image_paths')){
+            if(data.image_paths.length == 4){
+                data.id = "https://cdn.midjourney.com/" + data.id + "/grid_0.webp";
+            }
+        }
+        return data;
+    }
+
+</script>
+
+</html>

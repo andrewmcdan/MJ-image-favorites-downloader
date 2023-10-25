@@ -151,50 +151,10 @@
             display: block;
         }
     </style>
-    <script>
-        window.addEventListener('load', () => {
-            const loadingOverlay = document.getElementById('loading-overlay');
-            loadingOverlay.style.display = 'none';
-        });
-    </script>
-    <script>
-        let imagesLoaded = 0;  // Counter for images that have finished loading
-        let totalImages = 0;  // Total number of images on the page
-
-        function updateLoadingPercentage() {
-            const percentage = ((imagesLoaded / totalImages) * 100).toFixed(0);  // Calculate percentage
-            document.getElementById('loading-percentage').textContent = percentage;  // Update display
-            if (imagesLoaded === totalImages) {  // Hide overlay when all images are loaded
-                document.getElementById('loading-overlay').style.display = 'none';
-            }
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            const images = document.querySelectorAll('img');  // Get all images on the page
-            totalImages = images.length;  // Set totalImages
-            if (totalImages === 0) {  // If there are no images, hide overlay immediately
-                document.getElementById('loading-overlay').style.display = 'none';
-            } else {
-                images.forEach(img => {
-                    img.addEventListener('load', () => {
-                        imagesLoaded++;  // Increment counter when an image finishes loading
-                        updateLoadingPercentage();  // Update display
-                    });
-                    // Trigger load event for cached images
-                    if (img.complete) {
-                        img.dispatchEvent(new Event('load'));
-                    }
-                });
-            }
-        });
-    </script>
-
 </head>
 
 <body>
-    <div id="loading-overlay">
-        <div id="loading-text">Loading <span id="loading-percentage">0</span>%</div>
-    </div>
+
     <div id="overlay">
         <div id="folder-list"></div>
     </div>
@@ -231,6 +191,7 @@
     <iframe id="hiddenFrame" name="hiddenFrame" width="0" height="0" style="display: none;"></iframe>
     <script>
         function handleCheck(index) {
+            const removeOnClick = document.getElementById('removeOnClick').checked;
             const container = document.getElementById('container-' + index);
             if (container.classList.contains('handled')) return;
 
@@ -248,12 +209,14 @@
                         container.classList.add('handled');
                         const resetButton = document.getElementById('reset-' + index);
                         resetButton.style.display = 'block';
+                        if (removeOnClick) container.remove();
                     }
                 });
         }
 
 
         function handleX(index) {
+            const removeOnClick = document.getElementById('removeOnClick').checked;
             const container = document.getElementById('container-' + index);
             if (container.classList.contains('handled')) return;
 
@@ -271,6 +234,7 @@
                         container.classList.add('handled');
                         const resetButton = document.getElementById('reset-' + index);
                         resetButton.style.display = 'block';
+                        if (removeOnClick) container.remove();
                     }
                 });
         }
