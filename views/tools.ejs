@@ -234,75 +234,10 @@ Tools page:
         let userUUID = document.getElementById("userUUID").value;
         let data;
         let doLongVersion = false;
-        if (userUUID == "") {
-            userUUID = await getUserID();
-            doLongVersion = true;
-        }
-        
-        if (userUUID != await getUserID() || doLongVersion) {
 
-            let sDateVal = document.getElementById("start-date").value;
-            let dateObj = {};
-            
-            const updateTimeRemaining = async () => {
-                // wait for the job to start
-                let waitCount = 0;
-                let jobStatus = await getJobStatus();
-                while (jobStatus == 'waiting' || jobStatus == 'done') {
-                    timeRemainingLabel.innerHTML = "Job in progress...";
-                    await waitSeconds(2);
-                    waitCount++;
-                    if (waitCount > 60) return; // wait for 2 minutes max
-                    jobStatus = await getJobStatus();
-                }
-                // wait for the job to start fetching image data
-                jobStatus = await getJobStatus();
-                while (!(jobStatus == 'fetching jobs')) {
-                    await waitSeconds(0.5);
-                    jobStatus = await getJobStatus();
-                }
-                // update the time remaining every second
-                while (true) {
-                    await waitSeconds(1);
-                    // let remainingTime = await getRemainingTime();
-                    // if (remainingTime == -1) break; // job is done. stop updating.
-                    jobStatus = await getJobStatus();
-                    if(jobStatus == 'done') {
-                        timeRemainingLabel.innerHTML = "Job complete";
-                        break;
-                    }
-                    // convert remaining time to hours, minutes, seconds
-                    let seconds = Math.floor(remainingTime / 1000);
-                    let minutes = Math.floor(seconds / 60);
-                    let hours = Math.floor(minutes / 60);
-                    minutes = minutes % 60;
-                    seconds = seconds % 60;
-                    if (minutes < 10) minutes = "0" + minutes;
-                    if (seconds < 10) seconds = "0" + seconds;
-                    if (minutes == 0) minutes = "00";
-                    if (seconds == 0) seconds = "00";
-                    hours = hours > 0 ? (hours + ":") : "";
-                    remainingTime = hours + minutes + ":" + seconds;
-                    timeRemainingLabel.innerHTML = "Time remaining: " + remainingTime;
-                }
-                timeRemainingLabel.innerHTML = "Job complete";
-            };
-            // initiate the time remaining update
-            updateTimeRemaining();
-            // initiate the job data request
-            if (sDateVal != "") {
-                dateObj.start = sDateVal;
-                dateObj.end = document.getElementById("end-date").value;
-                // console.log({ dateObj })
-                data = await getJobDataUser(userUUID, dateObj);
-                // data = await getJobDataUser(userUUID);
-            } else {
-                data = await getJobDataUser(userUUID);
-            }
-        } else {
+        
             data = await getThisUserJobsData();
             data = rewriteIdsToUrls(data);
-        }
         // console.log({ data });
         // parse the data into a table
         document.getElementById("result-area").innerHTML = makeLinksClickable(objToHTML(data));

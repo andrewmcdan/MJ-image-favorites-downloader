@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MJ Images Show</title>
+</head>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        width: 100vw;
+        height: 100vh;
+    }
+
+    #main-container {
+        width: 100vw;
+        height: 100vh;
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        justify-content: center;
+        align-items: center;
+        background-color: black;
+        display: flex;
+    }
+
+    .image {
+        position: absolute;
+        opacity: 1;
+        transition: opacity 0.5s ease-in-out;
+    }
+
+    .hidden {
+        opacity: 0;
+    }
+
+    #top-nav {
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        width: 100vw;
+        height: 30px;
+        background-color: rgba(138, 138, 138, 0.747);
+        z-index: 1000;
+        color: rgb(0, 0, 0);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 20px;
+    }
+
+    .numberInput {
+        width: 50px;
+        height: 20px;
+        margin-left: 10px;
+        margin-right: 10px;
+        font-size: 16px;
+    }
+
+    .top-nav-button {
+        background-color: #d8d8d8;
+        border: 1px solid #707070;
+        color: white;
+        padding: 3px 3px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 1px 1px 1px 1px;
+        cursor: pointer;
+        color: rgb(0, 0, 0);
+    }
+
+    #logger-container{
+        position: absolute;
+        bottom: 0px;
+        left: 0px;
+        width: 100vw;
+        height: 100px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #logger-container .logger {
+        position: relative;
+        bottom: 2px;
+        width: 50%;
+        height: 100%;
+        overflow-y: hidden;
+        background-color: rgba(138, 138, 138, 0.747);
+        color: rgb(0, 0, 0);
+        font-size: 16px;
+        border-radius: 20px;
+        border: black 1px solid;
+    }
+
+    #logger-text {
+        overflow-y: scroll;
+        height: 100%;
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+</style>
+
+<body>
+    <div id="top-nav" class="hidden">
+        <!--<button class="top-nav-button">Button1</button>
+        <button class="top-nav-button">Button2</button>
+        <button class="top-nav-button">Button3</button>-->
+        <label for="updateInterval">Update Interval (seconds):</label>
+        <input type="number" id="updateInterval" class="numberInput" name="updateInterval" min="2" max="120" step="1"
+            value="3">
+        <label for="fadeDuration">Fade Duration (seconds):</label>
+        <input type="number" id="fadeDuration" class="numberInput" name="fadeDuration" min="0.25" max="10" step="0.25"
+            value="0.5">
+    </div>
+    <div id="main-container">
+    </div>
+    <div id="logger-container" class="hiddden">
+        <div class="logger">
+            <div id="logger-text">
+            </div>
+        </div>
+    </div>
+    <script>
+        class ImageInfo {
+            constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height) {
+                this.parent_id = parent_id;
+                this.grid_index = grid_index;
+                this.enqueue_time = enqueue_time;
+                this.fullCommand = fullCommand;
+                // this.fullCommand = fullCommand.replace(/'/g, "\\'");
+                this.width = width;
+                this.height = height;
+                this.storageLocation = "";
+                this.downloaded = false;
+                this.doNotDownload = false;
+            }
+
+            get id() {
+                return this.parent_id + '_' + this.grid_index;
+            }
+            get urlFull() {
+                return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.png`;
+            }
+            get urlSmall() {
+                return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_32_N.webp`;
+            }
+            get urlMedium() {
+                return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_384_N.webp`;
+            }
+            get urlAlt() {
+                return `https://storage.googleapis.com/dream-machines-output/${this.parent_id}/0_${this.grid_index}.png`;
+            }
+            get urlParentGrid() {
+                return `https://cdn.midjourney.com/${this.parent_id}/grid_0.webp`;
+            }
+        }
+        let getLogsFromServer = null;
+        function loggerDelete(id){
+                fetch('/loggerDelete/' + id)
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    getLogsFromServer();
+                });
+            }
+        (async () => {
+            // top bar hide/show
+            let navbar = document.getElementById('top-nav');
+            let hideNavbarTimeout;
+            function showNavbar() { navbar.classList.remove('hidden'); }
+            function hideNavbar() { navbar.classList.add('hidden'); }
+            function resetHideNavbarTimeout() { clearTimeout(hideNavbarTimeout); hideNavbarTimeout = setTimeout(hideNavbar, 10000); }
+            document.body.addEventListener('mousemove', () => { showNavbar(); resetHideNavbarTimeout(); });
+            document.body.addEventListener('mouseleave', () => { resetHideNavbarTimeout(); });
+
+            function updateFadeTime(newTime) {
+                let images = document.getElementsByClassName('image');
+                for (let i = 0; i < images.length; i++) {
+                    images[i].style.transition = `opacity ${newTime}s ease-in-out`;
+                }
+            }
+            document.getElementById('fadeDuration').addEventListener('change', (event) => {
+                if((document.getElementById('updateInterval').value / 4) < event.target.value) {
+                    document.getElementById('updateInterval').value = event.target.value * 4;
+                    setUpdateInterval(event.target.value * 4);
+                }
+                updateFadeTime(event.target.value);
+            });
+            document.getElementById('updateInterval').addEventListener('change', (event) => {
+                if((document.getElementById('fadeDuration').value * 4) > event.target.value) {
+                    document.getElementById('fadeDuration').value = event.target.value / 4;
+                    updateFadeTime(event.target.value / 4);
+                }
+                setUpdateInterval(event.target.value);
+            });
+
+            let loggerText = document.getElementById('logger-text');
+
+            getLogsFromServer = () => {
+                fetch('/loggerGet/10/false') // get the 10 most recent logs, do not delete them
+                .then(response => response.json())
+                .then(data => {
+                    // parse some data
+                    console.log(data);
+                    if(data.length == 0){
+                        document.getElementById('logger-container').classList.add('hidden');
+                    }else{
+                        document.getElementById('logger-container').classList.remove('hidden');
+                        let innerHTML = '';
+                        for(let i = 0; i < data.length; i++){
+                            let timeStamp = new Date(data[i].time);
+                            let message = "";
+                            if(typeof data[i].message == 'string') message = data[i].message;
+                            else message = JSON.stringify(data[i].message);
+                            innerHTML += `<span style="color: #00ff00;">${timeStamp.toLocaleString()}</span> - <span style="color: #0000ff;">${data[i].message}</span> - `;
+                            innerHTML += `<span style="color: red; text-decoration: underline;" onclick="loggerDelete(${data[i].id})">Delete Log Entry</span><br><br>`;
+                        }
+                        loggerText.innerHTML = innerHTML;
+                        // loggerText.scrollTop = loggerText.scrollHeight;
+                    }
+                });
+            }
+
+            getLogsFromServer();
+            setInterval(getLogsFromServer, 10000);
+
+            ////////////////////////////////
+            const mainContainer = document.getElementById('main-container');
+
+            let image1 = document.createElement('img');
+            image1.className = 'image';
+            image1.style.height = '100%';
+            mainContainer.appendChild(image1);
+
+            let image2 = document.createElement('img');
+            image2.className = 'image hidden'; // Initially hidden
+            image2.style.height = '100%';
+            mainContainer.appendChild(image2);
+
+            let image3 = document.createElement('img');
+            image3.className = 'image hidden'; // Initially hidden
+            image3.style.height = '100%';
+            mainContainer.appendChild(image3);
+
+            let currentImage = image1;
+            let nextImage = image2;
+            let prevImage = image3;
+
+            let imageEls = [image1, image2, image3];
+            let imageElsIndex = 0;
+
+            let intervalId;
+            let updateInterval = 10;
+
+            document.getElementById('updateInterval').value = updateInterval;
+
+            function setUpdateInterval(newInterval) {
+                clearInterval(intervalId); // Clear the existing interval
+                updateInterval = newInterval; // Set the new interval
+
+                document.getElementById('updateInterval').value = updateInterval;
+
+                // Set the new interval
+                intervalId = setInterval(updateImages, updateInterval * 1000);
+            }
+
+            let updateIntervalExceedCount = 0;
+
+            async function updateImages() {
+                let startTime = performance.now();
+                let randomImage = await fetch('/randomUUID');
+                let randomImageText = await randomImage.text();
+                let randomImageObj = JSON.parse(randomImageText.substring(randomImageText.indexOf('{'), randomImageText.lastIndexOf('}') + 1));
+                let imageInfo = new ImageInfo(randomImageObj.parent_id, randomImageObj.grid_index, randomImageObj.enqueue_time, randomImageObj.fullCommand, randomImageObj.width, randomImageObj.height);
+
+                imageEls[imageElsIndex++].src = imageInfo.urlFull;
+                if(imageElsIndex >= imageEls.length) imageElsIndex = 0;
+                imageEls[imageElsIndex++].classList.remove('hidden');
+                if(imageElsIndex >= imageEls.length) imageElsIndex = 0;
+                imageEls[imageElsIndex].classList.add('hidden');
+                let endTime = performance.now();
+                if((endTime - startTime) > (updateInterval * 1000)){
+                    console.log(`Image ${imageInfo.id} took ${(endTime - startTime) / 1000} seconds to load, which is longer than the update interval of ${updateInterval} seconds.`);
+                    updateIntervalExceedCount++;
+                    if(updateIntervalExceedCount > 5){
+                        console.log(`The update interval has been increased to ${parseInt(updateInterval) + 1} seconds.`);
+                        setUpdateInterval(parseInt(updateInterval) + 1);
+                        updateIntervalExceedCount = 0;
+                    }
+                }
+            }
+
+            // Start the interval with the initial value
+            setUpdateInterval(updateInterval);
+            updateImages();
+            updateImages();
+        })();
+
+
+    </script>
+</body>
+
+</html>
