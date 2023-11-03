@@ -41,16 +41,17 @@ const port = 3000;
 app.use(bodyParser.json({ limit: '100mb' }));
 const pgClient = require('pg');
 
-let updateDB = false;
+let updateDB = true;
 
 class DB_Error extends Error {
     constructor(message) {
         super(message);
         this.name = "DB_Error";
-        Error.captureStackTrace && Error.captureStackTrace(this, DB_Error);
-        if(systemLogger) systemLogger.log("DB_Error", message);
+        Error.captureStackTrace?.(this, DB_Error);
+        systemLogger?.log("DB_Error", message);
     }
 }
+
 
 class SystemLogger {
     constructor() {
@@ -680,6 +681,17 @@ function validatePNG(imagePath) {
 }
 
 systemLogger.log("Server started");
+systemLogger.log("a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. ");
+systemLogger.log("an entry with objects", { a: 1, b: 2, c: 3 }, { d: 4, e: 5, f: 6 });
+systemLogger.log("an entry with arrays", [1, 2, 3], [4, 5, 6]);
+systemLogger.log("an entry with strings", "string1", "string2");
+systemLogger.log("an entry with numbers", 1, 2, 3, 4, 5, 6);
+systemLogger.log("an entry with booleans", true, false, true, false);
+systemLogger.log("an entry with undefined", undefined);
+systemLogger.log("an entry with null", null);
+systemLogger.log("an entry with a function", function () { console.log("hello"); });
+systemLogger.log("an entry with a class", new ImageInfo("parent_id", 0, 0, "fullCommand", 0, 0));
+systemLogger.log("an entry with a class", new DB_Error("this is an error"));
 
 process.stdin.on('data', function (data) {
     console.log(data.toString());
