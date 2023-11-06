@@ -86,15 +86,12 @@ class SystemLogger {
     }
 
     getMostRecentLog(remove = false) {
-        if (this.logArr.length > 0) {
-            let logTemp = this.logArr[this.logArr.length - 1];
-            if (remove) {
-                this.logArr.pop();
-            }
-            return logTemp;
-        } else {
-            return null;
+        if(this.logArr.length === 0) return null;
+        let logTemp = this.logArr[this.logArr.length - 1];
+        if (remove) {
+            this.logArr.pop();
         }
+        return logTemp;
     }
 
     getRecentEntries(numberOfEntries, remove = false) {
@@ -447,10 +444,8 @@ app.get('/show/:uuid', async (req, res) => {
     const { uuid } = req.params;
     if (uuid === "" || uuid === undefined) res.render('show');
     else {
-        // const index = imageDataMap.get(uuid);
         console.log("looking up uuid: ", uuid);
         const image = await lookupImageUUID_DB(uuid);
-        // console.log("index: ", image);
         const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
         updateTimesSelectedPlusOne_DB(uuid);
         res.send(`<a href="/randomUUID"><img src="${imageInfo.urlFull}" /></a><script type="application/json">${JSON.stringify(imageInfo)}</script>`);
@@ -459,11 +454,7 @@ app.get('/show/:uuid', async (req, res) => {
 
 // selects a random image from the database and redirects to the show page for that image
 app.get('/randomUUID', async (req, res) => {
-    // let max = await countImages_DB();
-    // const imageInfo = await lookupImagesIndex_DB((Math.floor(Math.random() * max) + 1));
     const imageInfo = await getRandomImage_DB();
-    // console.log(imageInfo);
-    // const imageInfo = imageData[Math.floor(Math.random() * imageData.length)];
     res.redirect(`/show/${imageInfo.uuid}`);
 });
 
