@@ -28,7 +28,6 @@
  * 4. add a page of general tools. ie. revering an image uuid to the original prompt / user (url, name, etc.)
  */
 //
-const AdmZip = require('adm-zip');
 const fs = require('fs');
 const axios = require('axios');
 const path = require('path');
@@ -40,10 +39,9 @@ const app = express();
 const port = 3001;
 app.use(bodyParser.json({ limit: '100mb' }));
 const pgClient = require('pg');
-
 const puppeteer = require('puppeteer-extra');
-const cheerio = require('cheerio');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const { setTimeout } = require('timers/promises');
 puppeteer.use(StealthPlugin());
 
 let updateDB = true;
@@ -102,6 +100,7 @@ class SystemLogger {
 
     getRecentEntries(numberOfEntries, remove = false) {
         let entries = [];
+        if(typeof numberOfEntries === "string") numberOfEntries = parseInt(numberOfEntries);
         numberOfEntries = Math.min(numberOfEntries, this.logArr.length);
         if (remove) {
             for (let i = 0; i < numberOfEntries; i++) {
@@ -300,13 +299,13 @@ class PuppeteerClient{
         
     }
 
-    async getUsersJobsData(){
+    getUsersJobsData(){
         return new Promise(async (resolve, reject) => {
             if(!this.loggedIntoMJ)reject("Not logged into MJ");
             if(this.loginInProgress)reject("Login in progress");
             await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
 
-            let data = await this.page.evaluate(async() => {
+            let data = await this.page.evaluate(async () => {
                 const getUserUUID = async () => {
                     let homePage = await fetch("https://www.midjourney.com/imagine");
                     let homePageText = await homePage.text();
@@ -367,7 +366,40 @@ class PuppeteerClient{
             });
             resolve(data);
         });
-    }    
+    }
+
+    getSingleJobStatus(jobID){
+        return new Promise(async (resolve, reject) => {
+            if(!this.loggedIntoMJ)reject("Not logged into MJ");
+            if(this.loginInProgress)reject("Login in progress");
+            await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
+
+            let data = await this.page.evaluate(async (jobID) => {
+                let res1 = await fetch("https://www.midjourney.com/api/app/job-status", {
+                    "headers": {
+                        "accept": "*/*",
+                        "accept-language": "en-US,en;q=0.9",
+                        "content-type": "application/json",
+                        "sec-ch-ua": "\"Google Chrome\";v=\"119\", \"Chromium\";v=\"119\", \"Not?A_Brand\";v=\"24\"",
+                        "sec-ch-ua-mobile": "?0",
+                        "sec-ch-ua-platform": "\"Windows\"",
+                        "sec-fetch-dest": "empty",
+                        "sec-fetch-mode": "cors",
+                        "sec-fetch-site": "same-origin",
+                        "x-csrf-protection": "1",
+                        "Referer": "https://www.midjourney.com/imagine",
+                        "Referrer-Policy": "origin-when-cross-origin"
+                    },
+                    "body": "{\"jobIds\":[\""+jobID+"\"]}",
+                    "method": "POST"
+                    });
+                let res2 = await res1.json();
+                if(res2.length > 0) return res2[0];
+                else return null;
+            }, jobID);
+            resolve(data);
+        });
+    }
 };
 
 class ServerStatusMonitor{
@@ -394,223 +426,202 @@ class ServerStatusMonitor{
     }                   
 };
 
-const puppeteerClient = new PuppeteerClient();
-const systemLogger = new SystemLogger();
-const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient);
-
-const dbClient = new pgClient.Client({
-    user: 'mjuser',
-    host: 'postgresql.lan',
-    database: 'mjimages',
-    password: 'mjImagesPassword',
-    port: 5432,
-});
-dbClient.connect();
-
-
-const insertImage_DB = async (image, index) => {
-    // find if image exists in database
-    // if it does, update it
-    if (await lookupImageUUID_DB(image.id) !== undefined) {
-        await updateImage_DB(image);
-        return;
+class DatabaseManager{
+    constructor(){
+        this.dbClient = new pgClient.Client({
+            user: 'mjuser',
+            host: 'postgresql.lan',
+            database: 'mjimages',
+            password: 'mjImagesPassword',
+            port: 5432,
+        });
+        this.dbClient.connect();
     }
-    // if it doesn't, insert it
-    let res;
-    try {
-        res = await dbClient.query(
-            `INSERT INTO images (uuid, parent_uuid, grid_index, enqueue_time, full_command, width, height, storage_location, downloaded, do_not_download, processed, index) 
-         VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-            [
-                image.id,
-                image.parent_id,
-                image.grid_index,
-                image.enqueue_time,
-                image.fullCommand,
-                image.width,
-                image.height,
-                image.storageLocation,
-                image.downloaded,
-                image.doNotDownload,
-                image.processed,
-                index
-            ]
-        );
-    } catch (err) {
-        console.log({ err });
-        // console.log(JSON.stringify(image, null, 4));
-        // process.exit();
-        systemLogger.log("Error inserting image into database", err, image);
-    }
-    return res;
-}
 
-const lookupImageUUID_DB = async (uuid) => {
-    try {
-        const res = await dbClient.query(
-            `SELECT * FROM images WHERE uuid = $1`,
-            [uuid]
-        );
-
-        if (res.rows.length > 0) {
-            return res.rows[0];
+    insertImage = async (image, index) => {
+        // find if image exists in database
+        // if it does, update it
+        if (await lookupImageUUID_DB(image.id) !== undefined) {
+            await updateImage_DB(image);
+            return;
         }
-        return undefined;
-    } catch (err) {
-        console.log({ err });
-        systemLogger.log("Error looking up image in database", err, uuid);
-        return null;
-    }
-}
-
-const getRandomImage_DB = async (downloadedOnly = false) => {
-    try {
+        // if it doesn't, insert it
         let res;
-        if(downloadedOnly) {
-            res = await dbClient.query(
-                `SELECT * FROM images WHERE downloaded = true ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`
+        try {
+            res = await this.dbClient.query(
+                `INSERT INTO images (uuid, parent_uuid, grid_index, enqueue_time, full_command, width, height, storage_location, downloaded, do_not_download, processed, index) 
+             VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                [
+                    image.id,
+                    image.parent_id,
+                    image.grid_index,
+                    image.enqueue_time,
+                    image.fullCommand,
+                    image.width,
+                    image.height,
+                    image.storageLocation,
+                    image.downloaded,
+                    image.doNotDownload,
+                    image.processed,
+                    index
+                ]
             );
-        }else{
-            res = await dbClient.query(
-                `SELECT * FROM images ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`
+        } catch (err) {
+            new DB_Error("Error inserting image into database. Image ID: " + image.id);
+            return null;
+        }
+        return res;
+    }
+
+    lookupByUUID = async (uuid) => {
+        try {
+            const res = await this.dbClient.query(
+                `SELECT * FROM images WHERE uuid = $1`,
+                [uuid]
             );
+    
+            if (res.rows.length > 0) {
+                return res.rows[0];
+            }
+            return undefined;
+        } catch (err) {
+            new DB_Error("Error looking up image in database. Image ID: " + uuid);
+            return null;
         }
-        if (res.rows.length > 0) {
-            return res.rows[0];
+    }
+    getRandomImage = async (downloadedOnly = false) => {
+        try {
+            let res;
+            if(downloadedOnly) {
+                res = await this.dbClient.query(
+                    `SELECT * FROM images WHERE downloaded = true ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`
+                );
+            }else{
+                res = await this.dbClient.query(
+                    `SELECT * FROM images ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`
+                );
+            }
+            if (res.rows.length > 0) {
+                return res.rows[0];
+            }
+            return undefined;
+        } catch (err) {
+            new DB_Error("Error looking up random image in database");
+            return null;
         }
-        return undefined;
-    } catch (err) {
-        console.log({ err });
-        systemLogger.log("Error looking up random image in database", err);
-        return null;
     }
-}
-
-const lookupImagesIndex_DB = async (index) => {
-    try {
-        const res = await dbClient.query(
-            `SELECT * FROM images WHERE id = $1`,
-            [index]
-        );
-        if (res.rows.length > 0) {
-            return res.rows[0];
+    lookupImageByIndex = async (index) => {
+        try {
+            const res = await this.dbClient.query(
+                `SELECT * FROM images WHERE id = $1`,
+                [index]
+            );
+            if (res.rows.length == 1) {
+                return res.rows[0];
+            }else if(res.rows.length > 1){
+                new DB_Error("Error looking up image in database. Too many rows returned. Image index: " + index);
+            }else if(res.rows.length == 0){
+                return undefined;
+            }
+            return undefined;
+        } catch (err) {
+            new DB_Error("Error looking up image in database. Image index: " + index);
+            return null;
         }
-        return undefined;
-    } catch (err) {
-        console.log({ err });
-        systemLogger.log("Error looking up image in database", err, index);
-        return null;
     }
-}
-
-const updateImage_DB = async (image) => {
-    try {
-        const res = await dbClient.query(
-            `UPDATE images SET 
-            parent_uuid = $1,
-            grid_index = $2,
-            enqueue_time = $3,
-            full_command = $4,
-            width = $5,
-            height = $6,
-            storage_location = $7,
-            downloaded = $8,
-            do_not_download = $9,
-            processed = $10
-         WHERE uuid = $11`,
-            [
-                image.parent_id,
-                image.grid_index,
-                image.enqueue_time,
-                image.fullCommand,
-                image.width,
-                image.height,
-                image.storageLocation,
-                image.downloaded,
-                image.doNotDownload,
-                image.processed,
-                image.id
-            ]
-        );
-        return res;
-    } catch (err) {
-        console.log({ err });
-        // console.log(JSON.stringify(image, null, 4));
-        systemLogger.log("Error updating image in database", err, image);
-        return null;
+    updateImage = async (image) => {
+        try {
+            const res = await this.dbClient.query(
+                `UPDATE images SET 
+                parent_uuid = $1,
+                grid_index = $2,
+                enqueue_time = $3,
+                full_command = $4,
+                width = $5,
+                height = $6,
+                storage_location = $7,
+                downloaded = $8,
+                do_not_download = $9,
+                processed = $10
+             WHERE uuid = $11`,
+                [
+                    image.parent_id,
+                    image.grid_index,
+                    image.enqueue_time,
+                    image.fullCommand,
+                    image.width,
+                    image.height,
+                    image.storageLocation,
+                    image.downloaded,
+                    image.doNotDownload,
+                    image.processed,
+                    image.id
+                ]
+            );
+            return res;
+        } catch (err) {
+            new DB_Error("Error updating image in database. Image ID: " + image.id);
+            return null;
+        }
     }
-}
-
-const deleteImage_DB = async (uuid) => {
-    try {
-        const res = await dbClient.query(
-            `DELETE FROM images WHERE uuid = $1`,
-            [uuid]
-        );
-        return res;
-    } catch (err) {
-        console.log({ err });
-        systemLogger.log("Error deleting image from database", err, uuid);
-        return null;
+    deleteImage = async (uuid) => {
+        try {
+            const res = await this.dbClient.query(
+                `DELETE FROM images WHERE uuid = $1`,
+                [uuid]
+            );
+            return res;
+        } catch (err) {
+            new DB_Error("Error deleting image from database. Image ID: " + uuid);
+            return null;
+        }
     }
-}
-
-const countImages_DB = async () => {
-    try {
-        const res = await dbClient.query(
-            `SELECT COUNT(*) FROM images`
-        );
-        return res.rows[0].count;
-    } catch (err) {
-        console.log({ err });
-        systemLogger.log("Error counting images in database", err);
-        return null;
+    countImagesTotal = async () => {
+        try {
+            const res = await this.dbClient.query(
+                `SELECT COUNT(*) FROM images`
+            );
+            return res.rows[0].count;
+        } catch (err) {
+            new DB_Error("Error counting images in database");
+            return null;
+        }
     }
-}
-
-const setImageProcessed_DB = async (uuid, valueBool = true) => {
-    if(typeof valueBool === "string") valueBool = (valueBool === "true");
-    if(typeof valueBool !== "boolean") throw new Error("valueBool must be a boolean");
-    try {
-        const res = await dbClient.query(
-            `UPDATE images SET processed = $1 WHERE uuid = $2`,
-            [valueBool, uuid]
-        );
-        return res;
-    } catch (err) {
-        console.log({ err });
-        systemLogger.log("Error setting image processed in database", err, uuid);
-        return null;
+    setImageProcessed = async (uuid, valueBool = true) => {
+        if(typeof valueBool === "string") valueBool = (valueBool === "true");
+        if(typeof valueBool !== "boolean") throw new Error("valueBool must be a boolean");
+        try {
+            const res = await this.dbClient.query(
+                `UPDATE images SET processed = $1 WHERE uuid = $2`,
+                [valueBool, uuid]
+            );
+            return res;
+        } catch (err) {
+            new DB_Error("Error setting image processed in database. Image ID: " + uuid);
+            return null;
+        }
     }
-}
-
-const updateTimesSelectedPlusOne_DB = async (uuid) => {
-    try {
-        // get times_selected for uuid
-        let res = await dbClient.query(
-            `SELECT times_selected FROM images WHERE uuid = $1`,
-            [uuid]
-        );
-        let timesSelected = res.rows[0].times_selected;
-        // add 1 to it
-        timesSelected++;
-        // update times_selected for uuid
-        res = await dbClient.query(
-            `UPDATE images SET times_selected = $1 WHERE uuid = $2`,
-            [timesSelected, uuid]
-        );
-    } catch (err) {
-        console.log({ err });
-        systemLogger.log("Error updating times_selected in database", err, uuid);
-        return null;
+    updateTimesSelectedPlusOne = async (uuid) => {
+        try {
+            // get times_selected for uuid
+            let res = await this.dbClient.query(
+                `SELECT times_selected FROM images WHERE uuid = $1`,
+                [uuid]
+            );
+            let timesSelected = res.rows[0].times_selected;
+            // add 1 to it
+            timesSelected++;
+            // update times_selected for uuid
+            res = await this.dbClient.query(
+                `UPDATE images SET times_selected = $1 WHERE uuid = $2`,
+                [timesSelected, uuid]
+            );
+        } catch (err) {
+            new DB_Error("Error updating times_selected in database. Image ID: " + uuid);
+            return null;
+        }
     }
-}
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-// Serve static files from the "public" directory
-app.use(express.static('public'));
-app.use(express.static('output'));
+};
 
 class ImageInfo {
     constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height) {
@@ -655,21 +666,313 @@ class ImageInfo {
     get urlParentGrid() {
         return `https://cdn.midjourney.com/${this.parent_id}/grid_0.webp`;
     }
-}
+};
 
+class DownloadManager{
+    constructor(DatabaseManager = null, SystemLogger = null){
+        this.downloadLocation = "output";
+        this.timeToDownload = 0; // minutes past midnight
+        this.runEnabled = false;
+        this.downloadInProgress = false;
+        this.runTimeout = null;
+        this.dbClient = DatabaseManager;
+        this.systemLogger = SystemLogger;
+    }
+
+    downloadImage(url) {
+        return new Promise(async (resolve, reject) => {
+            const response = await axios.get(url, { responseType: 'stream' });
+            if(response.status !== 200) {reject("Bad response code: " + response.status); return;}
+            if(response.headers['content-type'] !== "image/png") {reject("Bad content type: " + response.headers['content-type']);return;}
+            if(response.headers['content-length'] < 1000) {reject("Bad content length: " + response.headers['content-length']); return;}
+            let contentLength = response.headers['content-length'];
+            if(!fs.existsSync(this.downloadLocation)) fs.mkdirSync(this.downloadLocation, { recursive: true });
+            // https://storage.googleapis.com/dream-machines-output/53ae5df3-edef-4adb-a4c2-586de79edfe9/0_0.png
+            let splitImage = url.split('/');
+            splitImage = splitImage[splitImage.length - 2] + splitImage[splitImage.length - 1];
+            response.data.pipe(fs.createWriteStream(path.join(this.downloadLocation, splitImage)));
+            let fileSize = 0;
+            let file = fs.readFileSync(path.join(this.downloadLocation, splitImage));
+            fileSize = file.length;
+            if(fileSize !== contentLength) {reject("File size mismatch: " + fileSize + " != " + contentLength);return;}
+            resolve({fileSize: fileSize, storageLocation: path.join(this.downloadLocation, splitImage)});
+        });
+    }
+
+    start(){
+        let now = new Date();
+        let timeToDownload = new Date(now.getFullYear(), now.getMonth(), now.getDate(), this.timeToDownload / 60, this.timeToDownload % 60, 0, 0);
+        let timeUntilDownload = timeToDownload - now;
+        if(timeUntilDownload < 0) timeUntilDownload += 1000 * 60 * 60 * 24;
+        this.runTimeout = setTimeout(this.run, timeUntilDownload);
+    }
+
+    async run(){
+        let imageCount = await dbClient.countImagesTotal();
+        for(let i = 0; i < imageCount; i++){
+            let image = await dbClient.lookupImageByIndex(i);
+            if(image === undefined) continue;
+            console.log(image); // TODO: remove this
+            if(i>10) break;
+            // if(image.downloaded) continue; // don't need to download it if it's already downloaded
+            this.downloadInProgress = true;
+            this.downloadImage(image.urlFull).then(async (obj) => {
+                image.downloaded = true;
+                image.storageLocation = obj.storageLocation;
+                await dbClient.updateImage(image);
+                this.downloadInProgress = false;
+            }).catch((err) => {
+                console.log(err); // TODO: remove this
+                this.downloadImage(image.urlAlt).then(async (obj) => {
+                    image.downloaded = true;
+                    image.storageLocation = obj.storageLocation;
+                    await dbClient.updateImage(image);
+                }).catch((err) => {
+                    console.log(err);
+                    this.systemLogger.log("Error downloading image", err, image);
+                }).finally(() => {
+                    this.downloadInProgress = false;
+                });
+            });
+            while(this.downloadInProgress){
+                await waitSeconds(0.1);
+            }
+        }
+        this.start();
+    }
+
+};
+
+const puppeteerClient = new PuppeteerClient();
+const systemLogger = new SystemLogger();
+const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient);
+const imageDB = new DatabaseManager();
+const downloadManager = new DownloadManager(imageDB, systemLogger);
+// const dbClient = new pgClient.Client({
+//     user: 'mjuser',
+//     host: 'postgresql.lan',
+//     database: 'mjimages',
+//     password: 'mjImagesPassword',
+//     port: 5432,
+// });
+// dbClient.connect();
+
+/*
+const insertImage_DB = async (image, index) => {
+    // find if image exists in database
+    // if it does, update it
+    if (await lookupImageUUID_DB(image.id) !== undefined) {
+        await updateImage_DB(image);
+        return;
+    }
+    // if it doesn't, insert it
+    let res;
+    try {
+        res = await dbClient.query(
+            `INSERT INTO images (uuid, parent_uuid, grid_index, enqueue_time, full_command, width, height, storage_location, downloaded, do_not_download, processed, index) 
+         VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            [
+                image.id,
+                image.parent_id,
+                image.grid_index,
+                image.enqueue_time,
+                image.fullCommand,
+                image.width,
+                image.height,
+                image.storageLocation,
+                image.downloaded,
+                image.doNotDownload,
+                image.processed,
+                index
+            ]
+        );
+    } catch (err) {
+        console.log({ err });
+        // console.log(JSON.stringify(image, null, 4));
+        // process.exit();
+        systemLogger.log("Error inserting image into database", err, image);
+    }
+    return res;
+}*/
+
+/*
+const lookupImageUUID_DB = async (uuid) => {
+    try {
+        const res = await dbClient.query(
+            `SELECT * FROM images WHERE uuid = $1`,
+            [uuid]
+        );
+
+        if (res.rows.length > 0) {
+            return res.rows[0];
+        }
+        return undefined;
+    } catch (err) {
+        console.log({ err });
+        systemLogger.log("Error looking up image in database", err, uuid);
+        return null;
+    }
+}*/
+
+/*
+const getRandomImage_DB = async (downloadedOnly = false) => {
+    try {
+        let res;
+        if(downloadedOnly) {
+            res = await dbClient.query(
+                `SELECT * FROM images WHERE downloaded = true ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`
+            );
+        }else{
+            res = await dbClient.query(
+                `SELECT * FROM images ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`
+            );
+        }
+        if (res.rows.length > 0) {
+            return res.rows[0];
+        }
+        return undefined;
+    } catch (err) {
+        console.log({ err });
+        systemLogger.log("Error looking up random image in database", err);
+        return null;
+    }
+}*/
+
+/*
+const lookupImagesIndex_DB = async (index) => {
+    try {
+        const res = await dbClient.query(
+            `SELECT * FROM images WHERE id = $1`,
+            [index]
+        );
+        if (res.rows.length > 0) {
+            return res.rows[0];
+        }
+        return undefined;
+    } catch (err) {
+        console.log({ err });
+        systemLogger.log("Error looking up image in database", err, index);
+        return null;
+    }
+}*/
+
+/*
+const updateImage_DB = async (image) => {
+    try {
+        const res = await dbClient.query(
+            `UPDATE images SET 
+            parent_uuid = $1,
+            grid_index = $2,
+            enqueue_time = $3,
+            full_command = $4,
+            width = $5,
+            height = $6,
+            storage_location = $7,
+            downloaded = $8,
+            do_not_download = $9,
+            processed = $10
+         WHERE uuid = $11`,
+            [
+                image.parent_id,
+                image.grid_index,
+                image.enqueue_time,
+                image.fullCommand,
+                image.width,
+                image.height,
+                image.storageLocation,
+                image.downloaded,
+                image.doNotDownload,
+                image.processed,
+                image.id
+            ]
+        );
+        return res;
+    } catch (err) {
+        console.log({ err });
+        // console.log(JSON.stringify(image, null, 4));
+        systemLogger.log("Error updating image in database", err, image);
+        return null;
+    }
+}*/
+
+/*
+const deleteImage_DB = async (uuid) => {
+    try {
+        const res = await dbClient.query(
+            `DELETE FROM images WHERE uuid = $1`,
+            [uuid]
+        );
+        return res;
+    } catch (err) {
+        console.log({ err });
+        systemLogger.log("Error deleting image from database", err, uuid);
+        return null;
+    }
+}*/
+
+/*
+const countImages_DB = async () => {
+    try {
+        const res = await dbClient.query(
+            `SELECT COUNT(*) FROM images`
+        );
+        return res.rows[0].count;
+    } catch (err) {
+        console.log({ err });
+        systemLogger.log("Error counting images in database", err);
+        return null;
+    }
+}*/
+
+/*
+const setImageProcessed_DB = async (uuid, valueBool = true) => {
+    if(typeof valueBool === "string") valueBool = (valueBool === "true");
+    if(typeof valueBool !== "boolean") throw new Error("valueBool must be a boolean");
+    try {
+        const res = await dbClient.query(
+            `UPDATE images SET processed = $1 WHERE uuid = $2`,
+            [valueBool, uuid]
+        );
+        return res;
+    } catch (err) {
+        console.log({ err });
+        systemLogger.log("Error setting image processed in database", err, uuid);
+        return null;
+    }
+}*/
+
+/*
+const updateTimesSelectedPlusOne_DB = async (uuid) => {
+    try {
+        // get times_selected for uuid
+        let res = await dbClient.query(
+            `SELECT times_selected FROM images WHERE uuid = $1`,
+            [uuid]
+        );
+        let timesSelected = res.rows[0].times_selected;
+        // add 1 to it
+        timesSelected++;
+        // update times_selected for uuid
+        res = await dbClient.query(
+            `UPDATE images SET times_selected = $1 WHERE uuid = $2`,
+            [timesSelected, uuid]
+        );
+    } catch (err) {
+        console.log({ err });
+        systemLogger.log("Error updating times_selected in database", err, uuid);
+        return null;
+    }
+}*/
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+// Serve static files from the "public" directory
+app.use(express.static('public'));
+app.use(express.static('output'));
 
 let imageData = [];
 
 
-async function downloadImages(images, location) {
-    for (let image of images) {
-        const response = await axios.get(image, { responseType: 'stream' });
-        // https://storage.googleapis.com/dream-machines-output/53ae5df3-edef-4adb-a4c2-586de79edfe9/0_0.png
-        let splitImage = image.split('/');
-        splitImage = splitImage[splitImage.length - 2] + splitImage[splitImage.length - 1];
-        response.data.pipe(fs.createWriteStream(path.join(location, splitImage)));
-    }
-}
 
 
 /***********************************
@@ -743,7 +1046,7 @@ app.get('/updateDB', async (req, res) => {
         console.log("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
         for (let i = 0; i < imageData.length; i++) {
             // await insertUUID(imageData[i].id, i);
-            if (updateDB) await insertImage_DB(imageData[i], i);
+            if (updateDB) await imageDB.insertImage(imageData[i], i);
         }
         console.log("Done updating database");
     }).catch((err) => {
@@ -768,16 +1071,16 @@ app.get('/show/:uuid', async (req, res) => {
     if (uuid === "" || uuid === undefined) res.render('show');
     else {
         console.log("looking up uuid: ", uuid);
-        const image = await lookupImageUUID_DB(uuid);
+        const image = await imageDB.lookupByUUID(uuid);
         const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
-        updateTimesSelectedPlusOne_DB(uuid);
+        imageDB.updateTimesSelectedPlusOne(uuid);
         res.send(`<a href="/randomUUID"><img src="${imageInfo.urlFull}" /></a><script type="application/json">${JSON.stringify(imageInfo)}</script>`);
     }
 });
 
 // selects a random image from the database and redirects to the show page for that image
 app.get('/randomUUID', async (req, res) => {
-    const imageInfo = await getRandomImage_DB();
+    const imageInfo = await imageDB.getRandomImage();
     res.redirect(`/show/${imageInfo.uuid}`);
 });
 
