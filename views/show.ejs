@@ -221,9 +221,11 @@
                         for(let i = 0; i < data.length; i++){
                             let timeStamp = new Date(data[i].time);
                             let message = "";
-                            if(typeof data[i].message == 'string') message = data[i].message;
-                            else message = JSON.stringify(data[i].message);
-                            innerHTML += `<span style="color: #00ff00;">${timeStamp.toLocaleString()}</span> - <span style="color: #0000ff;">${data[i].message}</span> - `;
+                            data[i].message.forEach((mes, i) => {
+                                if( i == 0) message += mes + " - ";
+                                else message += JSON.stringify(mes) + " - ";
+                            });
+                            innerHTML += `<span style="color: #00ff00;">${timeStamp.toLocaleString()}</span> - <span style="color: #0000ff;">${message}</span> `;
                             innerHTML += `<span style="color: red; text-decoration: underline;" onclick="loggerDelete(${data[i].id})">Delete Log Entry</span><br><br>`;
                         }
                         loggerText.innerHTML = innerHTML;

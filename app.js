@@ -37,21 +37,27 @@ const bodyParser = require('body-parser');
 const sharp = require('sharp');
 const PNG = require('pngjs').PNG;
 const app = express();
-const port = 3000;
+const port = 3001;
 app.use(bodyParser.json({ limit: '100mb' }));
 const pgClient = require('pg');
+
+const puppeteer = require('puppeteer-extra');
+const cheerio = require('cheerio');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
 
 let updateDB = true;
 
 class DB_Error extends Error {
+    static count = 0;
     constructor(message) {
         super(message);
         this.name = "DB_Error";
         Error.captureStackTrace?.(this, DB_Error);
         systemLogger?.log("DB_Error", message);
+        DB_Error.count++;
     }
 }
-
 
 class SystemLogger {
     constructor() {
@@ -125,7 +131,272 @@ class SystemLogger {
     }
 };
 
+class PuppeteerClient{
+    constructor(){
+        this.browser = null;
+        this.page = null;
+        this.pageURL = null;
+        this.loggedIntoMJ = false;
+        this.loginInProgress = false;
+        this.mj_cookies = null;
+        this.mj_localStorage = null;
+        this.mj_sessionStorage = null;
+        this.discord_cookies = null;
+        this.discord_localStorage = null;
+        this.discord_sessionStorage = null;
+        this.discordLoginComplete = false;
+    }
+
+    async loadSession(){
+        return new Promise(async (resolve, reject) => {
+            if(fs.existsSync('mjSession.json') && fs.existsSync('discordSession.json')){
+                let sessionData = JSON.parse(fs.readFileSync('mjSession.json'));
+                this.mj_cookies = sessionData.cookies;
+                this.mj_localStorage = sessionData.localStorage;
+                this.mj_sessionStorage = sessionData.sessionStorage;
+                sessionData = JSON.parse(fs.readFileSync('discordSession.json'));
+                this.discord_cookies = sessionData.cookies;
+                this.discord_localStorage = sessionData.localStorage;
+                this.discord_sessionStorage = sessionData.sessionStorage;
+            }else{
+                reject("Session file not found");
+                return;
+            }
+            
+            if(this.browser == null){
+                this.browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--start-maximized'] });
+                this.page = (await this.browser.pages())[0];
+            }
+            
+            await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
+            let discordPage = await this.browser.newPage();
+            await discordPage.goto('https://discord.com/');
+            await waitSeconds(1);
+            await this.page.setCookie(...this.mj_cookies);
+            await discordPage.setCookie(...this.discord_cookies);
+            await waitSeconds(1);
+
+            await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
+            await waitSeconds(2);
+            this.pageURL = this.page.url();
+            if(this.pageURL.includes("imagine") || this.pageURL.includes("explore")){
+                this.loggedIntoMJ = true;
+                await discordPage?.close();
+                resolve();
+            }else{
+                this.loggedIntoMJ = false;
+                reject("Session restore failed");
+            }
+        });
+    }
+
+    async loginToMJ(username, password, MFA_cb = null){
+        return new Promise(async (resolve, reject) => {
+            if((!this.loggedIntoMJ || this.browser == null) && !this.loginInProgress){
+                // attempt to restore session
+                try{
+                    await this.loadSession();
+                    resolve();
+                    return;
+                }catch(err){
+                    console.log(err);
+                }
+
+                this.loginInProgress = true;
+                this.browser = await puppeteer.launch({ headless: 'new', defaultViewport: null, args: ['--start-maximized'] });
+                this.page = (await this.browser.pages())[0];
+
+                this.browser.on('targetcreated', async (target) => {
+                    const pageList = await this.browser.pages();
+                    let discordLoginPage = pageList[pageList.length - 1];
+                    if(discordLoginPage.url().includes("discord.com/login")){
+                        await this.loginToDiscord(discordLoginPage, username, password, MFA_cb);
+                    }
+                });
+
+                await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
+                await waitSeconds(5);
+                
+                await this.page.click('button ::-p-text(Sign In)');
+                await waitSeconds(1);
+                let waitCount = 0;
+                while(!this.discordLoginComplete){
+                    await waitSeconds(1);
+                    waitCount++;
+                    if(waitCount > 120){
+                        reject("Timed out waiting for login");
+                    }
+                }
+                this.loginInProgress = false;
+                await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
+                await waitSeconds(5);
+                this.pageURL = this.page.url();
+                if(this.pageURL.includes("imagine") || this.pageURL.includes("explore")){
+                    this.loggedIntoMJ = true;
+                    this.mj_cookies = await this.page.cookies();
+                    this.mj_localStorage = await this.page.evaluate(() => { return window.localStorage; });
+                    this.mj_sessionStorage = await this.page.evaluate(() => { return window.sessionStorage; });
+                    fs.writeFileSync('mjSession.json', JSON.stringify({cookies: this.mj_cookies, localStorage: this.mj_localStorage, sessionStorage: this.mj_sessionStorage}));
+
+                    let discordPage = await this.browser.newPage();
+                    await discordPage.goto('https://discord.com/channels/@me');
+                    await waitSeconds(2);
+                    this.discord_cookies = await discordPage.cookies();
+                    this.discord_localStorage = await discordPage.evaluate(() => { return window.localStorage; });
+                    this.discord_sessionStorage = await discordPage.evaluate(() => { return window.sessionStorage; });
+                    fs.writeFileSync('discordSession.json', JSON.stringify({cookies: this.discord_cookies, localStorage: this.discord_localStorage, sessionStorage: this.discord_sessionStorage}));
+                    await waitSeconds(15);
+                    await discordPage?.close();
+                    resolve();
+                }else{
+                    this.loggedIntoMJ = false;
+                    reject("Login failed");
+                }
+            }
+            if(this.loggedIntoMJ){
+                await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
+                resolve();
+            }
+        });
+    }
+
+    async loginToDiscord(discordLoginPage, username, password, MFA_cb){
+        await waitSeconds(1);
+        await discordLoginPage.waitForSelector('input[name="email"]');
+        let typingRandomTimeMin = 0.03;
+        let typingRandomTimeMax = 0.15;
+        for (let i = 0; i < username.length; i++) {
+            await discordLoginPage.type('input[name="email"]', username.charAt(i));
+            let randomTime = Math.random() * (typingRandomTimeMin) + typingRandomTimeMax;
+            await waitSeconds(randomTime);
+        }
+
+        await discordLoginPage.keyboard.press('Tab');
+        for (let i = 0; i < password.length; i++) {
+            await discordLoginPage.type('input[name="password"]', password.charAt(i));
+            let randomTime = Math.random() * (typingRandomTimeMin) + typingRandomTimeMax;
+            await waitSeconds(randomTime);
+        }
+
+        await waitSeconds(1);
+        await discordLoginPage.click('button[type="submit"]');
+        discordLoginPage.waitForSelector('input[placeholder="6-digit authentication code"]', { timeout: 60000 }).then(async ()=>{
+            let data = "";
+            if(MFA_cb !== null){
+                data = await MFA_cb();
+            }
+            await discordLoginPage.type('input[placeholder="6-digit authentication code"]', data.toString());
+            await discordLoginPage.click('button[type="submit"]');
+            await waitSeconds(3);
+            // await discordLoginPage.waitForNavigation({ waitUntil: 'networkidle2' });
+            await discordLoginPage.waitForSelector('button ::-p-text(Authorize)', { timeout: 60000 });
+            await discordLoginPage.click('button ::-p-text(Authorize)');
+            await waitSeconds(3);
+            // await discordLoginPage.waitForNavigation({ waitUntil: 'networkidle2' });
+            this.discordLoginComplete = true;
+        }).catch(() => {
+            this.discordLoginComplete = true;
+        });
+        
+    }
+
+    async getUsersJobsData(){
+        return new Promise(async (resolve, reject) => {
+            if(!this.loggedIntoMJ)reject("Not logged into MJ");
+            if(this.loginInProgress)reject("Login in progress");
+            await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
+
+            let data = await this.page.evaluate(async() => {
+                const getUserUUID = async () => {
+                    let homePage = await fetch("https://www.midjourney.com/imagine");
+                    let homePageText = await homePage.text();
+                    let nextDataIndex = homePageText.indexOf("__NEXT_DATA__");
+                    let nextData = homePageText.substring(nextDataIndex);
+                    let startOfScript = nextData.indexOf("json\">");
+                    let endOfScript = nextData.indexOf("</script>");
+                    let script = nextData.substring(startOfScript + 6, endOfScript);
+                    let json = script.substring(script.indexOf("{"), script.lastIndexOf("}") + 1);
+                    let data = JSON.parse(json);
+                    imagineProps = data.props;
+                    let userUUID = data.props.initialAuthUser.midjourney_id;
+                    return userUUID;
+                }
+                let userUUID = await getUserUUID();
+                let numberOfJobsReturned = 0;
+                let cursor = "";
+                let loopCount = 0;
+                let returnedData = [];
+                do {
+                    // let response = await fetch("https://www.midjourney.com/api/pg/thomas-jobs?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
+                    
+                    let response = await fetch("https://www.midjourney.com/api/pg/thomas-jobs?user_id="+ userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor), {
+                        "headers": {
+                          "accept": "*/*",
+                          "accept-language": "en-US,en;q=0.9",
+                          "cache-control": "no-cache",
+                          "content-type": "application/json",
+                          "pragma": "no-cache",
+                          "sec-ch-ua": "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
+                          "sec-ch-ua-mobile": "?0",
+                          "sec-ch-ua-platform": "\"Windows\"",
+                          "sec-fetch-dest": "empty",
+                          "sec-fetch-mode": "cors",
+                          "sec-fetch-site": "same-origin",
+                          "x-csrf-protection": "1"
+                        },
+                        "referrer": "https://www.midjourney.com/imagine",
+                        "referrerPolicy": "origin-when-cross-origin",
+                        "body": null,
+                        "method": "GET",
+                        "mode": "cors",
+                        "credentials": "include"
+                      });
+            
+            
+                    let data = await response.json();
+                    // console.log({data});
+                    if (data.data.length == 0) break;
+                    numberOfJobsReturned = data.data.length;
+                    // put all the returned data into the returnedData array
+                    returnedData.push(...(data.data));
+                    cursor = data.cursor;
+                    loopCount++;
+                    if (loopCount > 100) break; // if we've returned more than 1,000,000 jobs, there's probably something wrong, and there's gonna be problems
+                } while (numberOfJobsReturned == 10000)
+                return returnedData;
+            });
+            resolve(data);
+        });
+    }    
+};
+
+class ServerStatusMonitor{
+    constructor(SystemLogger, PuppeteerClient){
+        this.systemLogger = SystemLogger;
+        this.puppeteerClient = PuppeteerClient;
+        this.serverStartTime = new Date();
+    }
+
+    checkServerStatus(){
+        let status = {};
+        status.serverStartTime = this.serverStartTime;
+        status.upTime = new Date() - this.serverStartTime;
+        status.upTimeFormatted = new Date(status.upTime).toISOString().substring(11, 8);
+        status.dbImageCount = countImages_DB();
+        status.loggedIntoMJ = this.puppeteerClient.loggedIntoMJ;
+        status.loginInProgress = this.puppeteerClient.loginInProgress;
+        status.numberOfLogEntries = this.systemLogger.getNumberOfEntries();
+        status.numberOfDBErrors = DB_Error.count;
+        status.puppeteerClient = {};
+        status.puppeteerClient.loggedIntoMJ = this.puppeteerClient.loggedIntoMJ;
+        status.puppeteerClient.loginInProgress = this.puppeteerClient.loginInProgress;
+        return status;
+    }                   
+};
+
+const puppeteerClient = new PuppeteerClient();
 const systemLogger = new SystemLogger();
+const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient);
 
 const dbClient = new pgClient.Client({
     user: 'mjuser',
@@ -135,6 +406,7 @@ const dbClient = new pgClient.Client({
     port: 5432,
 });
 dbClient.connect();
+
 
 const insertImage_DB = async (image, index) => {
     // find if image exists in database
@@ -355,6 +627,16 @@ class ImageInfo {
         this.processed = false;
     }
 
+    toJSON(){
+        let t = {...this};
+        t.urlFull = this.urlFull;
+        t.urlSmall = this.urlSmall;
+        t.urlMedium = this.urlMedium;
+        t.urlAlt = this.urlAlt;
+        t.urlParentGrid = this.urlParentGrid;
+        return t;
+    }
+
     get id() {
         return this.parent_id + '_' + this.grid_index;
     }
@@ -421,7 +703,7 @@ app.listen(port, () => {
 });
 
 app.get('/', (req, res) => {
-    res.send('Hello World!');
+    res.render('index');
 });
 
 app.set('view engine', 'ejs');
@@ -432,6 +714,47 @@ app.get('/images', (req, res) => {
 
 app.get('/tools', (req, res) => {
     res.render('tools');
+});
+
+app.get('/login/:username/:password', async (req, res) => {
+    const { username, password } = req.params;
+    puppeteerClient.loginToMJ(username, password, async () => {
+        let retData = "";
+        app.get('/mfa/:data', (req, res) => {
+            const { data } = req.params;
+            res.send(data);
+            retData = data;
+        });
+        while(retData == "") await waitSeconds(1);
+        return retData;
+    }).catch((err) => {
+        console.log(err);
+    });
+    res.send("ok");
+});
+
+app.get('/updateDB', async (req, res) => {
+    let data;
+    puppeteerClient.getUsersJobsData().then(async(dataTemp) => {
+        data = dataTemp;
+        console.log(typeof data);
+        console.log("Size of data: ", data.length, "\nCalling buildImageData()");
+        imageData = buildImageData(data);
+        console.log("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
+        for (let i = 0; i < imageData.length; i++) {
+            // await insertUUID(imageData[i].id, i);
+            if (updateDB) await insertImage_DB(imageData[i], i);
+        }
+        console.log("Done updating database");
+    }).catch((err) => {
+        console.log(err);
+    });
+
+    if(puppeteerClient.loggedIntoMJ){
+        res.send("ok");
+    }else{
+        res.send("not ok");
+    }
 });
 
 // starts a show of random images from the database that changes every so often
@@ -491,21 +814,6 @@ app.get('/get-images/:offset/:limit', (req, res) => {
     const images = imageData.slice(offset, offset + limit);
     res.json(images);
 });
-
-app.put('/imageData', async (req, res) => {
-    const data = req.body;
-    if (data.length > 0) res.send('ok');
-    console.log(typeof data);
-    console.log("Size of data: ", data.length, "\nCalling buildImageData()");
-    imageData = buildImageData(data);
-    console.log("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
-    for (let i = 0; i < imageData.length; i++) {
-        // await insertUUID(imageData[i].id, i);
-        if (updateDB) await insertImage_DB(imageData[i], i);
-    }
-    console.log("Done updating database");
-});
-
 
 /**
  * 
@@ -643,7 +951,7 @@ app.get('/image/:imageName', async (req, res) => {
         if (width || height) {
             const widthNum = width ? parseInt(width, 10) : null;
             const heightNum = height ? parseInt(height, 10) : null;
-            await image.resize(widthNum, heightNum, { fit: 'inside' });
+            image.resize(widthNum, heightNum, { fit: 'inside' });
         }
 
         // Output the image
@@ -694,8 +1002,7 @@ process.stdin.on('data', function (data) {
     }
 });
 
-process.exit = function (code) {
+process.on('exit',(code) =>{
     console.log('exiting');
     dbClient.end();
-    process.exit(code);
-}
+});

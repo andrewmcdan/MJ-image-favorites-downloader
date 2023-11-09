@@ -4,3 +4,4 @@
 /zips
 node_modules/
 .vscode
+*Session.json
