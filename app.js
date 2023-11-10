@@ -90,7 +90,7 @@ class SystemLogger {
     }
 
     getMostRecentLog(remove = false) {
-        if(this.logArr.length === 0) return null;
+        if (this.logArr.length === 0) return null;
         let logTemp = this.logArr[this.logArr.length - 1];
         if (remove) {
             this.logArr.pop();
@@ -100,7 +100,7 @@ class SystemLogger {
 
     getRecentEntries(numberOfEntries, remove = false) {
         let entries = [];
-        if(typeof numberOfEntries === "string") numberOfEntries = parseInt(numberOfEntries);
+        if (typeof numberOfEntries === "string") numberOfEntries = parseInt(numberOfEntries);
         numberOfEntries = Math.min(numberOfEntries, this.logArr.length);
         if (remove) {
             for (let i = 0; i < numberOfEntries; i++) {
@@ -115,7 +115,7 @@ class SystemLogger {
     }
 
     deleteEntry(id) {
-        if(typeof id === "string") id = parseInt(id);
+        if (typeof id === "string") id = parseInt(id);
         for (let i = 0; i < this.logArr.length; i++) {
             if (this.logArr[i].id === id) {
                 this.logArr.splice(i, 1);
@@ -130,8 +130,8 @@ class SystemLogger {
     }
 };
 
-class PuppeteerClient{
-    constructor(){
+class PuppeteerClient {
+    constructor() {
         this.browser = null;
         this.page = null;
         this.pageURL = null;
@@ -146,9 +146,9 @@ class PuppeteerClient{
         this.discordLoginComplete = false;
     }
 
-    async loadSession(){
+    async loadSession() {
         return new Promise(async (resolve, reject) => {
-            if(fs.existsSync('mjSession.json') && fs.existsSync('discordSession.json')){
+            if (fs.existsSync('mjSession.json') && fs.existsSync('discordSession.json')) {
                 let sessionData = JSON.parse(fs.readFileSync('mjSession.json'));
                 this.mj_cookies = sessionData.cookies;
                 this.mj_localStorage = sessionData.localStorage;
@@ -157,16 +157,16 @@ class PuppeteerClient{
                 this.discord_cookies = sessionData.cookies;
                 this.discord_localStorage = sessionData.localStorage;
                 this.discord_sessionStorage = sessionData.sessionStorage;
-            }else{
+            } else {
                 reject("Session file not found");
                 return;
             }
-            
-            if(this.browser == null){
+
+            if (this.browser == null) {
                 this.browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--start-maximized'] });
                 this.page = (await this.browser.pages())[0];
             }
-            
+
             await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
             let discordPage = await this.browser.newPage();
             await discordPage.goto('https://discord.com/');
@@ -178,26 +178,26 @@ class PuppeteerClient{
             await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
             await waitSeconds(2);
             this.pageURL = this.page.url();
-            if(this.pageURL.includes("imagine") || this.pageURL.includes("explore")){
+            if (this.pageURL.includes("imagine") || this.pageURL.includes("explore")) {
                 this.loggedIntoMJ = true;
                 await discordPage?.close();
                 resolve();
-            }else{
+            } else {
                 this.loggedIntoMJ = false;
                 reject("Session restore failed");
             }
         });
     }
 
-    async loginToMJ(username, password, MFA_cb = null){
+    async loginToMJ(username, password, MFA_cb = null) {
         return new Promise(async (resolve, reject) => {
-            if((!this.loggedIntoMJ || this.browser == null) && !this.loginInProgress){
+            if ((!this.loggedIntoMJ || this.browser == null) && !this.loginInProgress) {
                 // attempt to restore session
-                try{
+                try {
                     await this.loadSession();
                     resolve();
                     return;
-                }catch(err){
+                } catch (err) {
                     console.log(err);
                 }
 
@@ -208,21 +208,21 @@ class PuppeteerClient{
                 this.browser.on('targetcreated', async (target) => {
                     const pageList = await this.browser.pages();
                     let discordLoginPage = pageList[pageList.length - 1];
-                    if(discordLoginPage.url().includes("discord.com/login")){
+                    if (discordLoginPage.url().includes("discord.com/login")) {
                         await this.loginToDiscord(discordLoginPage, username, password, MFA_cb);
                     }
                 });
 
                 await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
                 await waitSeconds(5);
-                
+
                 await this.page.click('button ::-p-text(Sign In)');
                 await waitSeconds(1);
                 let waitCount = 0;
-                while(!this.discordLoginComplete){
+                while (!this.discordLoginComplete) {
                     await waitSeconds(1);
                     waitCount++;
-                    if(waitCount > 120){
+                    if (waitCount > 120) {
                         reject("Timed out waiting for login");
                     }
                 }
@@ -230,12 +230,12 @@ class PuppeteerClient{
                 await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
                 await waitSeconds(5);
                 this.pageURL = this.page.url();
-                if(this.pageURL.includes("imagine") || this.pageURL.includes("explore")){
+                if (this.pageURL.includes("imagine") || this.pageURL.includes("explore")) {
                     this.loggedIntoMJ = true;
                     this.mj_cookies = await this.page.cookies();
                     this.mj_localStorage = await this.page.evaluate(() => { return window.localStorage; });
                     this.mj_sessionStorage = await this.page.evaluate(() => { return window.sessionStorage; });
-                    fs.writeFileSync('mjSession.json', JSON.stringify({cookies: this.mj_cookies, localStorage: this.mj_localStorage, sessionStorage: this.mj_sessionStorage}));
+                    fs.writeFileSync('mjSession.json', JSON.stringify({ cookies: this.mj_cookies, localStorage: this.mj_localStorage, sessionStorage: this.mj_sessionStorage }));
 
                     let discordPage = await this.browser.newPage();
                     await discordPage.goto('https://discord.com/channels/@me');
@@ -243,23 +243,23 @@ class PuppeteerClient{
                     this.discord_cookies = await discordPage.cookies();
                     this.discord_localStorage = await discordPage.evaluate(() => { return window.localStorage; });
                     this.discord_sessionStorage = await discordPage.evaluate(() => { return window.sessionStorage; });
-                    fs.writeFileSync('discordSession.json', JSON.stringify({cookies: this.discord_cookies, localStorage: this.discord_localStorage, sessionStorage: this.discord_sessionStorage}));
+                    fs.writeFileSync('discordSession.json', JSON.stringify({ cookies: this.discord_cookies, localStorage: this.discord_localStorage, sessionStorage: this.discord_sessionStorage }));
                     await waitSeconds(15);
                     await discordPage?.close();
                     resolve();
-                }else{
+                } else {
                     this.loggedIntoMJ = false;
                     reject("Login failed");
                 }
             }
-            if(this.loggedIntoMJ){
+            if (this.loggedIntoMJ) {
                 await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
                 resolve();
             }
         });
     }
 
-    async loginToDiscord(discordLoginPage, username, password, MFA_cb){
+    async loginToDiscord(discordLoginPage, username, password, MFA_cb) {
         await waitSeconds(1);
         await discordLoginPage.waitForSelector('input[name="email"]');
         let typingRandomTimeMin = 0.03;
@@ -279,9 +279,9 @@ class PuppeteerClient{
 
         await waitSeconds(1);
         await discordLoginPage.click('button[type="submit"]');
-        discordLoginPage.waitForSelector('input[placeholder="6-digit authentication code"]', { timeout: 60000 }).then(async ()=>{
+        discordLoginPage.waitForSelector('input[placeholder="6-digit authentication code"]', { timeout: 60000 }).then(async () => {
             let data = "";
-            if(MFA_cb !== null){
+            if (MFA_cb !== null) {
                 data = await MFA_cb();
             }
             await discordLoginPage.type('input[placeholder="6-digit authentication code"]', data.toString());
@@ -296,13 +296,13 @@ class PuppeteerClient{
         }).catch(() => {
             this.discordLoginComplete = true;
         });
-        
+
     }
 
-    getUsersJobsData(){
+    getUsersJobsData() {
         return new Promise(async (resolve, reject) => {
-            if(!this.loggedIntoMJ)reject("Not logged into MJ");
-            if(this.loginInProgress)reject("Login in progress");
+            if (!this.loggedIntoMJ) reject("Not logged into MJ");
+            if (this.loginInProgress) reject("Login in progress");
             await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
 
             let data = await this.page.evaluate(async () => {
@@ -327,21 +327,21 @@ class PuppeteerClient{
                 let returnedData = [];
                 do {
                     // let response = await fetch("https://www.midjourney.com/api/pg/thomas-jobs?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
-                    
-                    let response = await fetch("https://www.midjourney.com/api/pg/thomas-jobs?user_id="+ userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor), {
+
+                    let response = await fetch("https://www.midjourney.com/api/pg/thomas-jobs?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor), {
                         "headers": {
-                          "accept": "*/*",
-                          "accept-language": "en-US,en;q=0.9",
-                          "cache-control": "no-cache",
-                          "content-type": "application/json",
-                          "pragma": "no-cache",
-                          "sec-ch-ua": "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
-                          "sec-ch-ua-mobile": "?0",
-                          "sec-ch-ua-platform": "\"Windows\"",
-                          "sec-fetch-dest": "empty",
-                          "sec-fetch-mode": "cors",
-                          "sec-fetch-site": "same-origin",
-                          "x-csrf-protection": "1"
+                            "accept": "*/*",
+                            "accept-language": "en-US,en;q=0.9",
+                            "cache-control": "no-cache",
+                            "content-type": "application/json",
+                            "pragma": "no-cache",
+                            "sec-ch-ua": "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
+                            "sec-ch-ua-mobile": "?0",
+                            "sec-ch-ua-platform": "\"Windows\"",
+                            "sec-fetch-dest": "empty",
+                            "sec-fetch-mode": "cors",
+                            "sec-fetch-site": "same-origin",
+                            "x-csrf-protection": "1"
                         },
                         "referrer": "https://www.midjourney.com/imagine",
                         "referrerPolicy": "origin-when-cross-origin",
@@ -349,9 +349,9 @@ class PuppeteerClient{
                         "method": "GET",
                         "mode": "cors",
                         "credentials": "include"
-                      });
-            
-            
+                    });
+
+
                     let data = await response.json();
                     // console.log({data});
                     if (data.data.length == 0) break;
@@ -368,10 +368,10 @@ class PuppeteerClient{
         });
     }
 
-    getSingleJobStatus(jobID){
+    getSingleJobStatus(jobID) {
         return new Promise(async (resolve, reject) => {
-            if(!this.loggedIntoMJ)reject("Not logged into MJ");
-            if(this.loginInProgress)reject("Login in progress");
+            if (!this.loggedIntoMJ) reject("Not logged into MJ");
+            if (this.loginInProgress) reject("Login in progress");
             await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
 
             let data = await this.page.evaluate(async (jobID) => {
@@ -390,11 +390,11 @@ class PuppeteerClient{
                         "Referer": "https://www.midjourney.com/imagine",
                         "Referrer-Policy": "origin-when-cross-origin"
                     },
-                    "body": "{\"jobIds\":[\""+jobID+"\"]}",
+                    "body": "{\"jobIds\":[\"" + jobID + "\"]}",
                     "method": "POST"
-                    });
+                });
                 let res2 = await res1.json();
-                if(res2.length > 0) return res2[0];
+                if (res2.length > 0) return res2[0];
                 else return null;
             }, jobID);
             resolve(data);
@@ -402,32 +402,42 @@ class PuppeteerClient{
     }
 };
 
-class ServerStatusMonitor{
-    constructor(SystemLogger, PuppeteerClient){
+class ServerStatusMonitor {
+    constructor(SystemLogger, PuppeteerClient, DownloadManager) {
         this.systemLogger = SystemLogger;
         this.puppeteerClient = PuppeteerClient;
+        this.downloadManager = DownloadManager;
         this.serverStartTime = new Date();
     }
 
-    checkServerStatus(){
+    checkServerStatus() {
         let status = {};
         status.serverStartTime = this.serverStartTime;
         status.upTime = new Date() - this.serverStartTime;
         status.upTimeFormatted = new Date(status.upTime).toISOString().substring(11, 8);
-        status.dbImageCount = countImages_DB();
-        status.loggedIntoMJ = this.puppeteerClient.loggedIntoMJ;
-        status.loginInProgress = this.puppeteerClient.loginInProgress;
         status.numberOfLogEntries = this.systemLogger.getNumberOfEntries();
-        status.numberOfDBErrors = DB_Error.count;
+
+        status.database = {};
+        status.database.numberOfImages = countImages_DB();
+        status.database.errorCount = DB_Error.count;
+
         status.puppeteerClient = {};
         status.puppeteerClient.loggedIntoMJ = this.puppeteerClient.loggedIntoMJ;
         status.puppeteerClient.loginInProgress = this.puppeteerClient.loginInProgress;
+
+        status.downloadManager = {};
+        status.downloadManager.downloadInProgress = this.downloadManager.downloadInProgress;
+        status.downloadManager.timeToDownload = this.downloadManager.timeToDownload;
+        status.downloadManager.runEnabled = this.downloadManager.runEnabled;
+        status.downloadManager.downloadLocation = this.downloadManager.downloadLocation;
+        status.downloadManager.downloadInProgress = this.downloadManager.downloadInProgress;
+
         return status;
-    }                   
+    }
 };
 
-class DatabaseManager{
-    constructor(){
+class DatabaseManager {
+    constructor() {
         this.dbClient = new pgClient.Client({
             user: 'mjuser',
             host: 'postgresql.lan',
@@ -479,7 +489,7 @@ class DatabaseManager{
                 `SELECT * FROM images WHERE uuid = $1`,
                 [uuid]
             );
-    
+
             if (res.rows.length > 0) {
                 return res.rows[0];
             }
@@ -492,11 +502,11 @@ class DatabaseManager{
     getRandomImage = async (downloadedOnly = false) => {
         try {
             let res;
-            if(downloadedOnly) {
+            if (downloadedOnly) {
                 res = await this.dbClient.query(
                     `SELECT * FROM images WHERE downloaded = true ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`
                 );
-            }else{
+            } else {
                 res = await this.dbClient.query(
                     `SELECT * FROM images ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`
                 );
@@ -510,17 +520,41 @@ class DatabaseManager{
             return null;
         }
     }
-    lookupImageByIndex = async (index) => {
+    lookupImageByIndex = async (index, processedOnly =  {processed: false, enabled: false}, downloadedOnly = {downloaded:false,enabled: false}, do_not_downloadOnly = {do_not_download: false, enabled: false}) => {
+        if(typeof index === 'number') index = index.toString();
+        if(typeof index === "string") {
+            try{
+                index = parseInt(index);
+            }catch{
+                return null;
+            }
+            index = index.toString();
+        }else{
+            return null;
+        }
+        // at this point index should be a string that is a number. Anything else would have returned null
         try {
-            const res = await this.dbClient.query(
-                `SELECT * FROM images WHERE id = $1`,
-                [index]
-            );
+            let queryParts = ['SELECT * FROM images WHERE id = $1'];
+            let queryParams = [index];
+
+            if (processedOnly.enabled===true) {
+                queryParts.push("AND processed = " + (processedOnly.processed===true ? "true" : "false"));
+            }
+            if (downloadedOnly.enabled===true) {
+                queryParts.push("AND downloaded = " + (downloadedOnly.downloaded===true ? "true" : "false"));
+            }
+            if (do_not_downloadOnly.enabled===true) {
+                queryParts.push("AND do_not_download = " + (do_not_downloadOnly.do_not_download===true ? "true" : "false"));
+            }
+
+            queryParts.push("LIMIT 1");
+
+            const res = await this.dbClient.query(queryParts.join(' '), queryParams);
             if (res.rows.length == 1) {
                 return res.rows[0];
-            }else if(res.rows.length > 1){
+            } else if (res.rows.length > 1) {
                 new DB_Error("Error looking up image in database. Too many rows returned. Image index: " + index);
-            }else if(res.rows.length == 0){
+            } else if (res.rows.length == 0) {
                 return undefined;
             }
             return undefined;
@@ -588,8 +622,8 @@ class DatabaseManager{
         }
     }
     setImageProcessed = async (uuid, valueBool = true) => {
-        if(typeof valueBool === "string") valueBool = (valueBool === "true");
-        if(typeof valueBool !== "boolean") throw new Error("valueBool must be a boolean");
+        if (typeof valueBool === "string") valueBool = (valueBool === "true");
+        if (typeof valueBool !== "boolean") throw new Error("valueBool must be a boolean");
         try {
             const res = await this.dbClient.query(
                 `UPDATE images SET processed = $1 WHERE uuid = $2`,
@@ -638,8 +672,8 @@ class ImageInfo {
         this.processed = false;
     }
 
-    toJSON(){
-        let t = {...this};
+    toJSON() {
+        let t = { ...this };
         t.urlFull = this.urlFull;
         t.urlSmall = this.urlSmall;
         t.urlMedium = this.urlMedium;
@@ -668,8 +702,8 @@ class ImageInfo {
     }
 };
 
-class DownloadManager{
-    constructor(DatabaseManager = null, SystemLogger = null){
+class DownloadManager {
+    constructor(DatabaseManager = null, SystemLogger = null) {
         this.downloadLocation = "output";
         this.timeToDownload = 0; // minutes past midnight
         this.runEnabled = false;
@@ -682,11 +716,11 @@ class DownloadManager{
     downloadImage(url) {
         return new Promise(async (resolve, reject) => {
             const response = await axios.get(url, { responseType: 'stream' });
-            if(response.status !== 200) {reject("Bad response code: " + response.status); return;}
-            if(response.headers['content-type'] !== "image/png") {reject("Bad content type: " + response.headers['content-type']);return;}
-            if(response.headers['content-length'] < 1000) {reject("Bad content length: " + response.headers['content-length']); return;}
+            if (response.status !== 200) { reject("Bad response code: " + response.status); return; }
+            if (response.headers['content-type'] !== "image/png") { reject("Bad content type: " + response.headers['content-type']); return; }
+            if (response.headers['content-length'] < 1000) { reject("Bad content length: " + response.headers['content-length']); return; }
             let contentLength = response.headers['content-length'];
-            if(!fs.existsSync(this.downloadLocation)) fs.mkdirSync(this.downloadLocation, { recursive: true });
+            if (!fs.existsSync(this.downloadLocation)) fs.mkdirSync(this.downloadLocation, { recursive: true });
             // https://storage.googleapis.com/dream-machines-output/53ae5df3-edef-4adb-a4c2-586de79edfe9/0_0.png
             let splitImage = url.split('/');
             splitImage = splitImage[splitImage.length - 2] + splitImage[splitImage.length - 1];
@@ -694,27 +728,29 @@ class DownloadManager{
             let fileSize = 0;
             let file = fs.readFileSync(path.join(this.downloadLocation, splitImage));
             fileSize = file.length;
-            if(fileSize !== contentLength) {reject("File size mismatch: " + fileSize + " != " + contentLength);return;}
-            resolve({fileSize: fileSize, storageLocation: path.join(this.downloadLocation, splitImage)});
+            if (fileSize !== contentLength) { reject("File size mismatch: " + fileSize + " != " + contentLength); return; }
+            resolve({ fileSize: fileSize, storageLocation: path.join(this.downloadLocation, splitImage) });
         });
     }
 
-    start(){
+    start() {
         let now = new Date();
         let timeToDownload = new Date(now.getFullYear(), now.getMonth(), now.getDate(), this.timeToDownload / 60, this.timeToDownload % 60, 0, 0);
         let timeUntilDownload = timeToDownload - now;
-        if(timeUntilDownload < 0) timeUntilDownload += 1000 * 60 * 60 * 24;
+        if (timeUntilDownload < 0) timeUntilDownload += 1000 * 60 * 60 * 24;
         this.runTimeout = setTimeout(this.run, timeUntilDownload);
     }
 
-    async run(){
+    async run() {
         let imageCount = await dbClient.countImagesTotal();
-        for(let i = 0; i < imageCount; i++){
-            let image = await dbClient.lookupImageByIndex(i);
-            if(image === undefined) continue;
+        for (let i = 0; i < imageCount; i++) {
+            let image = await dbClient.lookupImageByIndex(i, {processed: true, enabled: true}, {downloaded: false, enabled: true}, {do_not_download: false, enabled: true});
+            if (image === undefined) continue;
+            if (image === null) continue;
+
             console.log(image); // TODO: remove this
-            if(i>10) break;
-            // if(image.downloaded) continue; // don't need to download it if it's already downloaded
+            if (i > 10) break;/////      and this
+
             this.downloadInProgress = true;
             this.downloadImage(image.urlFull).then(async (obj) => {
                 image.downloaded = true;
@@ -734,28 +770,35 @@ class DownloadManager{
                     this.downloadInProgress = false;
                 });
             });
-            while(this.downloadInProgress){
+            while (this.downloadInProgress) {
                 await waitSeconds(0.1);
             }
         }
         this.start();
     }
 
+    checkFileExistsPath(path) {
+        fs.access(path, fs.F_OK, (err) => {
+            if (err) return false;
+            else return true;
+        });
+    }
 };
 
 const puppeteerClient = new PuppeteerClient();
 const systemLogger = new SystemLogger();
-const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient);
 const imageDB = new DatabaseManager();
 const downloadManager = new DownloadManager(imageDB, systemLogger);
-// const dbClient = new pgClient.Client({
-//     user: 'mjuser',
-//     host: 'postgresql.lan',
-//     database: 'mjimages',
-//     password: 'mjImagesPassword',
-//     port: 5432,
-// });
-// dbClient.connect();
+const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager);
+
+/*const dbClient = new pgClient.Client({
+    user: 'mjuser',
+    host: 'postgresql.lan',
+    database: 'mjimages',
+    password: 'mjImagesPassword',
+    port: 5432,
+});
+dbClient.connect();*/
 
 /*
 const insertImage_DB = async (image, index) => {
@@ -968,22 +1011,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Serve static files from the "public" directory
 app.use(express.static('public'));
-app.use(express.static('output'));
-
-let imageData = [];
+// app.use(express.static('output'));
 
 
-
-
-/***********************************
- * 
- * Server endpoints
- * 
- * 
- * 
- * 
- * 
- */
 
 // Start the server on port 3000 and print all the ip addresses of this server
 app.listen(port, () => {
@@ -1005,30 +1035,54 @@ app.listen(port, () => {
     });
 });
 
+app.set('view engine', 'ejs');
+
+/****************************************************************************************
+ * Server endpoints 
+ */
+/**
+ * GET /
+ * Home page
+ */
 app.get('/', (req, res) => {
     res.render('index');
 });
 
-app.set('view engine', 'ejs');
-
+/**
+ * GET /images
+ * Images page for viewing images and selecting them for download
+ */
 app.get('/images', (req, res) => {
-    res.render('images', { imageData });
+    res.render('images');
 });
 
 app.get('/tools', (req, res) => {
     res.render('tools');
 });
 
+/**
+ * GET /login/:username/:password
+ * Login endpoint for logging into Midjourney
+ * @param {string} username - username for Midjourney
+ * @param {string} password - password for Midjourney
+ * @returns {string} - "ok" once credentials have been entered
+ */
 app.get('/login/:username/:password', async (req, res) => {
     const { username, password } = req.params;
     puppeteerClient.loginToMJ(username, password, async () => {
         let retData = "";
+        /**
+         * GET /mfa/:data
+         * Endpoint for getting the MFA code from the user
+         * @param {string} data - the MFA code
+         * @returns {string} - the MFA code
+         */
         app.get('/mfa/:data', (req, res) => {
             const { data } = req.params;
             res.send(data);
             retData = data;
         });
-        while(retData == "") await waitSeconds(1);
+        while (retData == "") await waitSeconds(1);
         return retData;
     }).catch((err) => {
         console.log(err);
@@ -1036,13 +1090,18 @@ app.get('/login/:username/:password', async (req, res) => {
     res.send("ok");
 });
 
+/**
+ * GET /updateDB
+ * Endpoint for triggering an update of the database with the latest jobs from Midjourney
+ * @returns {string} - "ok" if PuppeteerClient is logged into Midjourney, "not ok" if not
+ */
 app.get('/updateDB', async (req, res) => {
     let data;
-    puppeteerClient.getUsersJobsData().then(async(dataTemp) => {
+    puppeteerClient.getUsersJobsData().then(async (dataTemp) => {
         data = dataTemp;
         console.log(typeof data);
         console.log("Size of data: ", data.length, "\nCalling buildImageData()");
-        imageData = buildImageData(data);
+        let imageData = buildImageData(data);
         console.log("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
         for (let i = 0; i < imageData.length; i++) {
             // await insertUUID(imageData[i].id, i);
@@ -1053,19 +1112,27 @@ app.get('/updateDB', async (req, res) => {
         console.log(err);
     });
 
-    if(puppeteerClient.loggedIntoMJ){
+    if (puppeteerClient.loggedIntoMJ) {
         res.send("ok");
-    }else{
+    } else {
         res.send("not ok");
     }
 });
 
-// starts a show of random images from the database that changes every so often
+/**
+ * GET /show
+ * Shows a slideshow of images from the database
+ */
 app.get('/show', (req, res) => {
     res.render('show');
 });
 
-// shows a specific image from the database
+/**
+ * GET /show/:uuid
+ * Shows a single image from the database
+ * @param {string} uuid - the uuid of the image to show
+ * @returns {string} - html that shows the image and is a link to another random image. JSON is also embedded in the html.
+ */
 app.get('/show/:uuid', async (req, res) => {
     const { uuid } = req.params;
     if (uuid === "" || uuid === undefined) res.render('show');
@@ -1078,170 +1145,79 @@ app.get('/show/:uuid', async (req, res) => {
     }
 });
 
-// selects a random image from the database and redirects to the show page for that image
+/**
+ * GET /randomUUID
+ * Redirects to a random image
+ */
 app.get('/randomUUID', async (req, res) => {
     const imageInfo = await imageDB.getRandomImage();
     res.redirect(`/show/${imageInfo.uuid}`);
 });
 
-// get a list of folders in the current directory
+/**
+ * GET /available-folders
+ * Gets a list of folders in the working directory
+ */
 app.get('/available-folders', (req, res) => {
     const folders = fs.readdirSync('./').filter(file => fs.lstatSync(path.join('./', file)).isDirectory());
     res.json(folders);
 });
 
-// get some entries from the logger
+/**
+ * GET /loggerGet/:entries/:remove
+ * Gets the most recent entries from the logger
+ * @param {number} entries - the number of entries to get
+ * @param {boolean} remove - whether or not to remove the entries from the logger
+ * @returns {json} - the entries from the logger
+ */
 app.get('/loggerGet/:entries/:remove', (req, res) => {
     const { entries, remove } = req.params;
-    if(remove === "true") console.log("removing entries from log");
-    let log = systemLogger.getRecentEntries(entries,remove === "true");
+    if (remove === "true") console.log("removing entries from log");
+    let log = systemLogger.getRecentEntries(entries, remove === "true");
     res.json(log);
 });
 
-// delete an entry in the logger
+/**
+ * GET /loggerDelete/:id
+ * Deletes an entry from the logger
+ * @param {number} id - the id of the entry to delete
+ */
 app.get('/loggerDelete/:id', (req, res) => {
     const { id } = req.params;
     const success = systemLogger.deleteEntry(id);
     res.json(success);
 });
 
-// add a message to the logger
+/**
+ * POST /logger
+ * Endpoint for logging messages to the logger
+ * @param {string} message - the message to log * 
+ */
 app.post('/logger', (req, res) => {
     const { message } = req.body;
     systemLogger.log(message);
     res.send('ok');
 });
 
-app.get('/get-images/:offset/:limit', (req, res) => {
-    const { offset, limit } = req.params;
-    const images = imageData.slice(offset, offset + limit);
-    res.json(images);
-});
-
 /**
- * 
- * @param {*} data 
- * @returns 
+ * GET /image/:imageUuid
+ * Endpoint for getting an image from the database
+ * @param {string} imageUuid - the uuid of the image to get
+ * @param {number} width - the width to resize the image to
+ * @param {number} height - the height to resize the image to
+ * @returns {image} - the image
  */
-function buildImageData(data) {
-    let imageData = [];
-    data.forEach((job) => {
-        if (job.batch_size == 4) {
-            for (let i = 0; i < 4; i++) {
-                imageData.push(new ImageInfo(job.id, i, job.enqueue_time, job.full_command, job.width, job.height));
-            }
-        } else {
-            imageData.push(new ImageInfo(job.parent_id, job.parent_grid, job.enqueue_time, job.full_command, job.width, job.height));
-        }
-    });
-    return imageData;
-}
-
-let axiosQueue = [];
-
-const checkFileExists = (url) => {
-    return new Promise((resolve, reject) => {
-        let fileName = `output/all/${url.split('/')[4]}_${url.split('/')[5]}`;
-        if (fs.existsSync(fileName)) {
-            reject();
-        } else {
-            resolve();
-        }
-    });
-}
-
-async function processAxiosQueue() {
-    // first thing to do is find all duplicate images
-    // then remove them from the queue
-    let uniqueQueue = Array.from(new Set(axiosQueue));
-
-    let promises = [];
-    let nonExistentImages = [];
-
-    axiosQueue.forEach((url) => {
-        promises.push(checkFileExists(url).then(() => { nonExistentImages.push(url) }).catch(() => { }));
-    });
-
-    await Promise.all(promises);
-
-    while (nonExistentImages.length > 0) {
-        process.stdout.cursorTo(0);
-        process.stdout.moveCursor(0, 1);
-        process.stdout.clearLine();
-        process.stdout.write(`nonExistentImages.length: ${nonExistentImages.length} images\r`);
-        process.stdout.moveCursor(0, -1);
-        let url = nonExistentImages.shift();
-        try {
-            const response = await axios.get(url, { responseType: 'stream' });
-            let fileName = `output/all/${url.split('/')[4]}_${url.split('/')[5]}`
-            await response.data.pipe(fs.createWriteStream(fileName));
-            await waitSeconds(0.1);
-        } catch (error) {
-            console.log(error);
-            nonExistentImages.push(url);
-        }
-    }
-
-    while (uniqueQueue.length > 0) {
-        process.stdout.cursorTo(0);
-        process.stdout.moveCursor(0, 1);
-        process.stdout.clearLine();
-        process.stdout.write(`uniqueQueue.length: ${uniqueQueue.length} images\r`);
-        process.stdout.moveCursor(0, -1);
-        let url = uniqueQueue.shift();
-        try {
-            const response = await axios.get(url, { responseType: 'stream' });
-            let fileName = `output/all/${url.split('/')[4]}_${url.split('/')[5]}`;
-            // check to see if file is same size as response
-            const stats = fs.statSync(fileName);
-            const fileSizeInBytes = stats.size;
-            const contentLength = response.headers['content-length'];
-            if (fileSizeInBytes != contentLength) {
-                await response.data.pipe(fs.createWriteStream(fileName));
-                await waitSeconds(0.1);
-            }
-        } catch (error) {
-            console.log(error.cause);
-            axiosQueue.push(url);
-        }
-    }
-}
-
-const waitSeconds = (seconds) => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => { resolve(); }, seconds * 1000);
-    });
-};
-
-let servedImageCount = 0;
-
-app.get('/image/:imageName', async (req, res) => {
-    servedImageCount++;
-    process.stdout.cursorTo(0);
-    process.stdout.moveCursor(0, 1);
-    process.stdout.clearLine();
-    process.stdout.write(`Served ${servedImageCount} images\r`);
-    process.stdout.moveCursor(0, -1);
-
-    const { imageName } = req.params;
+app.get('/image/:imageUuid', async (req, res) => {
+    const { imageUuid } = req.params;
     const { width, height } = req.query;
 
-    const imagePath = path.join(__dirname, 'output/all', imageName);
+    const imagePath = path.join(__dirname, 'output/all', imageUuid);
 
     // Ensure the file exists
     if (!fs.existsSync(imagePath)) {
         res.status(404).send('Image not found');
         return;
     }
-
-    // Ensure the file is a PNG
-    // const isPNG = await validatePNG(imagePath);
-    // if (!isPNG) {
-    //     res.status(400).send('Image is not a valid PNG');
-    //     return;
-    // }
-
-
     try {
         const image = sharp(imagePath);
 
@@ -1260,13 +1236,24 @@ app.get('/image/:imageName', async (req, res) => {
         // Output the image
         res.set('Content-Type', 'image/jpg');
         image.pipe(res);
-
     } catch (error) {
         console.error('Error processing image: ', { error });
         res.status(500).send('Server error');
     }
 });
 
+/**
+ * GET /status
+ * Endpoint for getting the status of the server
+ * @returns {json} - the status of the server
+ */
+app.get('/status', (req, res) => {
+    res.json(serverStatusMonitor.checkServerStatus());
+});
+
+////////////////////////////////////////////////////////////////////////////////////////
+/////  Utilities
+////////////////////////////////////////////////////////////////////////////////////////
 
 function validatePNG(imagePath) {
     return new Promise((resolve) => {
@@ -1281,6 +1268,26 @@ function validatePNG(imagePath) {
             });
     });
 }
+
+function buildImageData(data) {
+    let imageData = [];
+    data.forEach((job) => {
+        if (job.batch_size == 4) {
+            for (let i = 0; i < 4; i++) {
+                imageData.push(new ImageInfo(job.id, i, job.enqueue_time, job.full_command, job.width, job.height));
+            }
+        } else {
+            imageData.push(new ImageInfo(job.parent_id, job.parent_grid, job.enqueue_time, job.full_command, job.width, job.height));
+        }
+    });
+    return imageData;
+}
+
+const waitSeconds = (seconds) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => { resolve(); }, seconds * 1000);
+    });
+};
 
 systemLogger.log("Server started");
 systemLogger.log("a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. a really long log entry. ");
@@ -1305,7 +1312,7 @@ process.stdin.on('data', function (data) {
     }
 });
 
-process.on('exit',(code) =>{
+process.on('exit', (code) => {
     console.log('exiting');
     dbClient.end();
 });
