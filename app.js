@@ -411,15 +411,15 @@ class ServerStatusMonitor {
         this.serverStartTime = new Date();
     }
 
-    checkServerStatus() {
+    async checkServerStatus() {
         let status = {};
         status.serverStartTime = this.serverStartTime;
         status.upTime = new Date() - this.serverStartTime;
-        status.upTimeFormatted = new Date(status.upTime).toISOString().substring(11, 8);
+        status.upTimeFormatted = new Date(status.upTime).toISOString().substring(11);
         status.numberOfLogEntries = this.systemLogger.getNumberOfEntries();
 
         status.database = {};
-        status.database.numberOfImages = this.dbClient.countImagesTotal();
+        status.database.numberOfImages = await this.dbClient.countImagesTotal();
         status.database.errorCount = DB_Error.count;
 
         status.puppeteerClient = {};
@@ -437,7 +437,7 @@ class ServerStatusMonitor {
     }
 };
 
-class DatabaseManager {
+class Database {
     constructor() {
         this.dbClient = new pgClient.Client({
             user: 'mjuser',
@@ -448,6 +448,8 @@ class DatabaseManager {
         });
         this.dbClient.connect();
     }
+
+    // TODO: need to implement auto DB update
 
     insertImage = async (image, index) => {
         // find if image exists in database
@@ -788,7 +790,7 @@ class DownloadManager {
 
 const puppeteerClient = new PuppeteerClient();
 const systemLogger = new SystemLogger();
-const imageDB = new DatabaseManager();
+const imageDB = new Database();
 const downloadManager = new DownloadManager(imageDB, systemLogger);
 const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager, imageDB);
 
@@ -1248,8 +1250,8 @@ app.get('/image/:imageUuid', async (req, res) => {
  * Endpoint for getting the status of the server
  * @returns {json} - the status of the server
  */
-app.get('/status', (req, res) => {
-    res.json(serverStatusMonitor.checkServerStatus());
+app.get('/status', async (req, res) => {
+    res.json(await serverStatusMonitor.checkServerStatus());
 });
 
 ////////////////////////////////////////////////////////////////////////////////////////
