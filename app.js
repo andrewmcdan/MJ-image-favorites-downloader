@@ -403,10 +403,11 @@ class PuppeteerClient {
 };
 
 class ServerStatusMonitor {
-    constructor(SystemLogger, PuppeteerClient, DownloadManager) {
+    constructor(SystemLogger, PuppeteerClient, DownloadManager,DatabaseManager) {
         this.systemLogger = SystemLogger;
         this.puppeteerClient = PuppeteerClient;
         this.downloadManager = DownloadManager;
+        this.dbClient = DatabaseManager;
         this.serverStartTime = new Date();
     }
 
@@ -789,7 +790,7 @@ const puppeteerClient = new PuppeteerClient();
 const systemLogger = new SystemLogger();
 const imageDB = new DatabaseManager();
 const downloadManager = new DownloadManager(imageDB, systemLogger);
-const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager);
+const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager, imageDB);
 
 /*const dbClient = new pgClient.Client({
     user: 'mjuser',
