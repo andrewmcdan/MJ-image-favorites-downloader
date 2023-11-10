@@ -418,7 +418,7 @@ class ServerStatusMonitor {
         status.numberOfLogEntries = this.systemLogger.getNumberOfEntries();
 
         status.database = {};
-        status.database.numberOfImages = countImages_DB();
+        status.database.numberOfImages = this.dbClient.countImages_DB();
         status.database.errorCount = DB_Error.count;
 
         status.puppeteerClient = {};
