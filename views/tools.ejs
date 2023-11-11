@@ -101,7 +101,7 @@ Tools page:
             object-position: right;
         }
 
-        .tool-wrapper{
+        .tool-wrapper {
             margin: 10px;
             border: 1px solid rgb(153, 153, 153);
             border-radius: 5px;
@@ -116,7 +116,8 @@ Tools page:
         <div class="form-container">
             <h1>Tools</h1><button type="submit" id="reloadExt">Reload Extension</button>
             <div class="tool-wrapper">
-                <p>Take an image UUID and show the image and all the metadata about with links to the page for the user that generated it.</p>
+                <p>Take an image UUID and show the image and all the metadata about with links to the page for the user
+                    that generated it.</p>
                 <div>
                     <label for="imageUUID">Image UUID:</label>
                     <input type="text" id="imageUUID" name="imageUUID">
@@ -132,7 +133,9 @@ Tools page:
                 </div>
             </div>
             <div class="tool-wrapper">
-                <p>Take a user UUID and download their metadata. Defaults to the most recent day's data. Leave blank to get the long version (with specific dates) of your data or put your ID in to get the short version (but you must get all of it at once).</p>
+                <p>Take a user UUID and download their metadata. Defaults to the most recent day's data. Leave blank to
+                    get the long version (with specific dates) of your data or put your ID in to get the short version
+                    (but you must get all of it at once).</p>
                 <div>
                     <label for="userUUID">User UUID:</label>
                     <input type="text" id="userUUID" name="userUUID">
@@ -235,9 +238,9 @@ Tools page:
         let data;
         let doLongVersion = false;
 
-        
-            data = await getThisUserJobsData();
-            data = rewriteIdsToUrls(data);
+
+        data = await getThisUserJobsData();
+        data = rewriteIdsToUrls(data);
         // console.log({ data });
         // parse the data into a table
         document.getElementById("result-area").innerHTML = makeLinksClickable(objToHTML(data));
@@ -257,7 +260,7 @@ Tools page:
         let anyUUID = document.getElementById("anyUUID").value;
         console.log({ anyUUID });
         let yourUserID = await getUserID();
-        if(anyUUID == yourUserID){
+        if (anyUUID == yourUserID) {
             document.getElementById("anyUUID-result").innerHTML = "That's your UUID!";
             let userData = await getUserData(anyUUID);
             document.getElementById("result-area").innerHTML = objToHTML(userData);
@@ -265,7 +268,7 @@ Tools page:
         }
         let jobType = await getIfJobUserOrImage(anyUUID);
         console.log({ jobType });
-        switch(jobType.type){
+        switch (jobType.type) {
             case 'grid':
                 document.getElementById("anyUUID-result").innerHTML = "That's an image grid UUID!";
                 jobType.data = rewriteIdsToUrls(jobType.data);
@@ -516,8 +519,8 @@ Tools page:
             // data[i].parent_id = "https://cdn.midjourney.com/" + data[i].parent_id + "/0_" + data[i].parent_grid + ".png";
             data[i].link = "https://cdn.midjourney.com/" + data[i].parent_id + "/0_" + data[i].parent_grid + ".png";
         }
-        if(data.hasOwnProperty('image_paths')){
-            if(data.image_paths.length == 4){
+        if (data.hasOwnProperty('image_paths')) {
+            if (data.image_paths.length == 4) {
                 data.id = "https://cdn.midjourney.com/" + data.id + "/grid_0.webp";
             }
         }

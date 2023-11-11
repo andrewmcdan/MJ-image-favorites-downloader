@@ -13,6 +13,7 @@
             width: 100vw;
             height: 100vh;
         }
+
         #overlay {
             position: fixed;
             display: flex;
@@ -99,7 +100,7 @@
             const overlay = document.getElementById('overlay');
             overlay.style.display = 'none';
         }
-        function getMetaDataAndSendToServer(){
+        function getMetaDataAndSendToServer() {
             let metaData = null;
             let sent = -1;
             const getData = async (e) => {
@@ -113,9 +114,9 @@
                     body: JSON.stringify(metaData.thisUserJobsData)
                 });
                 success = await success.text();
-                if(success == 'ok'){
+                if (success == 'ok') {
                     sent = 1;
-                }else{
+                } else {
                     sent = 0;
                 }
             }
@@ -125,11 +126,11 @@
                 setTimeout(reject, 1000 * 15); // timeout after 15 seconds
                 // check if received every 500ms
                 const check = () => {
-                    if(sent == -1){ // not received yet
+                    if (sent == -1) { // not received yet
                         setTimeout(check, 500);
-                    }else if(sent == 1){ // received, resolve
+                    } else if (sent == 1) { // received, resolve
                         resolve();
-                    }else if(sent == 0){ // not received, reject
+                    } else if (sent == 0) { // not received, reject
                         reject();
                     }
                 }
