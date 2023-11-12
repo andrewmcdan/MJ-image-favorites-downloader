@@ -19,22 +19,31 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            width: 100vw;
+            width: calc(100vw - 1px);
             height: 100vh;
             background-color: rgba(0, 0, 0, 0.5);
             z-index: 1000;
+            transition: opacity 1s ease-out;
+            opacity: 1;
         }
 
         #overlay-text {
             color: white;
             font-size: 32px;
+            text-align: center;
         }
+
 
         #navbar {
             background-color: #333;
             color: white;
             padding: 10px;
             text-align: center;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+
         }
 
         #navbar button {
@@ -42,12 +51,12 @@
             /* Green */
             border: none;
             color: white;
-            padding: 7px 15px;
+            padding: 7px 10px;
             text-align: center;
             text-decoration: none;
             display: inline-block;
             font-size: 16px;
-            margin: 4px 2px;
+            margin: 4px 0px;
             transition-duration: 0.4s;
             cursor: pointer;
         }
@@ -55,38 +64,91 @@
         #navbar button:hover {
             background-color: white;
             color: black;
-            border: 2px solid #4CAF50;
+            border: none;
+        }
+
+        #image-container {
+            width: calc(100vw - 18px);
+        }
+
+        body {
+            padding-top: 60px;
+            width: calc(100vw - 18px);
         }
     </style>
 </head>
 
 <body>
     <div id="overlay">
-        <div id="overlay-text">Connecting to extension...</div>
+        <div id="overlay-text">Loading, this may take a minute...</div>
     </div>
     <nav id="navbar">
         <button id="update-metadata">Update Metadata on Server</button>
+        <label for="maxLoadedImages">Max Images to Load:</label>
+        <input type="number" id="maxLoadedImages" class="numberInput" name="maxLoadedImages" min="250" max="10000"
+            step="250" value="500">
+        <label for="selectFromTop">Select From Top:</label>
+        <input type="checkbox" id="selectFromTop" name="selectFromTop" value="selectFromTop">
+        <button id="selectAll">Select All</button>
+        <button id="deselectAll">Deselect All</button>
+        <button id="downloadSelected">Mark Selected for Download</button>
+        <button id="doNotDownloadSelected">Mark Selected to NOT be Downloaded</button>
+        <button id="loadAll">Load All Images Regardless of "Do Not Download"</button>
     </nav>
     <div id="image-container"></div>
     <script>
-        const serverUrl = 'http://favorites-downloader.midjourney.com:3000';
-        // connect to extension
-        let thisWindowListenerID = "main-script-event-" + generateUUID();
-        let channelReady = false;
-        window.addEventListener(thisWindowListenerID + 'c', function (event) {
-            console.log('message from content.js', event);
-            if (event.detail == 'ok') {
-                channelReady = true;
+        class ImageInfo {
+            static images = [];
+            static maxImages = 500;
+            static index = 0;
+            constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height, storageLocation, processed) {
+                this.parent_id = parent_id;
+                this.grid_index = grid_index;
+                this.enqueue_time = enqueue_time;
+                this.fullCommand = fullCommand;
+                // this.fullCommand = fullCommand.replace(/'/g, "\\'");
+                this.width = width;
+                this.height = height;
+                this.storageLocation = storageLocation;
+                this.do_not_download = null;
+                this.processed = processed;
+                if (processed == false) {
+                    ImageInfo.images.push(this);
+                }
+                this.index = ImageInfo.index++;
+                this.currentlySelected = false;
+                this.markForRemovalFromPage = false;
             }
-        });
-        const waitForChannel = async () => {
-            console.log("Waiting for comm channel to content.js...");
-            while (!channelReady) {
-                window.dispatchEvent(new CustomEvent('main-script-initiator', { detail: thisWindowListenerID }));
-                await waitSeconds(1);
+
+            toJSON() {
+                let t = { ...this };
+                t.urlFull = this.urlFull;
+                t.urlSmall = this.urlSmall;
+                t.urlMedium = this.urlMedium;
+                t.urlAlt = this.urlAlt;
+                t.urlParentGrid = this.urlParentGrid;
+                return t;
             }
-            console.log("Comm channel established");
-        }
+
+            get id() {
+                return this.parent_id + '_' + this.grid_index;
+            }
+            get urlFull() {
+                return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.png`;
+            }
+            get urlSmall() {
+                return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_32_N.webp`;
+            }
+            get urlMedium() {
+                return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_384_N.webp`;
+            }
+            get urlAlt() {
+                return `https://storage.googleapis.com/dream-machines-output/${this.parent_id}/0_${this.grid_index}.png`;
+            }
+            get urlParentGrid() {
+                return `https://cdn.midjourney.com/${this.parent_id}/grid_0.webp`;
+            }
+        };
         function generateUUID() {
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
                 var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -98,57 +160,293 @@
         };
         function removeOverlay() {
             const overlay = document.getElementById('overlay');
-            overlay.style.display = 'none';
+            // overlay.style.opacity = 1;
+            // fade out overlay
+            setTimeout(() => {
+                overlay.style.opacity = 0;
+            }, 1000);
+            // remove overlay after 0.5s
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 1500);
         }
-        function getMetaDataAndSendToServer() {
-            let metaData = null;
-            let sent = -1;
-            const getData = async (e) => {
-                metaData = e.detail;
-                window.removeEventListener(thisWindowListenerID + 'c', getData);
-                let success = await fetch(serverUrl + '/imageData', {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(metaData.thisUserJobsData)
-                });
-                success = await success.text();
-                if (success == 'ok') {
-                    sent = 1;
-                } else {
-                    sent = 0;
+        document.getElementById('update-metadata').addEventListener('click', async () => {
+            // show overlay
+            const overlay = document.getElementById('overlay');
+            overlay.style.display = 'flex';
+            overlay.style.opacity = 1;
+            window.scrollTo({
+                top: 0,
+                left: 0,
+                behavior: 'smooth'
+            });
+
+            // update metadata
+            let selectedImages = ImageInfo.images.filter((image) => image.currentlySelected && image.do_not_download != null);
+            let removalsInProgress = 0;
+            selectedImages.forEach(async (image) => {
+                removalsInProgress++;
+                let url = `/image/update/${image.id}/${image.do_not_download}`;
+                // console.log(url);
+                const response = await fetch(url);
+                const data = await response.json();
+                // console.log(data);
+                image.removeItem();
+                let i = ImageInfo.images.findIndex((img) => img.index == image.index);
+                if (i < ImageInfo.images.length) {
+                    ImageInfo.images.splice(i, 1);
+                }
+                removalsInProgress--;
+            });
+
+            let count = 0;
+            while (removalsInProgress > 0) {
+                await waitSeconds(1);
+                count++;
+                if (count > 300) {
+                    console.log('Timeout');
+                    break;
                 }
             }
-            window.addEventListener(thisWindowListenerID + 'c', getData);
-            window.dispatchEvent(new CustomEvent(thisWindowListenerID + 'm', { detail: 'getThisUserJobsData' }));
-            return new Promise((resolve, reject) => {
-                setTimeout(reject, 1000 * 15); // timeout after 15 seconds
-                // check if received every 500ms
-                const check = () => {
-                    if (sent == -1) { // not received yet
-                        setTimeout(check, 500);
-                    } else if (sent == 1) { // received, resolve
-                        resolve();
-                    } else if (sent == 0) { // not received, reject
-                        reject();
-                    }
-                }
-                check();
+
+            removeOverlay();
+
+            loadImages();
+        });
+
+
+        function markForDownload(downloadBool) {
+            let do_not_download = !downloadBool;
+            let selectedImages = ImageInfo.images.filter((image) => image.currentlySelected);
+            selectedImages.forEach(image => {
+                updateItemInImagesArray(image.index, do_not_download);
             });
         }
-        document.getElementById('update-metadata').addEventListener('click', () => {
-            // Your code to update metadata on the server goes here
-            getMetaDataAndSendToServer().then(() => {
-                alert('Metadata sent to server');
-            }).catch(() => {
-                alert('Error sending metadata to server');
+
+        document.getElementById('downloadSelected').addEventListener('click', () => {
+            markForDownload(true);
+        });
+
+        document.getElementById('doNotDownloadSelected').addEventListener('click', () => {
+            markForDownload(false);
+        });
+
+        document.getElementById('selectAll').addEventListener('click', () => {
+            ImageInfo.images.forEach((image, i) => {
+                document.getElementById('image#' + image.index).dispatchEvent(new Event('click_select'));
             });
         });
 
-        waitForChannel();
-        removeOverlay();
+        document.getElementById('deselectAll').addEventListener('click', () => {
+            ImageInfo.images.forEach((image, i) => {
+                document.getElementById('image#' + image.index).dispatchEvent(new Event('click_deselect'));
+            });
+        });
 
+        async function fetchImages(limit, offset, showParsed = false) {
+            if (showParsed) {
+                document.getElementById('overlay-text').innerHTML = `Loading...<br />Parsing database entries...<br />${offset} images parsed so far.`;
+            }
+            try {
+                const response = await fetch(`/image/recent/${limit}/${offset}`);
+                const data = await response.json();
+                return data.map(image => new ImageInfo(
+                    image.parent_uuid,
+                    image.grid_index,
+                    image.enqueue_time,
+                    image.full_command,
+                    image.width,
+                    image.height,
+                    image.storage_location,
+                    image.processed
+                ));
+            } catch (error) {
+                console.error('Error fetching images:', error);
+                return [];
+            }
+        }
+
+        function updateItemInImagesArray(imageNum, do_not_download) {
+            let index = ImageInfo.images.findIndex((image) => image.index == imageNum);
+            if (index < ImageInfo.images.length) {
+                ImageInfo.images[index].do_not_download = do_not_download;
+                ImageInfo.images[index].processed = true;
+            }
+        }
+
+        function setImageSelectedInImagesArray(imageNum, selected) {
+            // console.log(imageNum, selected);
+            let index = ImageInfo.images.findIndex((image) => image.index == imageNum);
+            // console.log(index);
+            if (index < ImageInfo.images.length) {
+                ImageInfo.images[index].currentlySelected = selected;
+            }
+        }
+
+        function addCheckmarkToImage(el) {
+            // Create a wrapper for the checkmark and the circle
+            const checkmarkWrapper = document.createElement('div');
+            checkmarkWrapper.style.position = 'absolute';
+            checkmarkWrapper.style.top = '5px';
+            checkmarkWrapper.style.left = '5px';
+            checkmarkWrapper.style.width = '25px'; // Slightly larger than the checkmark to accommodate the circle
+            checkmarkWrapper.style.height = '25px';
+            checkmarkWrapper.style.display = 'flex';
+            checkmarkWrapper.style.justifyContent = 'center';
+            checkmarkWrapper.style.alignItems = 'center';
+            checkmarkWrapper.style.borderRadius = '50%'; // Make it round
+            checkmarkWrapper.style.border = '2px solid white'; // Circle border
+            checkmarkWrapper.style.opacity = 0.3; // Initial opacity
+            checkmarkWrapper.style.backgroundColor = 'white'; // White background with opacity
+
+            // Create checkmark image element
+            const checkmark = document.createElement('img');
+            checkmark.src = '/checkmark.png';
+            checkmark.alt = 'Checkmark';
+            checkmark.style.width = '15px';
+            checkmark.style.height = '15px';
+            checkmark.style.filter = 'grayscale(100%)'; // Make it grey
+
+            // Add checkmark to the wrapper
+            checkmarkWrapper.appendChild(checkmark);
+
+            // Add the wrapper to the image element
+            el.style.position = 'relative'; // Needed to position the checkmark absolutely relative to the wrapper
+            el.appendChild(checkmarkWrapper);
+
+            // Add click event listener to the image wrapper
+            el.addEventListener('click', () => {
+                // Toggle checkmark appearance on click
+                if (checkmarkWrapper.style.opacity === '0.3') {
+                    checkmarkWrapper.style.opacity = '1'; // Make it fully visible
+                    checkmark.style.filter = 'grayscale(0%)';
+                } else {
+                    checkmarkWrapper.style.opacity = '0.3'; // Grey it out
+                    checkmark.style.filter = 'grayscale(100%)'; // Make it grey
+                }
+                // console.log(checkmarkWrapper.parentElement.id.split('#')[1]);
+                setImageSelectedInImagesArray(checkmarkWrapper.parentElement.id.split('#')[1], checkmarkWrapper.style.opacity === '1');
+            });
+            el.addEventListener('click_select', () => {
+                checkmarkWrapper.style.opacity = '1'; // Make it fully visible
+                checkmark.style.filter = 'grayscale(0%)';
+                // console.log(checkmarkWrapper.parentElement.id.split('#')[1]);
+                setImageSelectedInImagesArray(checkmarkWrapper.parentElement.id.split('#')[1], true);
+            });
+            el.addEventListener('click_deselect', () => {
+                checkmarkWrapper.style.opacity = '0.3'; // Grey it out
+                checkmark.style.filter = 'grayscale(100%)'; // Make it grey
+                // console.log(checkmarkWrapper.parentElement.id.split('#')[1]);
+                setImageSelectedInImagesArray(checkmarkWrapper.parentElement.id.split('#')[1], false);
+            });
+        }
+
+        function appendImages(images) {
+            const container = document.getElementById('image-container');
+            images.forEach(image => {
+                if (image.processed == true) {
+                    return;
+                }
+                const imgWrapper = document.createElement('div');
+                imgWrapper.style.display = 'inline-block'; // maintain inline layout
+                imgWrapper.style.verticalAlign = 'top'; // align at the top
+                // You can add more styling to imgWrapper if needed
+
+                const imgElement = document.createElement('img');
+                imgElement.src = image.urlMedium;
+                imgElement.alt = 'Image';
+                imgElement.style.width = 'calc((100vw - 18px) / 8)';
+                imgElement.style.margin = '0';
+                imgElement.style.padding = '0';
+                imgElement.style.border = '0';
+                imgElement.style.display = 'block';
+
+                imgWrapper.id = "image#" + image.index;
+
+                imgElement.addEventListener('click', () => {
+                    // Your code to handle image selection goes here
+                    let selectAllFromTop = document.getElementById('selectFromTop').checked;
+                    if (selectAllFromTop) {
+                        ImageInfo.images.forEach((image) => {
+                            if (image.index < imgWrapper.id.split('#')[1]) {
+                                document.getElementById('image#' + image.index)?.dispatchEvent(new Event('click_select'));
+                            }
+                        });
+                    }
+                });
+
+                image.removeItem = () => {
+                    imgWrapper.remove();
+                    image.markForRemovalFromPage = true;
+                };
+
+                imgWrapper.appendChild(imgElement);
+                container.appendChild(imgWrapper);
+
+                // Pass the wrapper div to addCheckmarkToImage function
+                addCheckmarkToImage(imgWrapper);
+            });
+        }
+
+
+        let isLoading = false;
+        let offset = 0;
+        const limit = 1000; // Number of images to fetch per request
+
+        async function loadImages(showParsed = false) {
+            if (ImageInfo.images.length > ImageInfo.maxImages) {
+                return;
+            }
+            if (isLoading) return;
+            isLoading = true;
+
+            const images = await fetchImages(limit, offset, showParsed);
+            appendImages(images);
+            offset += images.length;
+
+            isLoading = false;
+        }
+
+
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Infinite scrolling
+        const debouncedLoadImages = debounce(() => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) { // 100 is a threshold in pixels
+                loadImages();
+            }
+        }, 100);
+
+        // Initial load
+        loadImages(true);
+
+        window.addEventListener('scroll', debouncedLoadImages);
+
+        document.getElementById('maxLoadedImages').addEventListener('change', (e) => {
+            ImageInfo.maxImages = e.target.value;
+            loadImages();
+        });
+
+        (async () => {
+            while (document.getElementById('image-container').children.length == 0) {
+                await waitSeconds(1);
+                loadImages(true);
+            }
+            removeOverlay();
+            document.getElementById('overlay-text').innerHTML = `Loading...`;
+        }
+        )();
 
     </script>
 </body>

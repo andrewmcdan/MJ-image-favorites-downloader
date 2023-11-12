@@ -29,7 +29,7 @@
  */
 //
 const fs = require('fs');
-const axios = require('axios');
+// const axios = require('axios');
 const path = require('path');
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -45,6 +45,8 @@ puppeteer.use(StealthPlugin());
 const Upscaler = require('ai-upscale-module');
 
 let updateDB = true;
+
+let settings = {};
 
 class DB_Error extends Error {
     static count = 0;
@@ -476,8 +478,8 @@ class Database {
         let res;
         try {
             res = await this.dbClient.query(
-                `INSERT INTO images (uuid, parent_uuid, grid_index, enqueue_time, full_command, width, height, storage_location, downloaded, do_not_download, processed, index) 
-             VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                `INSERT INTO images (uuid, parent_uuid, grid_index, enqueue_time, full_command, width, height, storage_location, downloaded, do_not_download, processed, index, upscale_location) 
+             VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, null)`,
                 [
                     image.id,
                     image.parent_id,
@@ -487,14 +489,14 @@ class Database {
                     image.width,
                     image.height,
                     image.storageLocation,
-                    image.downloaded,
-                    image.doNotDownload,
-                    image.processed,
+                    image.downloaded !== null && image.downloaded !== undefined ? image.downloaded : false,
+                    image.doNotDownload !== null && image.doNotDownload !== undefined ? image.doNotDownload : false,
+                    image.processed !== null && image.processed !== undefined ? image.processed : false,
                     index
                 ]
             );
         } catch (err) {
-            new DB_Error("Error inserting image into database. Image ID: " + image.id);
+            new DB_Error("Error inserting image into database. Image ID: " + image.id + "Error: " + err);
             return null;
         }
         return res;
@@ -674,6 +676,37 @@ class Database {
             return null;
         }
     }
+
+    getEntriesOrderedByEnqueueTime = async (limit = 100, offset = 0) => {
+        if (typeof limit === "string") {
+            try {
+                limit = parseInt(limit);
+            } catch {
+                limit = 100;
+            }
+        }
+        if (typeof offset === "string") {
+            try {
+                offset = parseInt(offset);
+            } catch {
+                offset = 0;
+            }
+        }
+        if (typeof limit !== "number") limit = 100;
+        if (typeof offset !== "number") offset = 0;
+        try {
+            const res = await this.dbClient.query(
+                `SELECT * FROM images 
+                ORDER BY enqueue_time DESC 
+                LIMIT $1 OFFSET $2`,
+                [limit, offset]
+            );
+            return res.rows;
+        } catch (err) {
+            new DB_Error("Error getting entries ordered by enqueue_time");
+            return null;
+        }
+    }
 };
 
 class ImageInfo {
@@ -812,7 +845,6 @@ class DownloadManager {
         return (image);
     }
 
-
     start() {
         // TODO: add logic that checks if a timeout was already set, and if so, clear it
         if (this.runTimeout !== null) clearTimeout(this.runTimeout);
@@ -894,14 +926,13 @@ class DownloadManager {
             let image = await this.dbClient.lookupImageByIndex(i, { processed: true, enabled: true }, { downloaded: true, enabled: false }, { do_not_download: false, enabled: true });
             if (image === undefined) continue;
             if (image === null) continue;
-            if (image.downloaded === true) {
-                if (this.checkFileExistsPath(image.storage_location) === false) {
-                    image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
-                    image.downloaded = false;
-                    image.processed = true;
-                    image.storageLocation = "";
-                    await this.dbClient.updateImage(image);
-                }
+            if (image.downloaded !== true) continue;
+            if (this.checkFileExistsPath(image.storage_location) === false) {
+                image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
+                image.downloaded = false;
+                image.processed = true;
+                image.storageLocation = "";
+                await this.dbClient.updateImage(image);
             }
         }
     }
@@ -928,15 +959,11 @@ const downloadManager = new DownloadManager(imageDB, systemLogger);
 const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager, imageDB);
 const upscalerManager = new UpscaleManager(imageDB, systemLogger);
 
-
-
-
 /////////////////////////////////////////////////////////////////////////////////////////
+app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// Serve static files from the "public" directory
-app.use(express.static('public'));
-// app.use(express.static('output'));
+
 
 
 
@@ -1155,6 +1182,26 @@ app.post('/logger', (req, res) => {
     res.send('ok');
 });
 
+app.get('/image/recent/:limit/:offset', async (req, res) => {
+    const { limit, offset } = req.params;
+    const data = await imageDB.getEntriesOrderedByEnqueueTime(limit, offset);
+    res.json(data);
+});
+
+app.get('/image/update/:id/:do_not_download', async (req, res) => {
+    const { id, do_not_download } = req.params;
+    let image = await imageDB.lookupByUUID(id);
+    if (image === undefined) {
+        res.status(404).send('Image not found');
+        return;
+    }
+    const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
+    imageInfo.doNotDownload = do_not_download === "true";
+    imageInfo.processed = true;
+    await imageDB.updateImage(imageInfo);
+    res.json(imageInfo);
+});
+
 /**
  * GET /image/:imageUuid
  * Endpoint for getting an image from the database
@@ -1251,19 +1298,41 @@ function waitSeconds(seconds) {
     });
 }
 
-systemLogger.log("Server started", new Date().toLocaleString());
+function loadSettings() {
+    if (fs.existsSync("settings.json")) {
+        try {
+            settings = JSON.parse(fs.readFileSync("settings.json"));
+            return true;
+        } catch (err) {
+            return false;
+        }
+    } else {
+        return false;
+    }
+}
 
-process.stdin.on('data', function (data) {
-    console.log(data.toString());
-    if (data.toString().trim() === 'exit') {
-        process.exit();
-    }
-    if (data.toString().trim() === 'ls') {
-        console.log(JSON.stringify(checkArray, null, 2));
-    }
-});
+function saveSettings() {
+    fs.writeFileSync("settings.json", JSON.stringify(settings, null, 4));
+    systemLogger?.log("Setting saved", new Date().toLocaleString());
+}
+
+systemLogger.log("Server started", new Date().toLocaleString());
+if (!loadSettings()) {
+    systemLogger?.log("Settings file not found. Using default settings", new Date().toLocaleString());
+    settings = {
+        downloadLocation: "output",
+        timeToDownload: 0,
+        runEnabled: false
+    };
+    downloadManager?.setDownloadLocation(settings.downloadLocation);
+    downloadManager?.setTimeToDownload(settings.timeToDownload);
+    downloadManager.runEnabled = settings.runEnabled;
+}
+
 
 process.on('exit', (code) => {
+    saveSettings();
     console.log('exiting');
-    dbClient.end();
+    imageDB.dbClient.end();
+    systemLogger?.log("Server exited", new Date().toLocaleString());
 });
