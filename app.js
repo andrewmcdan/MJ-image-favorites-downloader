@@ -754,6 +754,56 @@ class ImageInfo {
     }
 };
 
+class DatabaseUpdateManager {
+    constructor(DatabaseManager = null, SystemLogger = null, PuppeteerClient = null) {
+        this.dbClient = DatabaseManager;
+        this.puppeteerClient = PuppeteerClient;
+        this.systemLogger = SystemLogger;
+        this.updateInProgress = false;
+        this.runTimeout = null;
+        this.timeToUpdate = 28;
+        this.runEnabled = true;
+        this.start();
+    }
+
+    start() {
+        if (this.runTimeout !== null) clearTimeout(this.runTimeout);
+        let now = new Date();
+        let timeToUpdate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), this.timeToUpdate / 60, this.timeToUpdate % 60, 0, 0);
+        let timeUntilUpdate = timeToUpdate - now;
+        if (timeUntilUpdate < 0) timeUntilUpdate += 1000 * 60 * 60 * 24;
+        this.runTimeout = setTimeout(() => this.run(), timeUntilUpdate);
+    }
+
+    run() {
+        if (!this.runEnabled) {
+            this.start();
+            return;
+        }
+        this.updateInProgress = true;
+
+        let data;
+        this.puppeteerClient.getUsersJobsData().then(async (dataTemp) => {
+            data = dataTemp;
+            console.log(typeof data);
+            console.log("Size of data: ", data.length, "\nCalling buildImageData()");
+            let imageData = buildImageData(data);
+            console.log("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
+            for (let i = 0; i < imageData.length; i++) {
+                // await insertUUID(imageData[i].id, i);
+                if (updateDB) await imageDB.insertImage(imageData[i], i);
+            }
+            console.log("Done updating database");
+        }).catch((err) => {
+            console.log(err);
+            this.systemLogger.log("Error getting user's jobs data", err);
+        }).finally(() => {
+            this.updateInProgress = false;
+            this.start();
+        });
+    }
+}
+
 class DownloadManager {
     constructor(DatabaseManager = null, SystemLogger = null) {
         this.downloadLocation = "output";
@@ -852,11 +902,14 @@ class DownloadManager {
         let timeToDownload = new Date(now.getFullYear(), now.getMonth(), now.getDate(), this.timeToDownload / 60, this.timeToDownload % 60, 0, 0);
         let timeUntilDownload = timeToDownload - now;
         if (timeUntilDownload < 0) timeUntilDownload += 1000 * 60 * 60 * 24;
-        this.runTimeout = setTimeout(this.run, timeUntilDownload);
+        this.runTimeout = setTimeout(() => this.run(), timeUntilDownload);
     }
 
     async run() {
-        if (!this.runEnabled) return;
+        if (!this.runEnabled) {
+            this.start();
+            return;
+        }
         await this.verifyDownloads();
         this.concurrentDownloads = 0;
         let imageCount = await this.dbClient.countImagesTotal();
@@ -958,6 +1011,7 @@ const imageDB = new Database();
 const downloadManager = new DownloadManager(imageDB, systemLogger);
 const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager, imageDB);
 const upscalerManager = new UpscaleManager(imageDB, systemLogger);
+const databaseUpdateManager = new DatabaseUpdateManager(imageDB, systemLogger, puppeteerClient);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 app.use(express.static('public'));
