@@ -12,7 +12,7 @@
  * 
  * TODO: 
  * 1. update the database so that it holds all the data that the ImageInfo class holds
- * 2. make it so that the server runs puppeteer instead of usaing the browser extension
+ * 2. make it so that the server runs puppeteer instead of using the browser extension
  *      - this will allow the server to pull down the metadata on a regular basis, like at night
  * 
  * 
