@@ -410,11 +410,13 @@ class PuppeteerClient {
 };
 
 class ServerStatusMonitor {
-    constructor(SystemLogger, PuppeteerClient, DownloadManager, DatabaseManager) {
+    constructor(SystemLogger, PuppeteerClient, DownloadManager, DatabaseManager, UpscaleManager, DatabaseUpdateManager) {
         this.systemLogger = SystemLogger;
         this.puppeteerClient = PuppeteerClient;
         this.downloadManager = DownloadManager;
         this.dbClient = DatabaseManager;
+        this.upscalerManager = UpscaleManager;
+        this.databaseUpdateManager = DatabaseUpdateManager;
         this.serverStartTime = new Date();
     }
 
@@ -432,6 +434,7 @@ class ServerStatusMonitor {
         upTimeMinutes = upTimeMinutes % 60;
         upTimeHours = upTimeHours % 24;
         status.upTimeFormatted = ((upTimeDays > 0) ? upTimeDays + " days, " : "") + ((upTimeHours > 0) ? upTimeHours + " hours, " : "") + ((upTimeMinutes > 0) ? upTimeMinutes + " minutes, " : "") + upTimeSeconds + " seconds";
+
         status.numberOfLogEntries = this.systemLogger.getNumberOfEntries();
 
         status.database = {};
@@ -443,10 +446,20 @@ class ServerStatusMonitor {
         status.puppeteerClient.loginInProgress = this.puppeteerClient.loginInProgress;
 
         status.downloadManager = {};
-        status.downloadManager.downloadsInProgress = this.downloadManager.concurrentDownloads.length;
+        status.downloadManager.downloadsInProgress = this.downloadManager.concurrentDownloads;
         status.downloadManager.timeToDownload = this.downloadManager.timeToDownload;
         status.downloadManager.runEnabled = this.downloadManager.runEnabled;
         status.downloadManager.downloadLocation = this.downloadManager.downloadLocation;
+
+        status.upscalerManager = {};
+        status.upscalerManager.upscaleInProgress = this.upscalerManager.upscaleInProgress;
+        status.upscalerManager.runningUpscales = this.upscalerManager.runningUpscales;
+        status.upscalerManager.queuedUpscales = this.upscalerManager.queuedUpscales;
+
+        status.databaseUpdateManager = {};
+        status.databaseUpdateManager.updateInProgress = this.databaseUpdateManager.updateInProgress;
+        status.databaseUpdateManager.timeToUpdate = this.databaseUpdateManager.timeToUpdate;
+        status.databaseUpdateManager.runEnabled = this.databaseUpdateManager.runEnabled;
 
         return status;
     }
@@ -761,7 +774,7 @@ class DatabaseUpdateManager {
         this.systemLogger = SystemLogger;
         this.updateInProgress = false;
         this.runTimeout = null;
-        this.timeToUpdate = 28;
+        this.timeToUpdate = 0; // minutes after midnight
         this.runEnabled = true;
         this.start();
     }
@@ -780,8 +793,8 @@ class DatabaseUpdateManager {
             this.start();
             return;
         }
+        if (this.updateInProgress === true) return;
         this.updateInProgress = true;
-
         let data;
         this.puppeteerClient.getUsersJobsData().then(async (dataTemp) => {
             data = dataTemp;
@@ -790,7 +803,6 @@ class DatabaseUpdateManager {
             let imageData = buildImageData(data);
             console.log("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
             for (let i = 0; i < imageData.length; i++) {
-                // await insertUUID(imageData[i].id, i);
                 if (updateDB) await imageDB.insertImage(imageData[i], i);
             }
             console.log("Done updating database");
@@ -809,7 +821,7 @@ class DownloadManager {
         this.downloadLocation = "output";
         this.timeToDownload = 0; // minutes past midnight
         this.runEnabled = false;
-        // this.downloadInProgress = false;
+        this.downloadInProgress = false;
         this.concurrentDownloads = 0;
         this.runTimeout = null;
         this.dbClient = DatabaseManager;
@@ -865,20 +877,25 @@ class DownloadManager {
         }
 
         let contentLength = parseInt(response.headers.get('content-length'), 10);
-        if (!fs.existsSync(this.downloadLocation)) fs.mkdirSync(this.downloadLocation, { recursive: true });
+        let imageDate = new Date(image.enqueue_time);
+        let year = imageDate.getFullYear();
+        let month = imageDate.getMonth() + 1;
+        let day = imageDate.getDate();
+        let destFolder = this.downloadLocation + "/" + year + "/" + month + "/" + day;
+        if (!fs.existsSync(destFolder)) fs.mkdirSync(destFolder, { recursive: true });
         let splitImage = url.split('/');
         let destFileName = splitImage[splitImage.length - 2] + "-" + splitImage[splitImage.length - 1];
 
-        if (fs.existsSync(path.join(this.downloadLocation, destFileName))) {
+        if (fs.existsSync(path.join(destFolder, destFileName))) {
             // delete file
-            fs.unlinkSync(path.join(this.downloadLocation, destFileName));
+            fs.unlinkSync(path.join(destFolder, destFileName));
         }
         let data = await response.arrayBuffer();
         data = Buffer.from(data);
-        fs.writeFileSync(path.join(this.downloadLocation, destFileName), data);
+        fs.writeFileSync(path.join(destFolder, destFileName), data);
         let fileSize = 0;
         // await waitSeconds(0.5);
-        let file = fs.statSync(path.join(this.downloadLocation, destFileName));
+        let file = fs.statSync(path.join(destFolder, destFileName));
         fileSize = file.size;
         fileSize = parseInt(fileSize);
         contentLength = parseInt(contentLength);
@@ -888,7 +905,7 @@ class DownloadManager {
         }
         console.log("Downloaded image " + destFileName + " of size " + fileSize + " bytes");
         image.downloaded = true;
-        image.storageLocation = path.join(this.downloadLocation, destFileName);
+        image.storageLocation = path.join(destFolder, destFileName);
         image.processed = true;
         image.fileSize = fileSize;
         image.success = true;
@@ -896,7 +913,6 @@ class DownloadManager {
     }
 
     start() {
-        // TODO: add logic that checks if a timeout was already set, and if so, clear it
         if (this.runTimeout !== null) clearTimeout(this.runTimeout);
         let now = new Date();
         let timeToDownload = new Date(now.getFullYear(), now.getMonth(), now.getDate(), this.timeToDownload / 60, this.timeToDownload % 60, 0, 0);
@@ -910,21 +926,31 @@ class DownloadManager {
             this.start();
             return;
         }
+        if (this.downloadInProgress === true) return;
+        this.downloadInProgress = true;
         await this.verifyDownloads();
         this.concurrentDownloads = 0;
         let imageCount = await this.dbClient.countImagesTotal();
         console.log("Image count: " + imageCount);
+        let success = true;
         for (let i = 0; i < imageCount; i++) {
-            await this.lookupAndDownloadImageByIndex(i);
+            if (!(await this.lookupAndDownloadImageByIndex(i))) success = false;
         }
-        console.log("Done downloading images");
+        if (success) {
+            console.log("Done downloading images");
+        } else {
+            console.log("One or more errors occurred while downloading images");
+            this.systemLogger.log("One or more errors occurred while downloading images");
+        }
+        this.downloadInProgress = false;
         this.start();
     }
 
     async lookupAndDownloadImageByIndex(index) {
+        if (!this.runEnabled) return true;
         let image = await this.dbClient.lookupImageByIndex(index, { processed: true, enabled: true }, { downloaded: false, enabled: true }, { do_not_download: false, enabled: true });
-        if (image === undefined) return;
-        if (image === null) return;
+        if (image === undefined) return true;
+        if (image === null) return true;
         image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
 
         this.concurrentDownloads++;
@@ -933,6 +959,7 @@ class DownloadManager {
             imageResult = await this.downloadImage(image.urlAlt, image);
         } catch (err) {
             this.systemLogger.log("Error downloading image", err, image);
+            return false;
         }
         this.concurrentDownloads--;
 
@@ -950,14 +977,17 @@ class DownloadManager {
                 altImageResult = await this.downloadImage(url);
             } catch (err) {
                 this.systemLogger.log("Error downloading image", err, image);
+                return false;
             }
             this.concurrentDownloads--;
             if (altImageResult.success === true) {
                 await this.dbClient.updateImage(altImageResult);
             } else {
                 this.systemLogger.log("Error downloading image", altImageResult.error, image);
+                return false;
             }
         }
+        return true;
     }
 
     checkFileExistsPath(path) {
@@ -1009,12 +1039,30 @@ const puppeteerClient = new PuppeteerClient();
 const systemLogger = new SystemLogger();
 const imageDB = new Database();
 const downloadManager = new DownloadManager(imageDB, systemLogger);
-const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager, imageDB);
 const upscalerManager = new UpscaleManager(imageDB, systemLogger);
 const databaseUpdateManager = new DatabaseUpdateManager(imageDB, systemLogger, puppeteerClient);
 
+const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager, imageDB, upscalerManager, databaseUpdateManager);
+
+
+if (!loadSettings()) {
+    systemLogger?.log("Settings file not found. Using default settings", new Date().toLocaleString());
+    settings = {
+        downloadLocation: "output",
+        timeToDownload: 0,
+        runEnabled: false,
+        updateDB: true
+    };
+    downloadManager?.setDownloadLocation(settings.downloadLocation);
+    downloadManager?.setTimeToDownload(settings.timeToDownload);
+    downloadManager.runEnabled = settings.runEnabled;
+    databaseUpdateManager.runEnabled = settings.runEnabled;
+    updateDB = settings.updateDB;
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 app.use(express.static('public'));
+app.use(express.static(settings.downloadLocation));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -1099,30 +1147,11 @@ app.get('/login/:username/:password', async (req, res) => {
 /**
  * GET /updateDB
  * Endpoint for triggering an update of the database with the latest jobs from Midjourney
- * @returns {string} - "ok" if PuppeteerClient is logged into Midjourney, "not ok" if not
+ * @returns {string} - "ok" once the update has been triggered
  */
 app.get('/updateDB', async (req, res) => {
-    let data;
-    puppeteerClient.getUsersJobsData().then(async (dataTemp) => {
-        data = dataTemp;
-        console.log(typeof data);
-        console.log("Size of data: ", data.length, "\nCalling buildImageData()");
-        let imageData = buildImageData(data);
-        console.log("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
-        for (let i = 0; i < imageData.length; i++) {
-            // await insertUUID(imageData[i].id, i);
-            if (updateDB) await imageDB.insertImage(imageData[i], i);
-        }
-        console.log("Done updating database");
-    }).catch((err) => {
-        console.log(err);
-    });
-
-    if (puppeteerClient.loggedIntoMJ) {
-        res.send("ok");
-    } else {
-        res.send("not ok");
-    }
+    databaseUpdateManager.run();
+    res.send("ok");
 });
 
 /**
@@ -1195,8 +1224,14 @@ app.get('/set-time-to-download/:time', (req, res) => {
  */
 app.get('/set-run-enabled/:enabled', (req, res) => {
     const { enabled } = req.params;
-    if (enabled === "true") downloadManager.runEnabled = true;
-    else downloadManager.runEnabled = false;
+    if (enabled === "true") {
+        downloadManager.runEnabled = true;
+        databaseUpdateManager.runEnabled = true;
+    }
+    else {
+        downloadManager.runEnabled = false;
+        databaseUpdateManager.runEnabled = false;
+    }
     res.json(downloadManager.runEnabled);
 });
 
@@ -1326,7 +1361,7 @@ function validatePNG(imagePath) {
                 resolve(true);  // Valid PNG
             })
             .on('error', function (error) {
-                console.error('Invalid PNG:', error);
+                // console.error('Invalid PNG:', error);
                 resolve(false);  // Invalid PNG
             });
     });
@@ -1371,17 +1406,7 @@ function saveSettings() {
 }
 
 systemLogger.log("Server started", new Date().toLocaleString());
-if (!loadSettings()) {
-    systemLogger?.log("Settings file not found. Using default settings", new Date().toLocaleString());
-    settings = {
-        downloadLocation: "output",
-        timeToDownload: 0,
-        runEnabled: false
-    };
-    downloadManager?.setDownloadLocation(settings.downloadLocation);
-    downloadManager?.setTimeToDownload(settings.timeToDownload);
-    downloadManager.runEnabled = settings.runEnabled;
-}
+
 
 
 process.on('exit', (code) => {
