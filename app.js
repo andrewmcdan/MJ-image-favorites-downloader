@@ -843,6 +843,7 @@ class DownloadManager {
         this.dbClient = DatabaseManager;
         this.systemLogger = SystemLogger;
         this.start();
+        this.verifyDownloadsInProgress = false;
     }
 
     setDownloadLocation(location) {
@@ -942,6 +943,9 @@ class DownloadManager {
             this.start();
             return;
         }
+        if (this.verifyDownloadsInProgress) {
+            setTimeout(() => this.run(), 10000);
+        }
         if (this.downloadInProgress === true) return;
         this.downloadInProgress = true;
         await this.verifyDownloads();
@@ -1020,6 +1024,8 @@ class DownloadManager {
     }
 
     async verifyDownloads() {
+        if (this.verifyDownloadsInProgress) return;
+        this.verifyDownloadsInProgress = true;
         let imageCount = await this.dbClient.countImagesTotal();
         for (let i = 0; i < imageCount; i++) {
             let image = await this.dbClient.lookupImageByIndex(i, { processed: true, enabled: true }, { downloaded: true, enabled: false }, { do_not_download: false, enabled: true });
@@ -1034,6 +1040,7 @@ class DownloadManager {
                 await this.dbClient.updateImage(image);
             }
         }
+        this.verifyDownloadsInProgress = false;
     }
 };
 
@@ -1055,6 +1062,13 @@ const puppeteerClient = new PuppeteerClient();
 const systemLogger = new SystemLogger();
 const imageDB = new Database();
 const downloadManager = new DownloadManager(imageDB, systemLogger);
+
+(async () => {
+    console.log("Verifying downloads");
+    await downloadManager.verifyDownloads();
+    console.log("Done verifying downloads");
+})()
+
 const upscalerManager = new UpscaleManager(imageDB, systemLogger);
 const databaseUpdateManager = new DatabaseUpdateManager(imageDB, systemLogger, puppeteerClient);
 
