@@ -532,11 +532,15 @@ class Database {
         }
     }
     getRandomImage = async (downloadedOnly = false) => {
+        if (downloadedOnly === "true") downloadedOnly = true;
+        if (downloadedOnly === "false") downloadedOnly = false;
+        if (typeof downloadedOnly !== "boolean") downloadedOnly = false;
         try {
             let res;
             if (downloadedOnly) {
                 res = await this.dbClient.query(
-                    `SELECT * FROM images WHERE downloaded = true ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`
+                    `SELECT * FROM images WHERE downloaded = $1 AND do_not_download = $2 ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`,
+                    [true, false]
                 );
             } else {
                 res = await this.dbClient.query(
@@ -690,6 +694,18 @@ class Database {
         }
     }
 
+    setAllImagesSelectedCountZero = async () => {
+        try {
+            const res = await this.dbClient.query(
+                `UPDATE images SET times_selected = 0`
+            );
+            return res;
+        } catch (err) {
+            new DB_Error("Error setting all images selected count to zero");
+            return null;
+        }
+    }
+
     getEntriesOrderedByEnqueueTime = async (limit = 100, offset = 0) => {
         if (typeof limit === "string") {
             try {
@@ -723,7 +739,7 @@ class Database {
 };
 
 class ImageInfo {
-    constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height) {
+    constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height, storage_location = "") {
         this.parent_id = parent_id;
         this.grid_index = grid_index;
         this.enqueue_time = enqueue_time;
@@ -731,7 +747,7 @@ class ImageInfo {
         // this.fullCommand = fullCommand.replace(/'/g, "\\'");
         this.width = width;
         this.height = height;
-        this.storageLocation = "";
+        this.storageLocation = storage_location;
         this.downloaded = null;
         this.doNotDownload = null;
         this.processed = null;
@@ -1062,7 +1078,7 @@ if (!loadSettings()) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 app.use(express.static('public'));
-app.use(express.static(settings.downloadLocation));
+app.use(express.static('./'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -1174,7 +1190,7 @@ app.get('/show/:uuid', async (req, res) => {
     else {
         console.log("looking up uuid: ", uuid);
         const image = await imageDB.lookupByUUID(uuid);
-        const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
+        const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height, image.storage_location);
         imageDB.updateTimesSelectedPlusOne(uuid);
         res.send(`<a href="/randomUUID"><img src="${imageInfo.urlFull}" /></a><script type="application/json">${JSON.stringify(imageInfo)}</script>`);
     }
@@ -1184,9 +1200,20 @@ app.get('/show/:uuid', async (req, res) => {
  * GET /randomUUID
  * Redirects to a random image
  */
-app.get('/randomUUID', async (req, res) => {
-    const imageInfo = await imageDB.getRandomImage();
+app.get('/randomUUID/:dlOnly', async (req, res) => {
+    const { dlOnly } = req.params;
+    let _dlOnly;
+    if (dlOnly === "true") _dlOnly = true;
+    else _dlOnly = false;
+    let imageInfo = await imageDB.getRandomImage(_dlOnly);
+    while (imageInfo === undefined || imageInfo === null) {
+        imageInfo = await imageDB.getRandomImage(true);
+    }
     res.redirect(`/show/${imageInfo.uuid}`);
+});
+
+app.get('/randomUUID', async (req, res) => {
+    res.redirect(`/randomUUID/false`);
 });
 
 /**

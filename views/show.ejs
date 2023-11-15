@@ -27,7 +27,7 @@
         display: flex;
     }
 
-    #main-container img{
+    #main-container img {
         max-width: 100vw;
         max-height: 100vh;
     }
@@ -79,7 +79,7 @@
         color: rgb(0, 0, 0);
     }
 
-    #logger-container{
+    #logger-container {
         position: absolute;
         bottom: 0px;
         left: 0px;
@@ -122,6 +122,10 @@
         <label for="fadeDuration">Fade Duration (seconds):</label>
         <input type="number" id="fadeDuration" class="numberInput" name="fadeDuration" min="0.25" max="10" step="0.25"
             value="0.5">
+        <label for="allImages">Enable All Images in DB:</label>
+        <input type="checkbox" id="allImages" name="allImages" value="allImages">
+        <label for="cdnSource">Use Midjourney CDN Source:</label>
+        <input type="checkbox" id="cdnSource" name="cdnSource" value="cdnSource">
     </div>
     <div id="main-container">
     </div>
@@ -133,15 +137,14 @@
     </div>
     <script>
         class ImageInfo {
-            constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height) {
+            constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height, storageLocation) {
                 this.parent_id = parent_id;
                 this.grid_index = grid_index;
                 this.enqueue_time = enqueue_time;
                 this.fullCommand = fullCommand;
-                // this.fullCommand = fullCommand.replace(/'/g, "\\'");
                 this.width = width;
                 this.height = height;
-                this.storageLocation = "";
+                this.storageLocation = storageLocation;
                 this.downloaded = false;
                 this.doNotDownload = false;
             }
@@ -164,17 +167,23 @@
             get urlParentGrid() {
                 return `https://cdn.midjourney.com/${this.parent_id}/grid_0.webp`;
             }
+            get localUrl() {
+                if (this.storageLocation == null || this.storageLocation == undefined || this.storageLocation == 'null' || this.storageLocation == 'undefined' || this.storageLocation == '') return urlFull;
+                return `/${this.storageLocation}`
+            }
         }
         let getLogsFromServer = null;
-        function loggerDelete(id){
-                fetch('/loggerDelete/' + id)
+        function loggerDelete(id) {
+            fetch('/loggerDelete/' + id)
                 .then(response => response.json())
                 .then(data => {
                     console.log(data);
                     getLogsFromServer();
                 });
-            }
+        }
         (async () => {
+            let allImages = false;
+            let cdnSource = false;
             // top bar hide/show
             let navbar = document.getElementById('top-nav');
             let hideNavbarTimeout;
@@ -183,6 +192,22 @@
             function resetHideNavbarTimeout() { clearTimeout(hideNavbarTimeout); hideNavbarTimeout = setTimeout(hideNavbar, 10000); }
             document.body.addEventListener('mousemove', () => { showNavbar(); resetHideNavbarTimeout(); });
             document.body.addEventListener('mouseleave', () => { resetHideNavbarTimeout(); });
+            document.getElementById('allImages').addEventListener('change', (event) => {
+                if (event.target.checked) {
+                    allImages = true;
+                    document.getElementById('cdnSource').checked = true;
+                    cdnSource = true;
+                } else {
+                    allImages = false;
+                }
+            });
+            document.getElementById('cdnSource').addEventListener('change', (event) => {
+                if (event.target.checked) {
+                    cdnSource = true;
+                } else {
+                    cdnSource = false;
+                }
+            });
 
             function updateFadeTime(newTime) {
                 let images = document.getElementsByClassName('image');
@@ -191,14 +216,14 @@
                 }
             }
             document.getElementById('fadeDuration').addEventListener('change', (event) => {
-                if((document.getElementById('updateInterval').value / 4) < event.target.value) {
+                if ((document.getElementById('updateInterval').value / 4) < event.target.value) {
                     document.getElementById('updateInterval').value = event.target.value * 4;
                     setUpdateInterval(event.target.value * 4);
                 }
                 updateFadeTime(event.target.value);
             });
             document.getElementById('updateInterval').addEventListener('change', (event) => {
-                if((document.getElementById('fadeDuration').value * 4) > event.target.value) {
+                if ((document.getElementById('fadeDuration').value * 4) > event.target.value) {
                     document.getElementById('fadeDuration').value = event.target.value / 4;
                     updateFadeTime(event.target.value / 4);
                 }
@@ -209,29 +234,29 @@
 
             getLogsFromServer = () => {
                 fetch('/loggerGet/10/false') // get the 10 most recent logs, do not delete them
-                .then(response => response.json())
-                .then(data => {
-                    // parse some data
-                    console.log(data);
-                    if(data.length == 0){
-                        document.getElementById('logger-container').classList.add('hidden');
-                    }else{
-                        document.getElementById('logger-container').classList.remove('hidden');
-                        let innerHTML = '';
-                        for(let i = 0; i < data.length; i++){
-                            let timeStamp = new Date(data[i].time);
-                            let message = "";
-                            data[i].message.forEach((mes, i) => {
-                                if( i == 0) message += mes + " - ";
-                                else message += JSON.stringify(mes) + " - ";
-                            });
-                            innerHTML += `<span style="color: #00ff00;">${timeStamp.toLocaleString()}</span> - <span style="color: #0000ff;">${message}</span> `;
-                            innerHTML += `<span style="color: red; text-decoration: underline;" onclick="loggerDelete(${data[i].id})">Delete Log Entry</span><br><br>`;
+                    .then(response => response.json())
+                    .then(data => {
+                        // parse some data
+                        console.log(data);
+                        if (data.length == 0) {
+                            document.getElementById('logger-container').classList.add('hidden');
+                        } else {
+                            document.getElementById('logger-container').classList.remove('hidden');
+                            let innerHTML = '';
+                            for (let i = 0; i < data.length; i++) {
+                                let timeStamp = new Date(data[i].time);
+                                let message = "";
+                                data[i].message.forEach((mes, i) => {
+                                    if (i == 0) message += mes + " - ";
+                                    else message += JSON.stringify(mes) + " - ";
+                                });
+                                innerHTML += `<span style="color: #00ff00;">${timeStamp.toLocaleString()}</span> - <span style="color: #0000ff;">${message}</span> `;
+                                innerHTML += `<span style="color: red; text-decoration: underline;" onclick="loggerDelete(${data[i].id})">Delete Log Entry</span><br><br>`;
+                            }
+                            loggerText.innerHTML = innerHTML;
+                            // loggerText.scrollTop = loggerText.scrollHeight;
                         }
-                        loggerText.innerHTML = innerHTML;
-                        // loggerText.scrollTop = loggerText.scrollHeight;
-                    }
-                });
+                    });
             }
 
             getLogsFromServer();
@@ -281,21 +306,27 @@
 
             async function updateImages() {
                 let startTime = performance.now();
-                let randomImage = await fetch('/randomUUID');
+                let url = '/randomUUID/' + !allImages;
+                let randomImage = await fetch(url);
                 let randomImageText = await randomImage.text();
                 let randomImageObj = JSON.parse(randomImageText.substring(randomImageText.indexOf('{'), randomImageText.lastIndexOf('}') + 1));
-                let imageInfo = new ImageInfo(randomImageObj.parent_id, randomImageObj.grid_index, randomImageObj.enqueue_time, randomImageObj.fullCommand, randomImageObj.width, randomImageObj.height);
+                console.log(randomImageObj);
+                let imageInfo = new ImageInfo(randomImageObj.parent_id, randomImageObj.grid_index, randomImageObj.enqueue_time, randomImageObj.fullCommand, randomImageObj.width, randomImageObj.height, randomImageObj.storageLocation);
 
-                imageEls[imageElsIndex++].src = imageInfo.urlFull;
-                if(imageElsIndex >= imageEls.length) imageElsIndex = 0;
+                if (cdnSource) {
+                    imageEls[imageElsIndex++].src = imageInfo.urlFull;
+                } else {
+                    imageEls[imageElsIndex++].src = imageInfo.storageLocation;
+                }
+                if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
                 imageEls[imageElsIndex++].classList.remove('hidden');
-                if(imageElsIndex >= imageEls.length) imageElsIndex = 0;
+                if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
                 imageEls[imageElsIndex].classList.add('hidden');
                 let endTime = performance.now();
-                if((endTime - startTime) > (updateInterval * 1000)){
+                if ((endTime - startTime) > (updateInterval * 1000)) {
                     console.log(`Image ${imageInfo.id} took ${(endTime - startTime) / 1000} seconds to load, which is longer than the update interval of ${updateInterval} seconds.`);
                     updateIntervalExceedCount++;
-                    if(updateIntervalExceedCount > 5){
+                    if (updateIntervalExceedCount > 5) {
                         console.log(`The update interval has been increased to ${parseInt(updateInterval) + 1} seconds.`);
                         setUpdateInterval(parseInt(updateInterval) + 1);
                         updateIntervalExceedCount = 0;

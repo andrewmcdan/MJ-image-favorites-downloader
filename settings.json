@@ -2,5 +2,5 @@
     "downloadLocation": "output",
     "timeToDownload": 0,
     "runEnabled": false,
-    "updateDB": true,
+    "updateDB": true
 }
