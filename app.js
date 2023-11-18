@@ -180,7 +180,7 @@ class PuppeteerClient {
 
             await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
             // await waitSeconds(2);
-            if (this.page.url().includes("imagine") || this.page.url().includes("explore")) {
+            if (this.page.url().includes("https://www.midjourney.com/imagine")) {
                 this.loggedIntoMJ = true;
                 resolve();
             } else {
@@ -190,21 +190,21 @@ class PuppeteerClient {
         });
     }
 
-    async loginToMJ(username, password, MFA_cb = null) {
+    async loginToMJ(credentials_cb) {
         return new Promise(async (resolve, reject) => {
             if ((!this.loggedIntoMJ || this.browser == null) && !this.loginInProgress) {
                 // attempt to restore session
                 this.loadSession().then(() => { resolve(); }).catch(async () => {
                     this.loginInProgress = true;
                     if (this.browser !== null) await this.browser.close();
-                    this.browser = await puppeteer.launch({ headless: 'new', defaultViewport: null, args: ['--start-maximized'] });
+                    this.browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--start-maximized'] });
                     this.page = (await this.browser.pages())[0];
 
                     this.browser.on('targetcreated', async (target) => {
                         const pageList = await this.browser.pages();
                         let discordLoginPage = pageList[pageList.length - 1];
                         if (discordLoginPage.url().includes("discord.com/login")) {
-                            await this.loginToDiscord(discordLoginPage, username, password, MFA_cb);
+                            await this.loginToDiscord(discordLoginPage, credentials_cb);
                         }
                     });
 
@@ -255,7 +255,11 @@ class PuppeteerClient {
         });
     }
 
-    async loginToDiscord(discordLoginPage, username, password, MFA_cb) {
+    async loginToDiscord(discordLoginPage, credentials_cb) {
+        let credentials = await credentials_cb();
+        let username = credentials.uName;
+        let password = credentials.pWord;
+        let MFA_cb = credentials.mfaCb;
         await waitSeconds(1);
         await discordLoginPage.waitForSelector('input[name="email"]');
         let typingRandomTimeMin = 0.03;
@@ -298,7 +302,45 @@ class PuppeteerClient {
     getUsersJobsData() {
         return new Promise(async (resolve, reject) => {
             if (!this.loggedIntoMJ) {
-                await this.loginToMJ().catch((err) => {
+                let uNamePWordCb = async () => {
+                    systemLogger.log("Not logged into MJ. Please send login credentials.");
+                    let uName = "";
+                    let pWord = "";
+                    let mfaCb = null;
+                    /**
+                     * GET /login/:username/:password
+                     * Login endpoint for logging into Midjourney
+                     * @param {string} username - username for Midjourney
+                     * @param {string} password - password for Midjourney
+                     * @returns {string} - "ok" once credentials have been entered
+                     */
+                    app.get('/login/:username/:password', async (req, res) => {
+                        const { username, password } = req.params;
+                        uName = username;
+                        pWord = password;
+                        mfaCb = async () => {
+                            systemLogger.log("MFA code requested. Please send MFA code.");
+                            let retData = "";
+                            /**
+                             * GET /mfa/:data
+                             * Endpoint for getting the MFA code from the user
+                             * @param {string} data - the MFA code
+                             * @returns {string} - the MFA code
+                             */
+                            app.get('/mfa/:data', (req, res) => {
+                                const { data } = req.params;
+                                res.send(data);
+                                retData = data;
+                            });
+                            while (retData == "") await waitSeconds(1);
+                            return retData;
+                        };
+                        res.send("ok");
+                    });
+                    while (uName == "" || pWord == "") await waitSeconds(1);
+                    return { uName, pWord, mfaCb };
+                }
+                await this.loginToMJ(uNamePWordCb).catch((err) => {
                     reject("Not logged into MJ. Error: " + err);
                 });
             }
@@ -310,68 +352,68 @@ class PuppeteerClient {
                     reject("Login in progress for too long");
                 }
             }
-            await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
+            this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 }).then(async () => {
+                let data = await this.page.evaluate(async () => {
+                    const getUserUUID = async () => {
+                        let homePage = await fetch("https://www.midjourney.com/imagine");
+                        let homePageText = await homePage.text();
+                        let nextDataIndex = homePageText.indexOf("__NEXT_DATA__");
+                        let nextData = homePageText.substring(nextDataIndex);
+                        let startOfScript = nextData.indexOf("json\">");
+                        let endOfScript = nextData.indexOf("</script>");
+                        let script = nextData.substring(startOfScript + 6, endOfScript);
+                        let json = script.substring(script.indexOf("{"), script.lastIndexOf("}") + 1);
+                        let data = JSON.parse(json);
+                        imagineProps = data.props;
+                        let userUUID = data.props.initialAuthUser.midjourney_id;
+                        return userUUID;
+                    }
+                    let userUUID = await getUserUUID();
+                    let numberOfJobsReturned = 0;
+                    let cursor = "";
+                    let loopCount = 0;
+                    let returnedData = [];
+                    do {
+                        // let response = await fetch("https://www.midjourney.com/api/pg/thomas-jobs?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
 
-            let data = await this.page.evaluate(async () => {
-                const getUserUUID = async () => {
-                    let homePage = await fetch("https://www.midjourney.com/imagine");
-                    let homePageText = await homePage.text();
-                    let nextDataIndex = homePageText.indexOf("__NEXT_DATA__");
-                    let nextData = homePageText.substring(nextDataIndex);
-                    let startOfScript = nextData.indexOf("json\">");
-                    let endOfScript = nextData.indexOf("</script>");
-                    let script = nextData.substring(startOfScript + 6, endOfScript);
-                    let json = script.substring(script.indexOf("{"), script.lastIndexOf("}") + 1);
-                    let data = JSON.parse(json);
-                    imagineProps = data.props;
-                    let userUUID = data.props.initialAuthUser.midjourney_id;
-                    return userUUID;
-                }
-                let userUUID = await getUserUUID();
-                let numberOfJobsReturned = 0;
-                let cursor = "";
-                let loopCount = 0;
-                let returnedData = [];
-                do {
-                    // let response = await fetch("https://www.midjourney.com/api/pg/thomas-jobs?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
-
-                    let response = await fetch("https://www.midjourney.com/api/pg/thomas-jobs?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor), {
-                        "headers": {
-                            "accept": "*/*",
-                            "accept-language": "en-US,en;q=0.9",
-                            "cache-control": "no-cache",
-                            "content-type": "application/json",
-                            "pragma": "no-cache",
-                            "sec-ch-ua": "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
-                            "sec-ch-ua-mobile": "?0",
-                            "sec-ch-ua-platform": "\"Windows\"",
-                            "sec-fetch-dest": "empty",
-                            "sec-fetch-mode": "cors",
-                            "sec-fetch-site": "same-origin",
-                            "x-csrf-protection": "1"
-                        },
-                        "referrer": "https://www.midjourney.com/imagine",
-                        "referrerPolicy": "origin-when-cross-origin",
-                        "body": null,
-                        "method": "GET",
-                        "mode": "cors",
-                        "credentials": "include"
-                    });
+                        let response = await fetch("https://www.midjourney.com/api/pg/thomas-jobs?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor), {
+                            "headers": {
+                                "accept": "*/*",
+                                "accept-language": "en-US,en;q=0.9",
+                                "cache-control": "no-cache",
+                                "content-type": "application/json",
+                                "pragma": "no-cache",
+                                "sec-ch-ua": "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
+                                "sec-ch-ua-mobile": "?0",
+                                "sec-ch-ua-platform": "\"Windows\"",
+                                "sec-fetch-dest": "empty",
+                                "sec-fetch-mode": "cors",
+                                "sec-fetch-site": "same-origin",
+                                "x-csrf-protection": "1"
+                            },
+                            "referrer": "https://www.midjourney.com/imagine",
+                            "referrerPolicy": "origin-when-cross-origin",
+                            "body": null,
+                            "method": "GET",
+                            "mode": "cors",
+                            "credentials": "include"
+                        });
 
 
-                    let data = await response.json();
-                    // console.log({data});
-                    if (data.data.length == 0) break;
-                    numberOfJobsReturned = data.data.length;
-                    // put all the returned data into the returnedData array
-                    returnedData.push(...(data.data));
-                    cursor = data.cursor;
-                    loopCount++;
-                    if (loopCount > 100) break; // if we've returned more than 1,000,000 jobs, there's probably something wrong, and there's gonna be problems
-                } while (numberOfJobsReturned == 10000)
-                return returnedData;
+                        let data = await response.json();
+                        // console.log({data});
+                        if (data.data.length == 0) break;
+                        numberOfJobsReturned = data.data.length;
+                        // put all the returned data into the returnedData array
+                        returnedData.push(...(data.data));
+                        cursor = data.cursor;
+                        loopCount++;
+                        if (loopCount > 100) break; // if we've returned more than 1,000,000 jobs, there's probably something wrong, and there's gonna be problems
+                    } while (numberOfJobsReturned == 10000)
+                    return returnedData;
+                });
+                resolve(data);
             });
-            resolve(data);
         });
     }
 
@@ -475,9 +517,11 @@ class Database {
             port: 5432,
         });
         this.dbClient.connect();
+        this.dbClient.on('error', (err) => {
+            new DB_Error("Database error: " + err);
+            if (err.includes("Connection terminated unexpectedly")) this.dbClient.connect();
+        });
     }
-
-    // TODO: need to implement auto DB update
 
     insertImage = async (image, index) => {
         // find if image exists in database
@@ -1144,35 +1188,7 @@ app.get('/tools', (req, res) => {
     res.render('tools');
 });
 
-/**
- * GET /login/:username/:password
- * Login endpoint for logging into Midjourney
- * @param {string} username - username for Midjourney
- * @param {string} password - password for Midjourney
- * @returns {string} - "ok" once credentials have been entered
- */
-app.get('/login/:username/:password', async (req, res) => {
-    const { username, password } = req.params;
-    puppeteerClient.loginToMJ(username, password, async () => {
-        let retData = "";
-        /**
-         * GET /mfa/:data
-         * Endpoint for getting the MFA code from the user
-         * @param {string} data - the MFA code
-         * @returns {string} - the MFA code
-         */
-        app.get('/mfa/:data', (req, res) => {
-            const { data } = req.params;
-            res.send(data);
-            retData = data;
-        });
-        while (retData == "") await waitSeconds(1);
-        return retData;
-    }).catch((err) => {
-        console.log(err);
-    });
-    res.send("ok");
-});
+
 
 /**
  * GET /updateDB
