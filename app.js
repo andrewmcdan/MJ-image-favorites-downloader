@@ -658,8 +658,9 @@ class Database {
                 storage_location = $7,
                 downloaded = COALESCE($8, downloaded),
                 do_not_download = COALESCE($9, do_not_download),
-                processed = COALESCE($10, processed)
-                WHERE uuid = $11`,
+                processed = COALESCE($10, processed),
+                upscale_location = COALESCE($11, upscale_location)
+                WHERE uuid = $12`,
                 [
                     image.parent_id,
                     image.grid_index,
@@ -671,6 +672,7 @@ class Database {
                     image.downloaded !== null && image.downloaded !== undefined ? image.downloaded : null,
                     image.doNotDownload !== null && image.doNotDownload !== undefined ? image.doNotDownload : null,
                     image.processed !== null && image.processed !== undefined ? image.processed : null,
+                    image.upscale_location !== null && image.upscale_location !== undefined ? image.upscale_location : null,
                     image.id
                 ]
             );
@@ -877,7 +879,8 @@ class DatabaseUpdateManager {
 }
 
 class DownloadManager {
-    constructor(DatabaseManager = null, SystemLogger = null) {
+    constructor(DatabaseManager = null, SystemLogger = null, UpscaleManager = null) {
+        this.upscaleManager = UpscaleManager;
         this.downloadLocation = "output";
         this.timeToDownload = 0; // minutes past midnight
         this.runEnabled = false;
@@ -1072,7 +1075,7 @@ class DownloadManager {
         this.verifyDownloadsInProgress = true;
         let imageCount = await this.dbClient.countImagesTotal();
         for (let i = 0; i < imageCount; i++) {
-            let image = await this.dbClient.lookupImageByIndex(i, { processed: true, enabled: true }, { downloaded: true, enabled: false }, { do_not_download: false, enabled: true });
+            let image = await this.dbClient.lookupImageByIndex(i, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
             if (image === undefined) continue;
             if (image === null) continue;
             if (image.downloaded !== true) continue;
@@ -1092,6 +1095,7 @@ class UpscaleManager {
     constructor(DatabaseManager = null, SystemLogger = null) {
         this.dbClient = DatabaseManager;
         this.systemLogger = SystemLogger;
+        this.queue = [];
         this.upscaler = new Upscaler({
             defaultScale: 4, // can be 2, 3, or 4
             defaultFormat: "jpg", // or "png"
@@ -1099,13 +1103,118 @@ class UpscaleManager {
             defaultModel: "ultrasharp-2.0.1", // Default model name 
             maxJobs: 2 // Max # of concurrent jobs
         });
+        this.timeToUpscale = 0; // minutes past midnight
+        this.runEnabled = false;
+        this.runTimeout = null;
+        this.upscaleRunInprogress = false;
+        this.start();
+    }
+
+    start() {
+        if (this.runTimeout !== null) clearTimeout(this.runTimeout);
+        let now = new Date();
+        let timeToUpscale = new Date(now.getFullYear(), now.getMonth(), now.getDate(), this.timeToUpscale / 60, this.timeToUpscale % 60, 0, 0);
+        let timeUntilUpscale = timeToUpscale - now;
+        if (timeUntilUpscale < 0) timeUntilUpscale += 1000 * 60 * 60 * 24;
+        this.runTimeout = setTimeout(() => this.run(), timeUntilUpscale);
+    }
+
+    async run() {
+        if (!this.runEnabled) {
+            this.start();
+            return;
+        }
+
+        if (this.upscaleRunInprogress) return;
+        this.queue = [];
+        this.upscaleRunInprogress = true;
+        let imageCount = await this.dbClient.countImagesTotal();
+        console.log("Image count: " + imageCount);
+        let success = true;
+        for (let i = 0; i < imageCount; i++) {
+            if (!(await this.lookupAndUpscaleImageByIndex(i))) success = false;
+        }
+        if (success) {
+            console.log("Done upscaling images");
+        } else {
+            console.log("One or more errors occurred while upscaling images");
+            this.systemLogger.log("One or more errors occurred while upscaling images");
+        }
+        this.checkForFinishedJobs();
+        this.start();
+    }
+
+    async lookupAndUpscaleImageByIndex(index) {
+        if (!this.runEnabled) return true;
+        let image = await this.dbClient.lookupImageByIndex(index, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
+        if (image === undefined) return true;
+        if (image === null) return true;
+        image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height, image.storage_location);
+        this.queueImage(image);
+    }
+
+    queueImage(image) {
+        // get folder name from image.storageLocation
+        let folder = image.storageLocation.substring(0, image.storageLocation.lastIndexOf('\\'));
+        let destFolder = path.join(folder, "upscaled");
+        if (!fs.existsSync(destFolder)) fs.mkdirSync(destFolder, { recursive: true });
+        let destFileName = image.storageLocation.split('\\').pop();
+        destFileName = destFileName.substring(0, destFileName.lastIndexOf('.')) + "-upscaled.jpg";
+        image.upscale_location = path.join(destFolder, destFileName);
+        image.jobID = null;
+        console.log({ image });
+        console.log({ destFileName });
+        console.log({ destFolder });
+        this.upscaler.upscale(image.storageLocation.replaceAll('\\', '/').replaceAll('\\\\', '/'), destFolder.replaceAll('\\', '/').replaceAll('\\\\', '/')).then((jobID) => {
+            image.jobID = jobID;
+            this.queue.push(image);
+            console.log("Queued image ", { image });
+        });
+    }
+
+    async checkForFinishedJobs() {
+        if (this.queue.length === 0) {
+            this.upscaleRunInprogress = false;
+        }
+        let finishedJobs = this.queue.filter((image) => {
+            let jobID = image.jobID;
+            if (jobID === null) return false;
+            let job = this.upscaler.getJob(jobID);
+            if (job === null) return false;
+            if (job.status === "complete") return true;
+            else return false;
+        });
+        () => {
+            finishedJobs.forEach(async (image) => {
+                await this.dbClient.updateImage(image);
+                this.queue = this.queue.filter((image2) => {
+                    return image2.jobID !== image.jobID;
+                });
+            })
+        };
+
+        await waitSeconds(30);
+        this.checkForFinishedJobs();
+    }
+
+    get queuedUpscales() {
+        return this.upscaler.getNumberOfWaitingJobs();
+    }
+
+    get runningUpscales() {
+        return this.upscaler.getNumberOfRunningJobs();
+    }
+
+    get upscaleInProgress() {
+        return this.upscaler.getNumberOfRunningJobs() > 0;
     }
 };
 
 const puppeteerClient = new PuppeteerClient();
 const systemLogger = new SystemLogger();
 const imageDB = new Database();
-const downloadManager = new DownloadManager(imageDB, systemLogger);
+const upscalerManager = new UpscaleManager(imageDB, systemLogger);
+const downloadManager = new DownloadManager(imageDB, systemLogger, upscalerManager);
 
 (async () => {
     console.log("Verifying downloads");
@@ -1113,7 +1222,7 @@ const downloadManager = new DownloadManager(imageDB, systemLogger);
     console.log("Done verifying downloads");
 })()
 
-const upscalerManager = new UpscaleManager(imageDB, systemLogger);
+
 const databaseUpdateManager = new DatabaseUpdateManager(imageDB, systemLogger, puppeteerClient);
 
 const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager, imageDB, upscalerManager, databaseUpdateManager);
@@ -1284,10 +1393,12 @@ app.get('/set-run-enabled/:enabled', (req, res) => {
     if (enabled === "true") {
         downloadManager.runEnabled = true;
         databaseUpdateManager.runEnabled = true;
+        upscalerManager.runEnabled = true;
     }
     else {
         downloadManager.runEnabled = false;
         databaseUpdateManager.runEnabled = false;
+        upscalerManager.runEnabled = false;
     }
     res.json(downloadManager.runEnabled);
 });
@@ -1404,6 +1515,11 @@ app.get('/status', async (req, res) => {
 app.get('/downloadRun', async (req, res) => {
     res.send("ok");
     await downloadManager.run();
+});
+
+app.get('/upscaleRun', async (req, res) => {
+    res.send("ok");
+    await upscalerManager.run();
 });
 
 ////////////////////////////////////////////////////////////////////////////////////////
