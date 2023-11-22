@@ -516,10 +516,10 @@ class Database {
             password: 'mjImagesPassword',
             port: 5432,
         });
-        this.dbClient.connect();
+        this.dbClient.connect().then(() => {console.log("Connected to database")}).catch((err) => {console.log("Error connecting to database: ", err)});
         this.dbClient.on('error', (err) => {
             new DB_Error("Database error: " + err);
-            if (err.includes("Connection terminated unexpectedly")) this.dbClient.connect();
+            if (typeof err === 'string' && err.includes("Connection terminated unexpectedly")) this.dbClient.connect();
         });
     }
 
@@ -1175,9 +1175,10 @@ class UpscaleManager {
     async checkForFinishedJobs() {
         if (this.queue.length === 0) {
             this.upscaleRunInprogress = false;
+            return;
         }
-        let finishedJobs = this.queue.filter((image) => {
-            let jobID = image.jobID;
+        let finishedJobs = this.queue.filter((job) => {
+            let jobID = job.jobID;
             if (jobID === null) return false;
             let job = this.upscaler.getJob(jobID);
             if (job === null) return false;
