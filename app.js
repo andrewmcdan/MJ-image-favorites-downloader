@@ -1177,8 +1177,8 @@ class UpscaleManager {
             this.upscaleRunInprogress = false;
             return;
         }
-        let finishedJobs = this.queue.filter((job) => {
-            let jobID = job.jobID;
+        let finishedJobs = this.queue.filter((img) => {
+            let jobID = img.jobID;
             if (jobID === null) return false;
             let job = this.upscaler.getJob(jobID);
             if (job === null) return false;
