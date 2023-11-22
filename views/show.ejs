@@ -118,10 +118,10 @@
         <button class="top-nav-button">Button3</button>-->
         <label for="updateInterval">Update Interval (seconds):</label>
         <input type="number" id="updateInterval" class="numberInput" name="updateInterval" min="1" max="600" step="1"
-            value="3">
+            value="10">
         <label for="fadeDuration">Fade Duration (seconds):</label>
         <input type="number" id="fadeDuration" class="numberInput" name="fadeDuration" min="0.25" max="30" step="0.25"
-            value="0.5">
+            value="5">
         <label for="allImages">Enable All Images in DB:</label>
         <input type="checkbox" id="allImages" name="allImages" value="allImages">
         <label for="cdnSource">Use Midjourney CDN Source:</label>
@@ -137,7 +137,7 @@
     </div>
     <script>
         class ImageInfo {
-            constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height, storageLocation) {
+            constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height, storageLocation, upscale_location) {
                 this.parent_id = parent_id;
                 this.grid_index = grid_index;
                 this.enqueue_time = enqueue_time;
@@ -147,6 +147,7 @@
                 this.storageLocation = storageLocation;
                 this.downloaded = false;
                 this.doNotDownload = false;
+                this.upscale_location = upscale_location;
             }
 
             get id() {
@@ -168,8 +169,16 @@
                 return `https://cdn.midjourney.com/${this.parent_id}/grid_0.webp`;
             }
             get localUrl() {
-                if (this.storageLocation == null || this.storageLocation == undefined || this.storageLocation == 'null' || this.storageLocation == 'undefined' || this.storageLocation == '') return urlFull;
-                return `/${this.storageLocation}`
+                let useUpscale = true;
+                let fileLocation = "";
+                if (useUpscale && this.upscale_location !== null && this.upscale_location !== undefined && this.upscale_location !== 'null' && this.upscale_location !== 'undefined' && this.upscale_location !== '') {
+                    fileLocation = `/${this.upscale_location}`;
+                } else if (!useUpscale && this.storageLocation !== null && this.storageLocation !== undefined && this.storageLocation !== 'null' && this.storageLocation !== 'undefined' && this.storageLocation !== '') {
+                    fileLocation = `/${this.storageLocation}`;
+                } else {
+                    fileLocation = this.urlFull;
+                }
+                return fileLocation;
             }
         }
         let getLogsFromServer = null;
@@ -312,12 +321,12 @@
                 let randomImageText = await randomImage.text();
                 let randomImageObj = JSON.parse(randomImageText.substring(randomImageText.indexOf('{'), randomImageText.lastIndexOf('}') + 1));
                 console.log(randomImageObj);
-                let imageInfo = new ImageInfo(randomImageObj.parent_id, randomImageObj.grid_index, randomImageObj.enqueue_time, randomImageObj.fullCommand, randomImageObj.width, randomImageObj.height, randomImageObj.storageLocation);
+                let imageInfo = new ImageInfo(randomImageObj.parent_id, randomImageObj.grid_index, randomImageObj.enqueue_time, randomImageObj.fullCommand, randomImageObj.width, randomImageObj.height, randomImageObj.storageLocation, randomImageObj.upscale_location);
 
                 if (cdnSource) {
                     imageEls[imageElsIndex++].src = imageInfo.urlFull;
                 } else {
-                    imageEls[imageElsIndex++].src = imageInfo.storageLocation;
+                    imageEls[imageElsIndex++].src = imageInfo.localUrl;
                 }
                 if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
                 imageEls[imageElsIndex++].classList.remove('hidden');
@@ -337,6 +346,7 @@
 
             // Start the interval with the initial value
             setUpdateInterval(updateInterval);
+            updateImages();
             updateImages();
             updateImages();
         })();

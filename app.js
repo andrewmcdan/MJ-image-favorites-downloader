@@ -516,7 +516,7 @@ class Database {
             password: 'mjImagesPassword',
             port: 5432,
         });
-        this.dbClient.connect().then(() => {console.log("Connected to database")}).catch((err) => {console.log("Error connecting to database: ", err)});
+        this.dbClient.connect().then(() => { console.log("Connected to database") }).catch((err) => { console.log("Error connecting to database: ", err) });
         this.dbClient.on('error', (err) => {
             new DB_Error("Database error: " + err);
             if (typeof err === 'string' && err.includes("Connection terminated unexpectedly")) this.dbClient.connect();
@@ -649,31 +649,31 @@ class Database {
         try {
             const res = await this.dbClient.query(
                 `UPDATE images SET 
-                parent_uuid = $1,
-                grid_index = $2,
-                enqueue_time = $3,
-                full_command = $4,
-                width = $5,
-                height = $6,
-                storage_location = $7,
+                parent_uuid = COALESCE($1, parent_uuid),
+                grid_index = COALESCE($2, grid_index),
+                enqueue_time = COALESCE($3, enqueue_time),
+                full_command = COALESCE($4, full_command),
+                width = COALESCE($5, width),
+                height = COALESCE($6, height),
+                storage_location = COALESCE($7, storage_location),
                 downloaded = COALESCE($8, downloaded),
                 do_not_download = COALESCE($9, do_not_download),
                 processed = COALESCE($10, processed),
                 upscale_location = COALESCE($11, upscale_location)
                 WHERE uuid = $12`,
                 [
-                    image.parent_id,
-                    image.grid_index,
-                    image.enqueue_time,
-                    image.fullCommand,
-                    image.width,
-                    image.height,
-                    image.storageLocation,
+                    image.parent_id !== null && image.parent_id !== undefined ? image.parent_id : (image.parent_uuid !== null && image.parent_uuid !== undefined ? image.parent_uuid : null),
+                    image.grid_index !== null && image.grid_index !== undefined ? image.grid_index : null,
+                    image.enqueue_time !== null && image.enqueue_time !== undefined ? image.enqueue_time : null,
+                    image.fullCommand !== null && image.fullCommand !== undefined ? image.fullCommand : null,
+                    image.width !== null && image.width !== undefined ? image.width : null,
+                    image.height !== null && image.height !== undefined ? image.height : null,
+                    image.storageLocation !== null && image.storageLocation !== undefined ? image.storageLocation : (image.storage_location !== null && image.storage_location !== undefined ? image.storage_location : null),
                     image.downloaded !== null && image.downloaded !== undefined ? image.downloaded : null,
                     image.doNotDownload !== null && image.doNotDownload !== undefined ? image.doNotDownload : null,
                     image.processed !== null && image.processed !== undefined ? image.processed : null,
                     image.upscale_location !== null && image.upscale_location !== undefined ? image.upscale_location : null,
-                    image.id
+                    image.id !== null && image.id !== undefined ? image.id : (image.parent_uuid !== null && image.parent_uuid !== undefined && image.grid_index !== null && image.grid_index !== undefined ? image.parent_uuid + '_' + image.grid_index : null)
                 ]
             );
             return res;
@@ -785,12 +785,13 @@ class Database {
 };
 
 class ImageInfo {
-    constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height, storage_location = "") {
+    constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height, storage_location = "", upscale_location = "") {
         this.parent_id = parent_id;
         this.grid_index = grid_index;
         this.enqueue_time = enqueue_time;
         this.fullCommand = fullCommand;
         // this.fullCommand = fullCommand.replace(/'/g, "\\'");
+        this.upscale_location = upscale_location;
         this.width = width;
         this.height = height;
         this.storageLocation = storage_location;
@@ -1149,26 +1150,25 @@ class UpscaleManager {
         let image = await this.dbClient.lookupImageByIndex(index, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
         if (image === undefined) return true;
         if (image === null) return true;
-        image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height, image.storage_location);
+        // image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height, image.storage_location);
         this.queueImage(image);
     }
 
     queueImage(image) {
         // get folder name from image.storageLocation
-        let folder = image.storageLocation.substring(0, image.storageLocation.lastIndexOf('\\'));
+        let folder = image.storage_location.substring(0, image.storage_location.lastIndexOf('\\'));
         let destFolder = path.join(folder, "upscaled");
         if (!fs.existsSync(destFolder)) fs.mkdirSync(destFolder, { recursive: true });
-        let destFileName = image.storageLocation.split('\\').pop();
+        let destFileName = image.storage_location.split('\\').pop();
         destFileName = destFileName.substring(0, destFileName.lastIndexOf('.')) + "-upscaled.jpg";
         image.upscale_location = path.join(destFolder, destFileName);
-        image.jobID = null;
-        console.log({ image });
-        console.log({ destFileName });
-        console.log({ destFolder });
-        this.upscaler.upscale(image.storageLocation.replaceAll('\\', '/').replaceAll('\\\\', '/'), destFolder.replaceAll('\\', '/').replaceAll('\\\\', '/')).then((jobID) => {
+        // console.log({ image });
+        // console.log({ destFileName });
+        // console.log({ destFolder });
+        this.upscaler.upscale(image.storage_location.replaceAll('\\', '/').replaceAll('\\\\', '/'), destFolder.replaceAll('\\', '/').replaceAll('\\\\', '/')).then((jobID) => {
             image.jobID = jobID;
             this.queue.push(image);
-            console.log("Queued image ", { image });
+            // console.log("Queued image ", { image });
         });
     }
 
@@ -1182,17 +1182,21 @@ class UpscaleManager {
             if (jobID === null) return false;
             let job = this.upscaler.getJob(jobID);
             if (job === null) return false;
-            if (job.status === "complete") return true;
+            if (job.status == "complete") return true;
             else return false;
         });
-        () => {
+        (() => {
             finishedJobs.forEach(async (image) => {
+                image.id = image.uuid;
+                console.log("Finished job: ", image.jobID);
+                console.log("Image: ", image);
+                // TODO: verify file exists and is valid jpg
                 await this.dbClient.updateImage(image);
                 this.queue = this.queue.filter((image2) => {
                     return image2.jobID !== image.jobID;
                 });
             })
-        };
+        })();
 
         await waitSeconds(30);
         this.checkForFinishedJobs();
@@ -1330,7 +1334,7 @@ app.get('/show/:uuid', async (req, res) => {
     else {
         console.log("looking up uuid: ", uuid);
         const image = await imageDB.lookupByUUID(uuid);
-        const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height, image.storage_location);
+        const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height, image.storage_location, image.upscale_location);
         imageDB.updateTimesSelectedPlusOne(uuid);
         res.send(`<a href="/randomUUID"><img src="${imageInfo.urlFull}" /></a><script type="application/json">${JSON.stringify(imageInfo)}</script>`);
     }
