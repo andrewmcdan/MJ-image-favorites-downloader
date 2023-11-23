@@ -508,6 +508,7 @@ class ServerStatusMonitor {
 };
 
 class Database {
+    static DB_connected = false;
     constructor() {
         this.dbClient = new pgClient.Client({
             user: 'mjuser',
@@ -516,7 +517,7 @@ class Database {
             password: 'mjImagesPassword',
             port: 5432,
         });
-        this.dbClient.connect().then(() => { console.log("Connected to database") }).catch((err) => { console.log("Error connecting to database: ", err) });
+        this.dbClient.connect().then(() => { console.log("Connected to database"); Database.DB_connected = true; }).catch((err) => { console.log("Error connecting to database:\n", err) });
         this.dbClient.on('error', (err) => {
             new DB_Error("Database error: " + err);
             if (typeof err === 'string' && err.includes("Connection terminated unexpectedly")) this.dbClient.connect();
@@ -1222,6 +1223,9 @@ const upscalerManager = new UpscaleManager(imageDB, systemLogger);
 const downloadManager = new DownloadManager(imageDB, systemLogger, upscalerManager);
 
 (async () => {
+    while (Database.DB_connected === false) {
+        await waitSeconds(1);
+    }
     console.log("Verifying downloads");
     await downloadManager.verifyDownloads();
     console.log("Done verifying downloads");
