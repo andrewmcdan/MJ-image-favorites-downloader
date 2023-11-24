@@ -994,6 +994,7 @@ class DownloadManager {
         }
         if (this.verifyDownloadsInProgress) {
             setTimeout(() => this.run(), 10000);
+            return;
         }
         if (this.downloadInProgress === true) return;
         this.downloadInProgress = true;
