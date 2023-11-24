@@ -216,7 +216,7 @@ class PuppeteerClient {
                     await waitSeconds(1);
                     await this.page.mouse.wheel({ deltaY: -200 });
                     await waitSeconds(1);
-                    await this.page.click('button ::-p-text(Sign In)').catch(() => { reject("Sign In button not found");});
+                    await this.page.click('span ::-p-text(Sign In)').catch(() => { reject("Sign In button not found");});
                     // await waitSeconds(1);
                     let waitCount = 0;
                     while (!this.discordLoginComplete) {
