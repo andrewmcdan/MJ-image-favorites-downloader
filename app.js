@@ -26,6 +26,12 @@
  * 3. Parse the output folder and omit images that have already been processed
  *      - This will require a database to store the image names, possibly just a json file
  * 4. add a page of general tools. ie. revering an image uuid to the original prompt / user (url, name, etc.)
+ * 
+ * 
+ * 
+ * /////////////////////////////////////////////////////
+ * Launch command for Ubuntu Server:
+ * xvfb-run -a --server-args="-screen 0 1280x800x24 -ac -nolisten tcp -dpi 96 +extension RANDR" node app
  */
 //
 const fs = require('fs');
