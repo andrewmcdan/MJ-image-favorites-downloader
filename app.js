@@ -199,7 +199,6 @@ class PuppeteerClient {
                     if (this.browser !== null) await this.browser.close();
                     this.browser = await puppeteer.launch({ headless: 'new', defaultViewport: null, args: [] });
                     this.page = (await this.browser.pages())[0];
-                    await this.page.setJavaScriptEnabled(true);
 
                     this.browser.on('targetcreated', async (target) => {
                         const pageList = await this.browser.pages();
