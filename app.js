@@ -1108,6 +1108,7 @@ class DownloadManager {
                 image.processed = true;
                 image.storageLocation = "";
                 await this.dbClient.updateImage(image);
+                process.stdout.write(".");
             }
         }
         this.verifyDownloadsInProgress = false;
