@@ -216,7 +216,7 @@ class PuppeteerClient {
 
                     await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
                     let html = await this.page.content();
-                    console.log(html);
+                    // console.log(html);
                     // await waitSeconds(5);
                     await this.page.mouse.move(0, 0);
                     await this.page.mouse.move(100, 100);
@@ -550,6 +550,7 @@ class Database {
             await this.updateImage(image);
             return;
         }
+
         // if it doesn't, insert it
         image.processed = false;
         let res;
