@@ -52,7 +52,7 @@ const Upscaler = require('ai-upscale-module');
 
 let updateDB = true;
 
-let verifyDownloadsOnStartup = false;
+let verifyDownloadsOnStartup = true;
 
 let settings = {};
 
@@ -623,6 +623,56 @@ class Database {
             return null;
         }
     }
+    lookupImagesByIndexRange = async (indexStart, indexEnd, processedOnly = { processed: false, enabled: false }, downloadedOnly = { downloaded: false, enabled: false }, do_not_downloadOnly = { do_not_download: false, enabled: false }) => {
+        if (typeof indexStart === 'number') indexStart = indexStart.toString();
+        if (typeof indexStart === "string") {
+            try {
+                indexStart = parseInt(indexStart);
+            } catch {
+                return null;
+            }
+            indexStart = indexStart.toString();
+        } else {
+            return null;
+        }
+        if (typeof indexEnd === 'number') indexEnd = indexEnd.toString();
+        if (typeof indexEnd === "string") {
+            try {
+                indexEnd = parseInt(indexEnd);
+            } catch {
+                return null;
+            }
+            indexEnd = indexEnd.toString();
+        } else {
+            return null;
+        }
+        // at this point indexStart and indexEnd should be strings that are numbers. Anything else would have returned null
+        try {
+            let queryParts = ['SELECT * FROM images WHERE index >= $1 AND index < $2'];
+            let queryParams = [indexStart, indexEnd];
+
+            if (processedOnly.enabled === true) {
+                queryParts.push("AND processed = " + (processedOnly.processed === true ? "true" : "false"));
+            }
+            if (downloadedOnly.enabled === true) {
+                queryParts.push("AND downloaded = " + (downloadedOnly.downloaded === true ? "true" : "false"));
+            }
+            if (do_not_downloadOnly.enabled === true) {
+                queryParts.push("AND do_not_download = " + (do_not_downloadOnly.do_not_download === true ? "true" : "false"));
+            }
+
+            // console.log(queryParts.join(' '), queryParams); // TODO: remove this
+
+            const res = await this.dbClient.query(queryParts.join(' '), queryParams);
+            if (res.rows.length > 0) {
+                return res.rows;
+            }
+            return undefined;
+        } catch (err) {
+            new DB_Error("Error looking up images in database. Image index range: " + indexStart + " to " + indexEnd);
+            return null;
+        }
+    }
     lookupImageByIndex = async (index, processedOnly = { processed: false, enabled: false }, downloadedOnly = { downloaded: false, enabled: false }, do_not_downloadOnly = { do_not_download: false, enabled: false }) => {
         if (typeof index === 'number') index = index.toString();
         if (typeof index === "string") {
@@ -1099,21 +1149,29 @@ class DownloadManager {
         if (this.verifyDownloadsInProgress) return;
         this.verifyDownloadsInProgress = true;
         let imageCount = await this.dbClient.countImagesTotal();
-        for (let i = 0; i < imageCount; i++) {
-            let image = await this.dbClient.lookupImageByIndex(i, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
-            process.stdout.write(".");
-            process.stdout.cursorTo(i%10);
-            if(i%10 === 0) process.stdout.clearLine(1);
-            if (image === undefined) continue;
-            if (image === null) continue;
-            if (image.downloaded !== true) continue;
-            if (this.checkFileExistsPath(image.storage_location) === false) {
-                image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
-                image.downloaded = false;
-                image.processed = true;
-                image.storageLocation = "";
-                await this.dbClient.updateImage(image);
-                process.stdout.write(":");
+        let images = null;
+        for (let i = 0; i < imageCount; i+=100) {
+            images = await this.dbClient.lookupImagesByIndexRange(i,i+100, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
+            if(i%10 === 0) {
+                process.stdout.clearLine();
+                process.stdout.cursorTo(0);
+                process.stdout.write(i.toString());
+            }
+            if(images === undefined) continue;
+            if(images === null) continue;
+            for(let p = 0; p < images.length; p++) {
+                let image = images[p];   
+                if (image === undefined) continue;
+                if (image === null) continue;
+                if (image.downloaded !== true) continue;
+                if (this.checkFileExistsPath(image.storage_location) === false) {
+                    image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
+                    image.downloaded = false;
+                    image.processed = true;
+                    image.storageLocation = "";
+                    await this.dbClient.updateImage(image);
+                    process.stdout.write(":");
+                }
             }
         }
         this.verifyDownloadsInProgress = false;
@@ -1258,6 +1316,7 @@ const downloadManager = new DownloadManager(imageDB, systemLogger, upscalerManag
     await downloadManager.verifyDownloads();
     console.log("Done verifying downloads");
 })()
+
 
 
 const databaseUpdateManager = new DatabaseUpdateManager(imageDB, systemLogger, puppeteerClient);
