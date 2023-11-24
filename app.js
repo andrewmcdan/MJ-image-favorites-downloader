@@ -165,7 +165,7 @@ class PuppeteerClient {
             }
 
             if (this.browser == null) {
-                this.browser = await puppeteer.launch({ headless: 'new', defaultViewport: null, args: ['--start-maximized'] });
+                this.browser = await puppeteer.launch({ headless: 'new', defaultViewport: null, args: ['--enable-javascript'] });
                 this.page = (await this.browser.pages())[0];
             }
 
@@ -197,7 +197,7 @@ class PuppeteerClient {
                 this.loadSession().then(() => { resolve(); }).catch(async () => {
                     this.loginInProgress = true;
                     if (this.browser !== null) await this.browser.close();
-                    this.browser = await puppeteer.launch({ headless: 'new', defaultViewport: null, args: [] });
+                    this.browser = await puppeteer.launch({ headless: 'new', defaultViewport: null, args: ['--enable-javascript'] });
                     this.page = (await this.browser.pages())[0];
 
                     this.browser.on('targetcreated', async (target) => {
