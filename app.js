@@ -210,8 +210,13 @@ class PuppeteerClient {
 
                     await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
                     // await waitSeconds(5);
-
-                    await this.page.click('button ::-p-text(Sign In)');
+                    await this.page.mouse.move(0, 0);
+                    await this.page.mouse.move(100, 100);
+                    await this.page.mouse.wheel({ deltaY: 100 });
+                    await waitSeconds(1);
+                    await this.page.mouse.wheel({ deltaY: -200 });
+                    await waitSeconds(1);
+                    await this.page.click('button ::-p-text(Sign In)').catch(() => { reject("Sign In button not found");});
                     // await waitSeconds(1);
                     let waitCount = 0;
                     while (!this.discordLoginComplete) {
