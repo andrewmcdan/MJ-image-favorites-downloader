@@ -165,7 +165,7 @@ class PuppeteerClient {
             }
 
             if (this.browser == null) {
-                this.browser = await puppeteer.launch({ headless: 'new', defaultViewport: null, args: ['--enable-javascript'] });
+                this.browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--enable-javascript'] });
                 this.page = (await this.browser.pages())[0];
             }
 
