@@ -1099,10 +1099,10 @@ class DownloadManager {
         let imageCount = await this.dbClient.countImagesTotal();
         for (let i = 0; i < imageCount; i++) {
             let image = await this.dbClient.lookupImageByIndex(i, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
+            process.stdout.write(".");
             if (image === undefined) continue;
             if (image === null) continue;
             if (image.downloaded !== true) continue;
-            console.log("Verifying image " + image.storage_location);
             if (this.checkFileExistsPath(image.storage_location) === false) {
                 image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
                 image.downloaded = false;
@@ -1111,7 +1111,6 @@ class DownloadManager {
                 await this.dbClient.updateImage(image);
                 process.stdout.write(":");
             }
-            process.stdout.write(".");
         }
         this.verifyDownloadsInProgress = false;
     }
