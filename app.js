@@ -197,12 +197,9 @@ class PuppeteerClient {
                 this.loadSession().then(() => { resolve(); }).catch(async () => {
                     this.loginInProgress = true;
                     if (this.browser !== null) await this.browser.close();
-                    this.browser = await puppeteer.launch({ headless: 'new', defaultViewport: null, args: [
-                        '--enable-javascript',
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        '--user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3312.0 Safari/537.36"',] });
+                    this.browser = await puppeteer.launch({ headless: 'new', defaultViewport: null, args: [] });
                     this.page = (await this.browser.pages())[0];
+                    await this.page.setJavaScriptEnabled(true);
 
                     this.browser.on('targetcreated', async (target) => {
                         const pageList = await this.browser.pages();
