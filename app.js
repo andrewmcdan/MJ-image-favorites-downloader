@@ -1102,6 +1102,8 @@ class DownloadManager {
         for (let i = 0; i < imageCount; i++) {
             let image = await this.dbClient.lookupImageByIndex(i, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
             process.stdout.write(".");
+            process.stdout.cursorTo(i%10);
+            if(i%10 === 0) process.stdout.clearLine(1);
             if (image === undefined) continue;
             if (image === null) continue;
             if (image.downloaded !== true) continue;
