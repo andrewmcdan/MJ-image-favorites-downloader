@@ -1102,6 +1102,7 @@ class DownloadManager {
             if (image === undefined) continue;
             if (image === null) continue;
             if (image.downloaded !== true) continue;
+            console.log("Verifying image " + image.storage_location);
             if (this.checkFileExistsPath(image.storage_location) === false) {
                 image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
                 image.downloaded = false;
