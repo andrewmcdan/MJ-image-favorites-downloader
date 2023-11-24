@@ -540,7 +540,13 @@ class Database {
     insertImage = async (image, index) => {
         // find if image exists in database
         // if it does, update it
-        if (await this.lookupByUUID(image.id) !== undefined) {
+        let lookup = await this.lookupByUUID(image.id);
+        if ( lookup !== undefined) {
+            image.processed = lookup.processed;
+            image.downloaded = lookup.downloaded;
+            image.doNotDownload = lookup.do_not_download;
+            image.storageLocation = lookup.storage_location;
+            image.upscale_location = lookup.upscale_location;
             await this.updateImage(image);
             return;
         }
