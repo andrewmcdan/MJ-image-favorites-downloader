@@ -52,6 +52,8 @@ const Upscaler = require('ai-upscale-module');
 
 let updateDB = true;
 
+let verifyDownloadsOnStartup = false;
+
 let settings = {};
 
 class DB_Error extends Error {
@@ -1246,6 +1248,7 @@ const upscalerManager = new UpscaleManager(imageDB, systemLogger);
 const downloadManager = new DownloadManager(imageDB, systemLogger, upscalerManager);
 
 (async () => {
+    if(!verifyDownloadsOnStartup) return;
     while (Database.DB_connected === false) {
         await waitSeconds(1);
     }
