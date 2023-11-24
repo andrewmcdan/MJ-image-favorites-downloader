@@ -1,16 +1,19 @@
 ## This project is a work in progress. It's not ready for use yet.
-I'm continually working on this project, so things may change. I'm not sure if I'll ever get it to a point where it's ready for use, but I'm trying. I have changed the way it interacts with the extension so it has to use a different extension than the one mentioned below. I'll update this when I have a working version.
+I'm continually working on this project, so things may change. The goal is to get this to a point where it is stable enough for my personal use, but beyond that, I can't guarantee I'll work on it much more. As of the time of updating this ReadMe, this project is _really close_ to being usable.
 
 # Midjourney Downloader
-This is a node.js webapp that helps you download all your images from Midjourney. There are other ways to download Midjourney images, but I wanted a way to easily browse through all (or nearly all) of my images and select only the ones I want to download. Also, I wanted something reliable. 
+This is a node.js webapp that helps you download all or some of your images from Midjourney. There are other ways to download Midjourney images, but I wanted a way to easily browse through all (or nearly all) of my images and select only the ones I want to download. Also, I wanted something reliable. 
 
 ## Usage
 
-First step is to use [this chrome extension](https://github.com/andrewmcdan/midjourney-archive-chrome-extension) or [my fork](https://github.com/andrewmcdan/midjourney-archive-chrome-extension) (which has some added features) to get the json files with all the metadata.
+Git clone this repo and then "npm i". You'll need to verify that the package.json isn't configured to use one of my local versions of any modules. 
 
-Next download this repo and extract it. In the folder with app.js, create a folder where you want to download all your images to.
+If you are running this on Windows or Linux desktop, "node app.js" then point your browser to the server.
+Linux headless, like Ubuntu Server requires that it be run with something like the line below so that puppeteer works:
 
-Then put all the zip files that the extension downloads into a folder called "zips". After running "npm install", "node app.js" will start the webserver and you can point your browser at "http://localhost:3000/images"
+xvfb-run -a --server-args="-screen 0 1280x800x24 -ac -nolisten tcp -dpi 96 +extension RANDR" node app
+
+TODO: Add the rest of the usage
 
 ## Issues and PR's
 
