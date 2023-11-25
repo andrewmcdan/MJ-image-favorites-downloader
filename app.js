@@ -957,7 +957,7 @@ class DownloadManager {
         this.upscaleManager = UpscaleManager;
         this.downloadLocation = "output";
         this.timeToDownload = 0; // minutes past midnight
-        this.runEnabled = false;
+        this.downloadRunEnabled = false;
         this.downloadInProgress = false;
         this.concurrentDownloads = 0;
         this.runTimeout = null;
@@ -1060,7 +1060,7 @@ class DownloadManager {
     }
 
     async run() {
-        if (!this.runEnabled) {
+        if (!this.downloadRunEnabled) {
             this.start();
             return;
         }
@@ -1089,7 +1089,7 @@ class DownloadManager {
     }
 
     async lookupAndDownloadImageByIndex(index) {
-        if (!this.runEnabled) return true;
+        if (!this.downloadRunEnabled) return true;
         let image = await this.dbClient.lookupImageByIndex(index, { processed: true, enabled: true }, { downloaded: false, enabled: true }, { do_not_download: false, enabled: true });
         if (image === undefined) return true;
         if (image === null) return true;
@@ -1329,13 +1329,16 @@ if (!loadSettings()) {
     settings = {
         downloadLocation: "output",
         timeToDownload: 0,
-        runEnabled: false,
+        downloadRunEnabled: false,
+        dbUpdateRunEnabled: false,
+        upscaleRunEnabled: false,
         updateDB: true
     };
     downloadManager?.setDownloadLocation(settings.downloadLocation);
     downloadManager?.setTimeToDownload(settings.timeToDownload);
-    downloadManager.runEnabled = settings.runEnabled;
-    databaseUpdateManager.runEnabled = settings.runEnabled;
+    downloadManager.runEnabled = settings.downloadRunEnabled;
+    databaseUpdateManager.runEnabled = settings.dbUpdateRunEnabled;
+    upscalerManager.runEnabled = settings.upscaleRunEnabled;
     updateDB = settings.updateDB;
 }
 
@@ -1484,19 +1487,13 @@ app.get('/set-time-to-download/:time', (req, res) => {
  * GET /set-run-enabled/:enabled
  * Sets whether or not the download manager should run
  */
-app.get('/set-run-enabled/:enabled', (req, res) => {
-    const { enabled } = req.params;
-    if (enabled === "true") {
-        downloadManager.runEnabled = true;
-        databaseUpdateManager.runEnabled = true;
-        upscalerManager.runEnabled = true;
-    }
-    else {
-        downloadManager.runEnabled = false;
-        databaseUpdateManager.runEnabled = false;
-        upscalerManager.runEnabled = false;
-    }
-    res.json(downloadManager.runEnabled);
+app.get('/set-run-enabled/:dl/:db/:up', (req, res) => {
+    const { dl,db,up } = req.params;
+    downloadManager.downloadRunEnabled = dl === "true";
+    databaseUpdateManager.runEnabled = db === "true";
+    upscalerManager.runEnabled = up === "true";
+    
+    res.json(downloadManager.downloadRunEnabled);
 });
 
 /**
