@@ -11,9 +11,7 @@
  * The click Download Selected to download the images that were checked on the server side to selected folder. 
  * 
  * TODO: 
- * 1. update the database so that it holds all the data that the ImageInfo class holds
- * 2. make it so that the server runs puppeteer instead of using the browser extension
- *      - this will allow the server to pull down the metadata on a regular basis, like at night
+ * - Add PM2 to the server to keep it running
  * 
  * 
  * 
@@ -1153,9 +1151,11 @@ class DownloadManager {
         for (let i = 0; i < imageCount; i+=100) {
             images = await this.dbClient.lookupImagesByIndexRange(i,i+100, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
             if(i%10 === 0) {
-                process.stdout.clearLine();
-                process.stdout.cursorTo(0);
-                process.stdout.write(i.toString());
+                if(typeof process.stdout.clearLine === 'function' && typeof process.stdout.cursorTo === 'function' && typeof process.stdout.write === 'function') {
+                    process.stdout.clearLine();
+                    process.stdout.cursorTo(0);
+                    process.stdout.write(i.toString());
+                }
             }
             if(images === undefined) continue;
             if(images === null) continue;
@@ -1170,7 +1170,6 @@ class DownloadManager {
                     image.processed = true;
                     image.storageLocation = "";
                     await this.dbClient.updateImage(image);
-                    process.stdout.write(":");
                 }
             }
         }
