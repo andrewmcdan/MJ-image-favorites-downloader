@@ -11,10 +11,29 @@
     <h2>Links</h2>
     <a href="/show">slide show</a><br />
     <a href="/images">images</a><br />
-    <a href="/tools">tools</a>
-    <label>Set Run Enabled</label>
+    <a href="/tools">tools</a><br />
+    <label>Set Run Enabled - </label>
+    <label for="download">Download:</label>
     <input type="checkbox" id="download" name="download" value="false">
-    
+    <label for="dbUpdate">DB Update:</label>
+    <input type="checkbox" id="dbUpdate" name="dbUpdate" value="false">
+    <label for="upscale">Upscale Update:</label>
+    <input type="checkbox" id="upscale" name="upscale" value="false">
+    <button id="setRunEnabled" onclick="(()=>{
+        let download = document.getElementById('download').checked;
+        let dbUpdate = document.getElementById('dbUpdate').checked;
+        let upscale = document.getElementById('upscale').checked;
+        fetch('/set-run-enabled/'+download+'/'+dbUpdate+'/'+upscale);
+    })()">SET</button><br />
+    <button onclick="(()=>{
+        fetch('/downloadRun');
+    })()">Download Run</button><br />
+    <button onclick="(()=>{
+        fetch('/updateDB');
+    })()">DB Update Run</button><br />
+    <button onclick="(()=>{
+        fetch('/upscaleRun');
+    })()">Upscale Run</button>
 </body>
 
 </html>
