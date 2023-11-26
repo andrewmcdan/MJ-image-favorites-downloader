@@ -50,7 +50,7 @@
                 console.log({ data });
                 document.getElementById('download').checked = data.downloadManager.runEnabled;
                 document.getElementById('dbUpdate').checked = data.databaseUpdateManager.runEnabled;
-                document.getElementById('upscale').checked = data.upscaleManager.runEnabled;
+                document.getElementById('upscale').checked = data.upscalerManager.runEnabled;
                 document.getElementById('upTime').innerHTML = 'Up Time: ' + data.upTimeFormatted;
             });
         })();
