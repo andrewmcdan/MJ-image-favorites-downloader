@@ -1073,7 +1073,7 @@ class DownloadManager {
         let imageCount = await this.dbClient.countImagesTotal();
         console.log("Image count: " + imageCount);
         let success = true;
-        for (let i = 0; i < imageCount; i++) {
+        for (let i = 0; i < imageCount; i+=10) {
             if (!(await this.lookupAndDownloadImageByIndex(i))) success = false;
         }
         if (success) {
@@ -1088,46 +1088,51 @@ class DownloadManager {
 
     async lookupAndDownloadImageByIndex(index) {
         if (!this.downloadRunEnabled) return true;
-        let image = await this.dbClient.lookupImageByIndex(index, { processed: true, enabled: true }, { downloaded: false, enabled: true }, { do_not_download: false, enabled: true });
-        if (image === undefined) return true;
-        if (image === null) return true;
-        image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
+        let images = await this.dbClient.lookupImagesByIndexRange(index, index + 10, { processed: true, enabled: true }, { downloaded: false, enabled: true }, { do_not_download: false, enabled: true });
+        if (images === undefined) return true;
+        if (images === null) return true;
+        for(let i = 0; i < images.length; i++) {
+            while(this.concurrentDownloads >= 10) await waitSeconds(1);
+            (async(image)=>{
+                image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
 
-        this.concurrentDownloads++;
-        let imageResult;
-        try {
-            imageResult = await this.downloadImage(image.urlAlt, image);
-        } catch (err) {
-            this.systemLogger.log("Error downloading image", err, image);
-            return false;
-        }
-        this.concurrentDownloads--;
+                this.concurrentDownloads++;
+                let imageResult;
+                try {
+                    imageResult = await this.downloadImage(image.urlAlt, image);
+                } catch (err) {
+                    this.systemLogger.log("Error downloading image", err, image);
+                    return false;
+                }
+                this.concurrentDownloads--;
 
-        if (imageResult.success === true) {
-            await this.dbClient.updateImage(imageResult);
-        } else {
-            this.systemLogger?.log("Error downloading image", imageResult.error, image);
-            let url = image.urlFull;
-            if (imageResult.error.includes("File size mismatch")) {
-                url = image.urlAlt;
-            }
-            this.concurrentDownloads++;
-            let altImageResult;
-            try {
-                altImageResult = await this.downloadImage(url);
-            } catch (err) {
-                this.systemLogger.log("Error downloading image", err, image);
-                return false;
-            }
-            this.concurrentDownloads--;
-            if (altImageResult.success === true) {
-                await this.dbClient.updateImage(altImageResult);
-            } else {
-                this.systemLogger.log("Error downloading image", altImageResult.error, image);
-                return false;
-            }
+                if (imageResult.success === true) {
+                    await this.dbClient.updateImage(imageResult);
+                } else {
+                    this.systemLogger?.log("Error downloading image", imageResult.error, image);
+                    let url = image.urlFull;
+                    if (imageResult.error.includes("File size mismatch")) {
+                        url = image.urlAlt;
+                    }
+                    this.concurrentDownloads++;
+                    let altImageResult;
+                    try {
+                        altImageResult = await this.downloadImage(url);
+                    } catch (err) {
+                        this.systemLogger.log("Error downloading image", err, image);
+                        return false;
+                    }
+                    this.concurrentDownloads--;
+                    if (altImageResult.success === true) {
+                        await this.dbClient.updateImage(altImageResult);
+                    } else {
+                        this.systemLogger.log("Error downloading image", altImageResult.error, image);
+                        return false;
+                    }
+                }
+                return true;
+            },images[i])();
         }
-        return true;
     }
 
     checkFileExistsPath(path) {
