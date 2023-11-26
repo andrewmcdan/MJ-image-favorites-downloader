@@ -318,6 +318,9 @@
 
             let updateIntervalExceedCount = 0;
 
+            const params = new URLSearchParams(window.location.search);
+            let enableAutoAdjustUpdateInterval = params.get('enableAutoAdjustUpdateInterval');
+
             async function updateImages() {
                 let startTime = performance.now();
                 let url = '/randomUUID/' + !allImages;
@@ -337,7 +340,7 @@
                 if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
                 imageEls[imageElsIndex].classList.add('hidden');
                 let endTime = performance.now();
-                if ((endTime - startTime) > (updateInterval * 1000)) {
+                if ((endTime - startTime) > (updateInterval * 1000) && enableAutoAdjustUpdateInterval !== 'false') {
                     console.log(`Image ${imageInfo.id} took ${(endTime - startTime) / 1000} seconds to load, which is longer than the update interval of ${updateInterval} seconds.`);
                     updateIntervalExceedCount++;
                     if (updateIntervalExceedCount > 5) {
