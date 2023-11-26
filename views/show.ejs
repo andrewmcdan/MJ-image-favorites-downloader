@@ -329,6 +329,7 @@
                 let randomImageObj = JSON.parse(randomImageText.substring(randomImageText.indexOf('{'), randomImageText.lastIndexOf('}') + 1));
                 console.log(randomImageObj);
                 let imageInfo = new ImageInfo(randomImageObj.parent_id, randomImageObj.grid_index, randomImageObj.enqueue_time, randomImageObj.fullCommand, randomImageObj.width, randomImageObj.height, randomImageObj.storageLocation, randomImageObj.upscale_location);
+                while(!imageEls[imageElsIndex].complete)await waitSeconds(1);
                 if (cdnSource) {
                     imageEls[imageElsIndex++].src = imageInfo.urlFull;
                 } else {
