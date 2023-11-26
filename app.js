@@ -1131,7 +1131,7 @@ class DownloadManager {
                     }
                 }
                 return true;
-            },images[i])();
+            })(images[i]);
         }
     }
 
