@@ -261,7 +261,7 @@
                                     else message += JSON.stringify(mes) + " - ";
                                 });
                                 innerHTML += `<span style="color: #00ff00;">${timeStamp.toLocaleString()}</span> - <span style="color: #0000ff;">${message}</span> `;
-                                innerHTML += `<span style="color: red; text-decoration: underline;" onclick="loggerDelete(${data[i].id})">Delete Log Entry</span><br><br>`;
+                                innerHTML += `<span style="color: red; text-decoration: underline;" onclick="loggerDelete(${data[i].id});getLogsFromServer();">Delete Log Entry</span><br><br>`;
                             }
                             loggerText.innerHTML = innerHTML;
                             // loggerText.scrollTop = loggerText.scrollHeight;
