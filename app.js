@@ -929,7 +929,7 @@ class DatabaseUpdateManager {
         this.updateInProgress = false;
         this.runTimeout = null;
         this.timeToUpdate = 0; // minutes after midnight
-        this.runEnabled = true;
+        this.runEnabled = false;
         this.start();
     }
 
@@ -1368,15 +1368,16 @@ if (!loadSettings()) {
         upscaleRunEnabled: false,
         updateDB: true
     };
-    downloadManager?.setDownloadLocation(settings.downloadLocation);
-    downloadManager?.setTimeToDownload(settings.timeToDownload);
-
-    downloadManager.runEnabled = settings.downloadRunEnabled;
-    databaseUpdateManager.runEnabled = settings.dbUpdateRunEnabled;
-    upscalerManager.runEnabled = settings.upscaleRunEnabled;
-
-    updateDB = settings.updateDB;
 }
+downloadManager?.setDownloadLocation(settings.downloadLocation);
+downloadManager?.setTimeToDownload(settings.timeToDownload);
+
+downloadManager.runEnabled = settings.downloadRunEnabled;
+databaseUpdateManager.runEnabled = settings.dbUpdateRunEnabled;
+upscalerManager.runEnabled = settings.upscaleRunEnabled;
+
+updateDB = settings.updateDB;
+
 
 /////////////////////////////////////////////////////////////////////////////////////////
 app.use(express.static('public'));
