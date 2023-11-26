@@ -1370,9 +1370,11 @@ if (!loadSettings()) {
     };
     downloadManager?.setDownloadLocation(settings.downloadLocation);
     downloadManager?.setTimeToDownload(settings.timeToDownload);
+
     downloadManager.runEnabled = settings.downloadRunEnabled;
     databaseUpdateManager.runEnabled = settings.dbUpdateRunEnabled;
     upscalerManager.runEnabled = settings.upscaleRunEnabled;
+
     updateDB = settings.updateDB;
 }
 
@@ -1651,6 +1653,11 @@ app.get('/upscaleRun', async (req, res) => {
 app.get('/resetSelectCount', async (req, res) => {
     res.send("ok");
     await imageDB.setAllImagesSelectedCountZero();
+});
+
+app.get('/saveSettings', async (req, res) => {
+    res.send("ok");
+    saveSettings();
 });
 
 ////////////////////////////////////////////////////////////////////////////////////////
