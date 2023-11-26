@@ -1372,7 +1372,7 @@ if (!loadSettings()) {
 downloadManager?.setDownloadLocation(settings.downloadLocation);
 downloadManager?.setTimeToDownload(settings.timeToDownload);
 
-downloadManager.runEnabled = settings.downloadRunEnabled;
+downloadManager.downloadRunEnabled = settings.downloadRunEnabled;
 databaseUpdateManager.runEnabled = settings.dbUpdateRunEnabled;
 upscalerManager.runEnabled = settings.upscaleRunEnabled;
 
@@ -1534,7 +1534,7 @@ app.get('/set-run-enabled/:dl/:db/:up', (req, res) => {
     settings.downloadRunEnabled = dl === "true";
     settings.upscaleRunEnabled = up === "true";
 
-    res.json(downloadManager.downloadRunEnabled);
+    res.json({ downloadRunEnabled: downloadManager.downloadRunEnabled, dbUpdateRunEnabled: databaseUpdateManager.runEnabled, upscaleRunEnabled: upscalerManager.runEnabled });
 });
 
 /**
