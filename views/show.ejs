@@ -329,7 +329,6 @@
                 let randomImageObj = JSON.parse(randomImageText.substring(randomImageText.indexOf('{'), randomImageText.lastIndexOf('}') + 1));
                 console.log(randomImageObj);
                 let imageInfo = new ImageInfo(randomImageObj.parent_id, randomImageObj.grid_index, randomImageObj.enqueue_time, randomImageObj.fullCommand, randomImageObj.width, randomImageObj.height, randomImageObj.storageLocation, randomImageObj.upscale_location);
-                let endTime = 0;
                 if (cdnSource) {
                     imageEls[imageElsIndex++].src = imageInfo.urlFull;
                 } else {
@@ -337,7 +336,7 @@
                 }
                 ((imgEl, startTime)=>{
                     imgEl.onload = () => {
-                        endTime = performance.now();
+                        let endTime = performance.now();
                         if ((endTime - startTime) > (updateInterval * 1000) && enableAutoAdjustUpdateInterval !== 'false') {
                             console.log(`Image ${imageInfo.id} took ${(endTime - startTime) / 1000} seconds to load, which is longer than the update interval of ${updateInterval} seconds.`);
                             updateIntervalExceedCount++;
