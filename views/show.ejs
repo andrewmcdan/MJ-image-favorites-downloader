@@ -109,6 +109,10 @@
         padding-left: 15px;
         padding-right: 15px;
     }
+
+    .hide-cursor {
+        cursor: none;
+    }
 </style>
 
 <body>
@@ -343,6 +347,24 @@
                     }
                 }
             }
+
+
+            let cursorHideTimer;
+
+            function hideCursor() {
+                document.body.classList.add('hide-cursor');
+            }
+
+            function resetTimer() {
+                clearTimeout(cursorHideTimer);
+                document.body.classList.remove('hide-cursor');
+                cursorHideTimer = setTimeout(hideCursor, 10000); // 10 seconds
+            }
+
+            window.onload = function() {
+                cursorHideTimer = setTimeout(hideCursor, 10000); // 10 seconds
+                document.onmousemove = resetTimer;
+            };
 
             // Start the interval with the initial value
             setUpdateInterval(updateInterval);
