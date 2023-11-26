@@ -1073,7 +1073,7 @@ class DownloadManager {
         let imageCount = await this.dbClient.countImagesTotal();
         console.log("Image count: " + imageCount);
         let success = true;
-        for (let i = 0; i < imageCount; i+=10) {
+        for (let i = 0; i < imageCount; i+=100) {
             if (!(await this.lookupAndDownloadImageByIndex(i))) success = false;
         }
         if (success) {
@@ -1088,7 +1088,7 @@ class DownloadManager {
 
     async lookupAndDownloadImageByIndex(index) {
         if (!this.downloadRunEnabled) return true;
-        let images = await this.dbClient.lookupImagesByIndexRange(index, index + 10, { processed: true, enabled: true }, { downloaded: false, enabled: true }, { do_not_download: false, enabled: true });
+        let images = await this.dbClient.lookupImagesByIndexRange(index, index + 100, { processed: true, enabled: true }, { downloaded: false, enabled: true }, { do_not_download: false, enabled: true });
         if (images === undefined) return true;
         if (images === null) return true;
         for(let i = 0; i < images.length; i++) {
@@ -1117,7 +1117,7 @@ class DownloadManager {
                     this.concurrentDownloads++;
                     let altImageResult;
                     try {
-                        altImageResult = await this.downloadImage(url);
+                        altImageResult = await this.downloadImage(url, image);
                     } catch (err) {
                         this.systemLogger.log("Error downloading image", err, image);
                         return false;
