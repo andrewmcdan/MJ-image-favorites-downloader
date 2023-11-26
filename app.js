@@ -11,7 +11,7 @@
  * The click Download Selected to download the images that were checked on the server side to selected folder. 
  * 
  * TODO: 
- * - Add PM2 to the server to keep it running
+ * - add weekly reset to selected count
  * 
  * 
  * 
@@ -242,7 +242,7 @@ class PuppeteerClient {
                     await waitSeconds(1);
                     await this.page.mouse.wheel({ deltaY: -200 });
                     await waitSeconds(1);
-                    await this.page.click('span ::-p-text(Sign In)').catch(() => { reject("Sign In button not found");});
+                    await this.page.click('span ::-p-text(Sign In)').catch(() => { reject("Sign In button not found"); });
                     // await waitSeconds(1);
                     let waitCount = 0;
                     while (!this.discordLoginComplete) {
@@ -559,7 +559,7 @@ class Database {
         // find if image exists in database
         // if it does, update it
         let lookup = await this.lookupByUUID(image.id);
-        if ( lookup !== undefined) {
+        if (lookup !== undefined) {
             image.processed = lookup.processed;
             image.downloaded = lookup.downloaded;
             image.doNotDownload = lookup.do_not_download;
@@ -1091,7 +1091,7 @@ class DownloadManager {
         let imageCount = await this.dbClient.countImagesTotal();
         console.log("Image count: " + imageCount);
         let success = true;
-        for (let i = 0; i < imageCount; i+=100) {
+        for (let i = 0; i < imageCount; i += 100) {
             if (!(await this.lookupAndDownloadImageByIndex(i))) success = false;
         }
         if (success) {
@@ -1112,9 +1112,9 @@ class DownloadManager {
         if (images === undefined) return true;
         if (images === null) return true;
         let success = true;
-        for(let i = 0; i < images.length; i++) {
-            while(this.concurrentDownloads >= 10) await waitSeconds(1);
-            (async(image)=>{
+        for (let i = 0; i < images.length; i++) {
+            while (this.concurrentDownloads >= 10) await waitSeconds(1);
+            (async (image) => {
                 image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
 
                 this.concurrentDownloads++;
@@ -1181,19 +1181,19 @@ class DownloadManager {
         this.verifyDownloadsInProgress = true;
         let imageCount = await this.dbClient.countImagesTotal();
         let images = null;
-        for (let i = 0; i < imageCount; i+=100) {
-            images = await this.dbClient.lookupImagesByIndexRange(i,i+100, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
-            if(i%10 === 0) {
-                if(typeof process.stdout.clearLine === 'function' && typeof process.stdout.cursorTo === 'function' && typeof process.stdout.write === 'function') {
+        for (let i = 0; i < imageCount; i += 100) {
+            images = await this.dbClient.lookupImagesByIndexRange(i, i + 100, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
+            if (i % 10 === 0) {
+                if (typeof process.stdout.clearLine === 'function' && typeof process.stdout.cursorTo === 'function' && typeof process.stdout.write === 'function') {
                     process.stdout.clearLine();
                     process.stdout.cursorTo(0);
                     process.stdout.write(i.toString());
                 }
             }
-            if(images === undefined) continue;
-            if(images === null) continue;
-            for(let p = 0; p < images.length; p++) {
-                let image = images[p];   
+            if (images === undefined) continue;
+            if (images === null) continue;
+            for (let p = 0; p < images.length; p++) {
+                let image = images[p];
                 if (image === undefined) continue;
                 if (image === null) continue;
                 if (image.downloaded !== true) continue;
@@ -1340,7 +1340,7 @@ const upscalerManager = new UpscaleManager(imageDB, systemLogger);
 const downloadManager = new DownloadManager(imageDB, systemLogger, upscalerManager);
 
 (async () => {
-    if(!verifyDownloadsOnStartup) return;
+    if (!verifyDownloadsOnStartup) return;
     while (Database.DB_connected === false) {
         await waitSeconds(1);
     }
@@ -1475,10 +1475,10 @@ app.get('/randomUUID/:dlOnly', async (req, res) => {
     let _dlOnly;
     if (dlOnly === "true") _dlOnly = true;
     else _dlOnly = false;
-    let imageInfo = await imageDB.getRandomImage(_dlOnly);
-    while (imageInfo === undefined || imageInfo === null) {
-        imageInfo = await imageDB.getRandomImage(true);
-    }
+    let imageInfo = null;
+    do {
+        imageInfo = await imageDB.getRandomImage(_dlOnly);
+    } while (imageInfo === undefined || imageInfo === null);
     res.redirect(`/show/${imageInfo.uuid}`);
 });
 
@@ -1520,11 +1520,11 @@ app.get('/set-time-to-download/:time', (req, res) => {
  * Sets whether or not the download manager should run
  */
 app.get('/set-run-enabled/:dl/:db/:up', (req, res) => {
-    const { dl,db,up } = req.params;
+    const { dl, db, up } = req.params;
     downloadManager.downloadRunEnabled = dl === "true";
     databaseUpdateManager.runEnabled = db === "true";
     upscalerManager.runEnabled = up === "true";
-    
+
     res.json(downloadManager.downloadRunEnabled);
 });
 

@@ -195,7 +195,11 @@
                 });
         }
         (async () => {
-            const minimumFadeUpdateRatio = 1.01;
+            const params = new URLSearchParams(window.location.search);
+            let enableAutoAdjustUpdateInterval = params.get('enableAutoAdjustUpdateInterval');
+            let fadeDurationParam = params.get('fadeDuration');
+            let updateIntervalParam = params.get('updateInterval');
+            const minimumFadeUpdateRatio = 1.2;
             let allImages = false;
             let cdnSource = false;
             // top bar hide/show
@@ -318,9 +322,6 @@
 
             let updateIntervalExceedCount = 0;
 
-            const params = new URLSearchParams(window.location.search);
-            let enableAutoAdjustUpdateInterval = params.get('enableAutoAdjustUpdateInterval');
-
             async function updateImages() {
                 let startTime = performance.now();
                 let url = '/randomUUID/' + !allImages;
@@ -372,6 +373,14 @@
                 cursorHideTimer = setTimeout(hideCursor, 10000); // 10 seconds
                 document.onmousemove = resetTimer;
             };
+
+            if (fadeDurationParam !== null && fadeDurationParam !== undefined && fadeDurationParam !== 'null' && fadeDurationParam !== 'undefined' && fadeDurationParam !== '') {
+                document.getElementById('fadeDuration').value = fadeDurationParam;
+                updateFadeTime(fadeDurationParam);
+            }
+            if (updateIntervalParam !== null && updateIntervalParam !== undefined && updateIntervalParam !== 'null' && updateIntervalParam !== 'undefined' && updateIntervalParam !== '') {
+                setUpdateInterval(updateIntervalParam);
+            }
 
             // Start the interval with the initial value
             setUpdateInterval(updateInterval);
