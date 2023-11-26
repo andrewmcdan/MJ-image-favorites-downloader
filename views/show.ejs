@@ -335,19 +335,20 @@
                 } else {
                     imageEls[imageElsIndex++].src = imageInfo.localUrl;
                 }
-                ((imgEl)=>{
-                    imgEl.onload(() => {
-                    endTime = performance.now();
-                    if ((endTime - startTime) > (updateInterval * 1000) && enableAutoAdjustUpdateInterval !== 'false') {
-                        console.log(`Image ${imageInfo.id} took ${(endTime - startTime) / 1000} seconds to load, which is longer than the update interval of ${updateInterval} seconds.`);
-                        updateIntervalExceedCount++;
-                        if (updateIntervalExceedCount > 5) {
-                            console.log(`The update interval has been increased to ${parseInt(updateInterval) + 1} seconds.`);
-                            setUpdateInterval(parseInt(updateInterval) + 1);
-                            updateIntervalExceedCount = 0;
+                ((imgEl, startTime)=>{
+                    imgEl.onload = () => {
+                        endTime = performance.now();
+                        if ((endTime - startTime) > (updateInterval * 1000) && enableAutoAdjustUpdateInterval !== 'false') {
+                            console.log(`Image ${imageInfo.id} took ${(endTime - startTime) / 1000} seconds to load, which is longer than the update interval of ${updateInterval} seconds.`);
+                            updateIntervalExceedCount++;
+                            if (updateIntervalExceedCount > 5) {
+                                console.log(`The update interval has been increased to ${parseInt(updateInterval) + 1} seconds.`);
+                                setUpdateInterval(parseInt(updateInterval) + 1);
+                                updateIntervalExceedCount = 0;
+                            }
                         }
-                    }
-                })})(imageEls[imageElsIndex - 1]);
+                    };
+                })(imageEls[imageElsIndex - 1], startTime);
 
                 if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
                 imageEls[imageElsIndex++].classList.remove('hidden');
