@@ -177,7 +177,7 @@
                 let fileLocation = "";
                 if (useUpscale && this.upscale_location !== null && this.upscale_location !== undefined && this.upscale_location !== 'null' && this.upscale_location !== 'undefined' && this.upscale_location !== '') {
                     fileLocation = `/${this.upscale_location}`;
-                } else if (!useUpscale && this.storageLocation !== null && this.storageLocation !== undefined && this.storageLocation !== 'null' && this.storageLocation !== 'undefined' && this.storageLocation !== '') {
+                } else if (this.storageLocation !== null && this.storageLocation !== undefined && this.storageLocation !== 'null' && this.storageLocation !== 'undefined' && this.storageLocation !== '') {
                     fileLocation = `/${this.storageLocation}`;
                 } else {
                     fileLocation = this.urlFull;
@@ -329,13 +329,13 @@
                 let randomImageObj = JSON.parse(randomImageText.substring(randomImageText.indexOf('{'), randomImageText.lastIndexOf('}') + 1));
                 console.log(randomImageObj);
                 let imageInfo = new ImageInfo(randomImageObj.parent_id, randomImageObj.grid_index, randomImageObj.enqueue_time, randomImageObj.fullCommand, randomImageObj.width, randomImageObj.height, randomImageObj.storageLocation, randomImageObj.upscale_location);
-                while(!imageEls[imageElsIndex].complete)await waitSeconds(1);
+                while (!imageEls[imageElsIndex].complete) await waitSeconds(1);
                 if (cdnSource) {
                     imageEls[imageElsIndex++].src = imageInfo.urlFull;
                 } else {
                     imageEls[imageElsIndex++].src = imageInfo.localUrl;
                 }
-                ((imgEl, startTime)=>{
+                ((imgEl, startTime) => {
                     imgEl.onload = () => {
                         let endTime = performance.now();
                         if ((endTime - startTime) > (updateInterval * 1000) && enableAutoAdjustUpdateInterval !== 'false') {
@@ -368,7 +368,7 @@
                 cursorHideTimer = setTimeout(hideCursor, 10000); // 10 seconds
             }
 
-            window.onload = function() {
+            window.onload = function () {
                 cursorHideTimer = setTimeout(hideCursor, 10000); // 10 seconds
                 document.onmousemove = resetTimer;
             };
@@ -380,9 +380,9 @@
             updateImages();
         })();
 
-        const waitSeconds = (s)=>{
-            return new Promise((resolve,reject)=>{
-                setTimeout(()=>{
+        const waitSeconds = (s) => {
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
                     resolve();
                 }, s * 1000);
             })
