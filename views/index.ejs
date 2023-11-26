@@ -12,6 +12,8 @@
     <a href="/show">slide show</a><br />
     <a href="/images">images</a><br />
     <a href="/tools">tools</a><br />
+    <a href="/status">status</a><br />
+    <a href="/resetSelectCount">Reset Select Count</a><br />
     <label>Set Run Enabled - </label>
     <label for="download">Download:</label>
     <input type="checkbox" id="download" name="download" value="false">
@@ -34,6 +36,15 @@
     <button onclick="(()=>{
         fetch('/upscaleRun');
     })()">Upscale Run</button>
+    <script>
+        (() => {
+            fetch('/status').then((res) => {
+                return res.json();
+            }).then((data) => {
+                console.log({ data });
+            });
+        })();
+    </script>
 </body>
 
 </html>

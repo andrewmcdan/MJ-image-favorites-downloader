@@ -1636,7 +1636,6 @@ app.get('/status', async (req, res) => {
     res.json(await serverStatusMonitor.checkServerStatus());
 });
 
-
 app.get('/downloadRun', async (req, res) => {
     res.send("ok");
     await downloadManager.run();
