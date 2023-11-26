@@ -65,6 +65,24 @@ class DB_Error extends Error {
     }
 }
 
+class DownloadError extends Error {
+    static count = 0;
+    constructor(message) {
+        super(message);
+        this.name = "DownloadError";
+        Error.captureStackTrace?.(this, DownloadError);
+        DownloadError.count++;
+    }
+
+    static resetCount() {
+        DownloadError.count = 0;
+    }
+
+    static sendErrorCountToSystemLogger() {
+        systemLogger?.log("DownloadError!!! ", "DownloadError count: " + DownloadError.count);
+    }
+}
+
 class SystemLogger {
     constructor() {
         this.logArr = [];
@@ -1081,6 +1099,8 @@ class DownloadManager {
         } else {
             console.log("One or more errors occurred while downloading images");
             this.systemLogger.log("One or more errors occurred while downloading images");
+            DownloadError.sendErrorCountToSystemLogger();
+            DownloadError.resetCount();
         }
         this.downloadInProgress = false;
         this.start();
@@ -1091,6 +1111,7 @@ class DownloadManager {
         let images = await this.dbClient.lookupImagesByIndexRange(index, index + 100, { processed: true, enabled: true }, { downloaded: false, enabled: true }, { do_not_download: false, enabled: true });
         if (images === undefined) return true;
         if (images === null) return true;
+        let success = true;
         for(let i = 0; i < images.length; i++) {
             while(this.concurrentDownloads >= 10) await waitSeconds(1);
             (async(image)=>{
@@ -1101,17 +1122,20 @@ class DownloadManager {
                 try {
                     imageResult = await this.downloadImage(image.urlAlt, image);
                 } catch (err) {
-                    this.systemLogger.log("Error downloading image", err, image);
-                    return false;
+                    // this.systemLogger.log("Error downloading image", err, image);
+                    success = false;
+                    new DownloadError("Error downloading image", err, image);
+                    return;
                 }
                 this.concurrentDownloads--;
 
                 if (imageResult.success === true) {
                     await this.dbClient.updateImage(imageResult);
                 } else {
-                    this.systemLogger?.log("Error downloading image", imageResult.error, image);
+                    // this.systemLogger?.log("Error downloading image", imageResult.error, image);
+                    new DownloadError("Error downloading image", imageResult.error, image);
                     let url = image.urlFull;
-                    if (imageResult.error.includes("File size mismatch")) {
+                    if (typeof imageResult.error == 'string' && imageResult.error.includes("File size mismatch")) {
                         url = image.urlAlt;
                     }
                     this.concurrentDownloads++;
@@ -1119,20 +1143,24 @@ class DownloadManager {
                     try {
                         altImageResult = await this.downloadImage(url, image);
                     } catch (err) {
-                        this.systemLogger.log("Error downloading image", err, image);
-                        return false;
+                        // this.systemLogger.log("Error downloading image", err, image);
+                        new DownloadError("Error downloading image", err, image);
+                        success = false;
+                        return;
                     }
                     this.concurrentDownloads--;
                     if (altImageResult.success === true) {
                         await this.dbClient.updateImage(altImageResult);
                     } else {
-                        this.systemLogger.log("Error downloading image", altImageResult.error, image);
-                        return false;
+                        // this.systemLogger.log("Error downloading image", altImageResult.error, image);
+                        new DownloadError("Error downloading image", altImageResult.error, image);
+                        success = false;
+                        return;
                     }
                 }
-                return true;
             })(images[i]);
         }
+        return success;
     }
 
     checkFileExistsPath(path) {
