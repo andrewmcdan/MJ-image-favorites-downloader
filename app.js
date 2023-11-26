@@ -1530,6 +1530,10 @@ app.get('/set-run-enabled/:dl/:db/:up', (req, res) => {
     databaseUpdateManager.runEnabled = db === "true";
     upscalerManager.runEnabled = up === "true";
 
+    settings.dbUpdateRunEnabled = db === "true";
+    settings.downloadRunEnabled = dl === "true";
+    settings.upscaleRunEnabled = up === "true";
+
     res.json(downloadManager.downloadRunEnabled);
 });
 
