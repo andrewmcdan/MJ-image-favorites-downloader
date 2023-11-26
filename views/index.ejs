@@ -42,7 +42,7 @@
                 return res.json();
             }).then((data) => {
                 console.log({ data });
-                document.getElementById('download').checked = data.downloadManager.downloadRunEnabled;
+                document.getElementById('download').checked = data.downloadManager.runEnabled;
                 document.getElementById('dbUpdate').checked = data.databaseUpdateManager.runEnabled;
                 document.getElementById('upscale').checked = data.upscaleManager.runEnabled;
             });
