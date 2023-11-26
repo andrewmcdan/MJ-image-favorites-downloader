@@ -521,13 +521,15 @@ class ServerStatusMonitor {
         status.downloadManager = {};
         status.downloadManager.downloadsInProgress = this.downloadManager.concurrentDownloads;
         status.downloadManager.timeToDownload = this.downloadManager.timeToDownload;
-        status.downloadManager.runEnabled = this.downloadManager.runEnabled;
+        status.downloadManager.runEnabled = this.downloadManager.downloadRunEnabled;
         status.downloadManager.downloadLocation = this.downloadManager.downloadLocation;
 
         status.upscalerManager = {};
         status.upscalerManager.upscaleInProgress = this.upscalerManager.upscaleInProgress;
         status.upscalerManager.runningUpscales = this.upscalerManager.runningUpscales;
         status.upscalerManager.queuedUpscales = this.upscalerManager.queuedUpscales;
+        status.upscalerManager.timeToUpscale = this.upscalerManager.timeToUpscale;
+        status.upscalerManager.runEnabled = this.upscalerManager.runEnabled;
 
         status.databaseUpdateManager = {};
         status.databaseUpdateManager.updateInProgress = this.databaseUpdateManager.updateInProgress;
