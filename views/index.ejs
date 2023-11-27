@@ -14,6 +14,7 @@
     <h2>Status</h2>
     <p id="serverUp">The server is up.</p>
     <p id="upTime"></p>
+    <p id="downloadedImagesCount"></p>
     <h2>Links</h2>
     <a href="/show">slide show</a><br />
     <a href="/images">images</a><br />
@@ -80,6 +81,7 @@
                 document.getElementById('dbUpdate').checked = data.databaseUpdateManager.runEnabled;
                 document.getElementById('upscale').checked = data.upscalerManager.runEnabled;
                 document.getElementById('upTime').innerHTML = 'Up Time: ' + data.upTimeFormatted;
+                document.getElementById('downloadedImagesCount').innerHTML = 'Downloaded Images Count: ' + data.database.numberOfImagesDownloaded;
                 setInterval(() => {
                     fetch('/status').then((res) => {
                         return res.json();
