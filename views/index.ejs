@@ -58,6 +58,12 @@
         let mfaCode = document.getElementById('mfaCode').value;
         fetch('/mfa/'+mfaCode);
     })()">Send MFA code</button><br />
+    <div id="logger-container" class="hiddden">
+        <div class="logger">
+            <div id="logger-text">
+            </div>
+        </div>
+    </div>
 
     <script>
         (() => {
@@ -82,6 +88,45 @@
                 }, 5000);
             });
         })();
+        let getLogsFromServer = null;
+        function loggerDelete(id) {
+            fetch('/loggerDelete/' + id)
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    getLogsFromServer();
+                });
+        }
+        let loggerText = document.getElementById('logger-text');
+        getLogsFromServer = () => {
+            fetch('/loggerGet/10/false') // get the 10 most recent logs, do not delete them
+                .then(response => response.json())
+                .then(data => {
+                    // parse some data
+                    console.log(data);
+                    if (data.length == 0) {
+                        document.getElementById('logger-container').classList.add('hidden');
+                    } else {
+                        document.getElementById('logger-container').classList.remove('hidden');
+                        let innerHTML = '';
+                        for (let i = 0; i < data.length; i++) {
+                            let timeStamp = new Date(data[i].time);
+                            let message = "";
+                            data[i].message.forEach((mes, i) => {
+                                if (i == 0) message += mes + " - ";
+                                else message += JSON.stringify(mes) + " - ";
+                            });
+                            innerHTML += `<span style="color: #00ff00;">${timeStamp.toLocaleString()}</span> - <span style="color: #0000ff;">${message}</span> `;
+                            innerHTML += `<span style="color: red; text-decoration: underline;" onclick="loggerDelete(${data[i].id});getLogsFromServer();">Delete Log Entry</span><br><br>`;
+                        }
+                        loggerText.innerHTML = innerHTML;
+                        // loggerText.scrollTop = loggerText.scrollHeight;
+                    }
+                });
+        }
+
+        getLogsFromServer();
+        setInterval(getLogsFromServer, 5000);
     </script>
 </body>
 
