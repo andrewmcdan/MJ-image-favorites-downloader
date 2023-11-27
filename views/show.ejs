@@ -133,7 +133,7 @@
     </div>
     <div id="main-container">
     </div>
-    <div id="logger-container" class="hiddden">
+    <div id="logger-container" class="hidden">
         <div class="logger">
             <div id="logger-text">
             </div>
@@ -389,13 +389,7 @@
             updateImages();
         })();
 
-        const waitSeconds = (s) => {
-            return new Promise((resolve, reject) => {
-                setTimeout(() => {
-                    resolve();
-                }, s * 1000);
-            })
-        }
+        const waitSeconds = (s) => { return new Promise((resolve, reject) => { setTimeout(() => { resolve(); }, s * 1000); }) }
 
     </script>
 </body>

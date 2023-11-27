@@ -3,6 +3,11 @@
 <head>
     <title>Home</title>
 </head>
+<style>
+    .hidden {
+        display: none;
+    }
+</style>
 
 <body>
     <h1>Midjourney Images DB</h1>
@@ -58,7 +63,7 @@
         let mfaCode = document.getElementById('mfaCode').value;
         fetch('/mfa/'+mfaCode);
     })()">Send MFA code</button><br /><br />
-    <div id="logger-container" class="hiddden">
+    <div id="logger-container" class="hidden">
         <div class="logger">
             <div id="logger-text">
             </div>
@@ -99,7 +104,7 @@
         }
         let loggerText = document.getElementById('logger-text');
         getLogsFromServer = () => {
-            fetch('/loggerGet/10/false') // get the 10 most recent logs, do not delete them
+            fetch('/loggerGet/100/false')
                 .then(response => response.json())
                 .then(data => {
                     // parse some data
