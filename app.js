@@ -512,6 +512,7 @@ class ServerStatusMonitor {
 
         status.database = {};
         status.database.numberOfImages = await this.dbClient.countImagesTotal();
+        status.database.numberOfImagesDownloaded = await this.dbClient.countImagesDownloaded();
         status.database.errorCount = DB_Error.count;
 
         status.puppeteerClient = {};
@@ -793,6 +794,17 @@ class Database {
             return res.rows[0].count;
         } catch (err) {
             new DB_Error("Error counting images in database");
+            return null;
+        }
+    }
+    countImagesDownloaded = async () => {
+        try {
+            const res = await this.dbClient.query(
+                `SELECT COUNT(*) FROM images WHERE downloaded = true`
+            );
+            return res.rows[0].count;
+        } catch (err) {
+            new DB_Error("Error counting downloaded images in database");
             return null;
         }
     }
