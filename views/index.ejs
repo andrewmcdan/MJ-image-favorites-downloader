@@ -7,7 +7,7 @@
 <body>
     <h1>Midjourney Images DB</h1>
     <h2>Status</h2>
-    <p>The server is up.</p>
+    <p id="serverUp">The server is up.</p>
     <p id="upTime"></p>
     <h2>Links</h2>
     <a href="/show">slide show</a><br />
@@ -51,12 +51,16 @@
                 document.getElementById('download').checked = data.downloadManager.runEnabled;
                 document.getElementById('dbUpdate').checked = data.databaseUpdateManager.runEnabled;
                 document.getElementById('upscale').checked = data.upscalerManager.runEnabled;
+                document.getElementById('upTime').innerHTML = 'Up Time: ' + data.upTimeFormatted;
                 setInterval(() => {
                     fetch('/status').then((res) => {
                         return res.json();
                     }).then((data) => {
                         document.getElementById('upTime').innerHTML = 'Up Time: ' + data.upTimeFormatted;
-                    });
+                    }).catch((err) => {
+                        document.getElementById('serverUp').innerHTML = 'The server is down.';
+                        document.getElementById('upTime').innerHTML = '';
+                    })
                 }, 5000);
             });
         })();
