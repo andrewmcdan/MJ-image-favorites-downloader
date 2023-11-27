@@ -41,7 +41,24 @@
     })()">Save Settings</button><br />
     <button onclick="(()=>{
         fetch('/resetSelectCount');
-    })()">Reset Select Count</button><br />
+    })()">Reset Select Count</button><br /><br />
+    <label>MJ / Discord login - </label>
+    <label for="username">Discord Username:</label>
+    <input type="text" id="username" name="username" value="">
+    <label for="password">Discord Password:</label>
+    <input type="password" id="password" name="password" value="">
+    <button id="login" onclick="(()=>{
+        let username = document.getElementById('username').value;
+        let password = document.getElementById('password').value;
+        fetch('/login/'+username+'/'+password);
+    })()">Login</button><br />
+    <label for="mfaCode">Discord MFA code:</label>
+    <input type="text" id="mfaCode" name="mfaCode" value="">
+    <button id="setmfaCode" onclick="(()=>{
+        let mfaCode = document.getElementById('mfaCode').value;
+        fetch('/mfa/'+mfaCode);
+    })()">Send MFA code</button><br />
+
     <script>
         (() => {
             fetch('/status').then((res) => {
