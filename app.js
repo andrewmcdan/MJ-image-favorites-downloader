@@ -66,7 +66,7 @@ const log_levels = {
 };
 
 const logFileTransport = new winston.transports.File({
-    filename: 'mj_dl_server.log',
+    filename: 'log/%DATE%.log',
     datePattern: 'YYYY-MM-DD-HH',
     maxSize: '1m',
     maxFiles: '14d'
