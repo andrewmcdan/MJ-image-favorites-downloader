@@ -84,7 +84,7 @@ const winstonLogger = winston.createLogger({
     ]
 });
 
-winstonLogger[log_levels['silly']]("Silly log level enabled");
+winstonLogger.silly("Silly log level enabled");
 
 
 class DB_Error extends Error {
