@@ -181,7 +181,7 @@ const winstonLogger = winston.createLogger({
     ]
 });
 
-winstonLogger.silly("Silly log level enabled", { silly: "silly" }, ["silly", "silly", "silly"]);
+winstonLogger.silly(["Silly log level enabled", { silly: "silly" }, ["silly", "silly", "silly"]]);
 
 
 
