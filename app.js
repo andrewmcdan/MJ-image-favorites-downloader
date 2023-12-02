@@ -163,7 +163,7 @@ class WinstonToSystemLoggerTransport extends Transport {
         setImmediate(() => {
             this.emit('logged', info);
         });
-        systemLogger?.log(info.level, info.message);
+        systemLogger?.log(info.message);
         callback();
     }
 }
