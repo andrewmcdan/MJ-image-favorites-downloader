@@ -49,6 +49,8 @@ puppeteer.use(StealthPlugin());
 const Upscaler = require('ai-upscale-module');
 const winston = require('winston');
 require('winston-daily-rotate-file');
+const Transport = require('winston-transport');
+const util = require('util');
 
 let logLevel = process.env.mj_dl_server_log_level | 0;
 if (typeof logLevel === "string") logLevel = parseInt(logLevel);
@@ -77,6 +79,20 @@ const logFileTransport = new winston.transports.DailyRotateFile({
     maxFiles: '14d'
 });
 
+class WinstonToSystemLoggerTransport extends Transport {
+    constructor(opts) {
+        super(opts);
+    }
+
+    log(info, callback) {
+        setImmediate(() => {
+            this.emit('logged', info);
+        });
+        systemLogger?.log(info.level, info.message);
+        callback();
+    }
+}
+
 const winstonLogger = winston.createLogger({
     level: log_level_names[logLevel],
     format: winston.format.combine(
@@ -85,11 +101,13 @@ const winstonLogger = winston.createLogger({
     ),
     transports: [
         new winston.transports.Console(),
-        logFileTransport
+        logFileTransport,
+        new WinstonToSystemLoggerTransport()
     ]
 });
 
-winstonLogger.silly("Silly log level enabled");
+winstonLogger.silly("Silly log level enabled", { silly: "silly" }, ["silly", "silly", "silly"]);
+
 
 
 class DB_Error extends Error {
