@@ -61,6 +61,81 @@ if (typeof verifyDownloadsOnStartup === "string") verifyDownloadsOnStartup = ver
 
 let settings = {};
 
+class SystemLogger {
+    constructor() {
+        this.logArr = [];
+        this.idIndex = 0;
+    }
+
+    log(...message) {
+        let entry = {};
+        entry.time = new Date();
+        entry.message = message;
+        entry.id = this.idIndex++;
+        this.logArr.push(entry);
+    }
+
+    getLog() {
+        return this.logArr;
+    }
+
+    clearLog() {
+        this.logArr = [];
+    }
+
+    printLog() {
+        console.log(this.logArr);
+    }
+
+    printLogToFile() {
+        // serialize the log
+        console.log("Not implemented");
+        // fs.writeFileSync('log.txt', this.log);
+    }
+
+    getMostRecentLog(remove = false) {
+        if (this.logArr.length === 0) return null;
+        let logTemp = this.logArr[this.logArr.length - 1];
+        if (remove) {
+            this.logArr.pop();
+        }
+        return logTemp;
+    }
+
+    getRecentEntries(numberOfEntries, remove = false) {
+        let entries = [];
+        if (typeof numberOfEntries === "string") numberOfEntries = parseInt(numberOfEntries);
+        numberOfEntries = Math.min(numberOfEntries, this.logArr.length);
+        if (remove) {
+            for (let i = 0; i < numberOfEntries; i++) {
+                entries.push(this.getMostRecentLog(remove));
+            }
+        } else {
+            for (let i = 0; i < numberOfEntries; i++) {
+                entries.push(this.logArr[this.logArr.length - 1 - i]);
+            }
+        }
+        return entries;
+    }
+
+    deleteEntry(id) {
+        if (typeof id === "string") id = parseInt(id);
+        for (let i = 0; i < this.logArr.length; i++) {
+            if (this.logArr[i].id === id) {
+                this.logArr.splice(i, 1);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    getNumberOfEntries() {
+        return this.logArr.length;
+    }
+};
+
+const systemLogger = new SystemLogger();
+
 const log_levels = {
     error: 0,
     warn: 1,
@@ -139,78 +214,7 @@ class DownloadError extends Error {
     }
 }
 
-class SystemLogger {
-    constructor() {
-        this.logArr = [];
-        this.idIndex = 0;
-    }
 
-    log(...message) {
-        let entry = {};
-        entry.time = new Date();
-        entry.message = message;
-        entry.id = this.idIndex++;
-        this.logArr.push(entry);
-    }
-
-    getLog() {
-        return this.logArr;
-    }
-
-    clearLog() {
-        this.logArr = [];
-    }
-
-    printLog() {
-        console.log(this.logArr);
-    }
-
-    printLogToFile() {
-        // serialize the log
-        console.log("Not implemented");
-        // fs.writeFileSync('log.txt', this.log);
-    }
-
-    getMostRecentLog(remove = false) {
-        if (this.logArr.length === 0) return null;
-        let logTemp = this.logArr[this.logArr.length - 1];
-        if (remove) {
-            this.logArr.pop();
-        }
-        return logTemp;
-    }
-
-    getRecentEntries(numberOfEntries, remove = false) {
-        let entries = [];
-        if (typeof numberOfEntries === "string") numberOfEntries = parseInt(numberOfEntries);
-        numberOfEntries = Math.min(numberOfEntries, this.logArr.length);
-        if (remove) {
-            for (let i = 0; i < numberOfEntries; i++) {
-                entries.push(this.getMostRecentLog(remove));
-            }
-        } else {
-            for (let i = 0; i < numberOfEntries; i++) {
-                entries.push(this.logArr[this.logArr.length - 1 - i]);
-            }
-        }
-        return entries;
-    }
-
-    deleteEntry(id) {
-        if (typeof id === "string") id = parseInt(id);
-        for (let i = 0; i < this.logArr.length; i++) {
-            if (this.logArr[i].id === id) {
-                this.logArr.splice(i, 1);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    getNumberOfEntries() {
-        return this.logArr.length;
-    }
-};
 
 class PuppeteerClient {
     constructor() {
@@ -1476,7 +1480,6 @@ class UpscaleManager {
 };
 
 const puppeteerClient = new PuppeteerClient();
-const systemLogger = new SystemLogger();
 const imageDB = new Database();
 const upscalerManager = new UpscaleManager(imageDB, systemLogger);
 const downloadManager = new DownloadManager(imageDB, systemLogger, upscalerManager);
