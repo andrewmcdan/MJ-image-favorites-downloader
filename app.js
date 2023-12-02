@@ -96,42 +96,67 @@ winstonLogger[log_level_names[logLevel]](["Log level set to " + log_level_names[
 winstonLogger[log_level_names[logLevel]](["Update DB set to " + updateDB]);
 winstonLogger[log_level_names[logLevel]](["Verify Downloads on Startup set to " + verifyDownloadsOnStartup]);
 
+/**
+ * @var {function} log0 - Alias for winstonLogger.error()
+ */
 let log0 = winstonLogger[log_level_names[0]];
+/**
+ * @var {function} log1 - Alias for winstonLogger.warn()
+ */
 let log1 = winstonLogger[log_level_names[1]];
+/**
+ * @var {function} log2 - Alias for winstonLogger.info()
+ */
 let log2 = winstonLogger[log_level_names[2]];
+/**
+ * @var {function} log3 - Alias for winstonLogger.http()
+ */
 let log3 = winstonLogger[log_level_names[3]];
+/**
+ * @var {function} log4 - Alias for winstonLogger.verbose()
+ */
 let log4 = winstonLogger[log_level_names[4]];
+/**
+ * @var {function} log5 - Alias for winstonLogger.debug()
+ */
 let log5 = winstonLogger[log_level_names[5]];
+/**
+ * @var {function} log6 - Alias for winstonLogger.silly()
+ */
 let log6 = winstonLogger[log_level_names[6]];
 
 class DB_Error extends Error {
     static count = 0;
     constructor(message) {
-        log6("DB_Error: " + message);
+        log5("DB_Error: " + message);
         super(message);
         this.name = "DB_Error";
         Error.captureStackTrace?.(this, DB_Error);
         systemLogger?.log("DB_Error", message);
         DB_Error.count++;
-        log6("DB_Error count: " + DB_Error.count);
+        log5("DB_Error count: " + DB_Error.count);
     }
 }
 
 class DownloadError extends Error {
     static count = 0;
     constructor(message) {
+        log5("DownloadError: " + message);
         super(message);
         this.name = "DownloadError";
         Error.captureStackTrace?.(this, DownloadError);
         DownloadError.count++;
+        log5("DownloadError count: " + DownloadError.count);
     }
 
     static resetCount() {
         DownloadError.count = 0;
+        log5("Reset downloadError.count. New DownloadError count: " + DownloadError.count);
     }
 
     static sendErrorCountToSystemLogger() {
         systemLogger?.log("DownloadError!!! ", "DownloadError count: " + DownloadError.count);
+        log5("Added DownloadError count to systemLogger");
     }
 }
 
@@ -156,6 +181,7 @@ class SystemLogger {
 
     clearLog() {
         this.logArr = [];
+        log5("Cleared systemLogger log");
     }
 
     printLog() {
@@ -163,6 +189,7 @@ class SystemLogger {
     }
 
     getMostRecentLog(remove = false) {
+        log5("systemLogger.getMostRecentLog called with remove = " + remove);
         if (this.logArr.length === 0) return null;
         let logTemp = this.logArr[this.logArr.length - 1];
         if (remove) {
@@ -172,6 +199,7 @@ class SystemLogger {
     }
 
     getRecentEntries(numberOfEntries, remove = false) {
+        log5("systemLogger.getRecentEntries called with numberOfEntries = " + numberOfEntries + " and remove = " + remove);
         let entries = [];
         if (typeof numberOfEntries === "string") numberOfEntries = parseInt(numberOfEntries);
         numberOfEntries = Math.min(numberOfEntries, this.logArr.length);
@@ -237,6 +265,7 @@ class PuppeteerClient {
                 this.discord_localStorage = sessionData.localStorage;
                 this.discord_sessionStorage = sessionData.sessionStorage;
             } else {
+                log0("LoadSession error. Session file not found.")
                 reject("Session file not found");
                 return;
             }
@@ -262,6 +291,7 @@ class PuppeteerClient {
                 resolve();
             } else {
                 this.loggedIntoMJ = false;
+                log0("loadSession() error. Session restore failed.")
                 reject("Session restore failed");
             }
         });
@@ -292,7 +322,7 @@ class PuppeteerClient {
 
                     await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
                     let html = await this.page.content();
-                    // console.log(html);
+                    // log2(html);
                     // await waitSeconds(5);  
                     await this.page.mouse.move(0, 0);
                     await this.page.mouse.move(100, 100);
@@ -300,13 +330,17 @@ class PuppeteerClient {
                     await waitSeconds(1);
                     await this.page.mouse.wheel({ deltaY: -200 });
                     await waitSeconds(1);
-                    await this.page.click('span ::-p-text(Sign In)').catch(() => { reject("Sign In button not found"); });
+                    await this.page.click('span ::-p-text(Sign In)').catch(() => {
+                        log0("loginToMJ() error. Sign In button not found.");
+                        reject("Sign In button not found");
+                    });
                     // await waitSeconds(1);
                     let waitCount = 0;
                     while (!this.discordLoginComplete) {
                         await waitSeconds(1);
                         waitCount++;
                         if (waitCount > 120) {
+                            log0("loginToMJ() error. Timed out waiting for login.");
                             reject("Timed out waiting for login");
                         }
                     }
@@ -333,6 +367,7 @@ class PuppeteerClient {
                         resolve();
                     } else {
                         this.loggedIntoMJ = false;
+                        log0("loginToMJ() error. Login failed.");
                         reject("Login failed");
                     }
                 });
@@ -382,11 +417,9 @@ class PuppeteerClient {
             await discordLoginPage.type('input[placeholder="6-digit authentication code"]', data.toString());
             await discordLoginPage.click('button[type="submit"]');
             await waitSeconds(3);
-            // await discordLoginPage.waitForNavigation({ waitUntil: 'networkidle2' });
             await discordLoginPage.waitForSelector('button ::-p-text(Authorize)', { timeout: 60000 });
             await discordLoginPage.click('button ::-p-text(Authorize)');
             await waitSeconds(3);
-            // await discordLoginPage.waitForNavigation({ waitUntil: 'networkidle2' });
             this.discordLoginComplete = true;
         }).catch(() => {
             this.discordLoginComplete = true;
@@ -442,6 +475,7 @@ class PuppeteerClient {
                     return { uName, pWord, mfaCb };
                 }
                 await this.loginToMJ(uNamePWordCb).catch((err) => {
+                    log0("getUsersJobsData() error. Not logged into MJ. Error: " + err);
                     reject("Not logged into MJ. Error: " + err);
                 });
             }
@@ -450,6 +484,7 @@ class PuppeteerClient {
                 await waitSeconds(1);
                 waitCount++;
                 if (waitCount > 60 * 5) {
+                    log0("getUsersJobsData() error. Login in progress for too long");
                     reject("Login in progress for too long");
                 }
             }
@@ -502,7 +537,7 @@ class PuppeteerClient {
 
 
                         let data = await response.json();
-                        // console.log({data});
+                        // log2({data});
                         if (data.data.length == 0) break;
                         numberOfJobsReturned = data.data.length;
                         // put all the returned data into the returnedData array
@@ -625,7 +660,10 @@ class Database {
             password: 'mjImagesPassword',
             port: 5432,
         });
-        this.dbClient.connect().then(() => { console.log("Connected to database"); Database.DB_connected = true; }).catch((err) => { console.log("Error connecting to database:\n", err) });
+        this.dbClient.connect().then(() => { log2("Connected to database"); Database.DB_connected = true; }).catch((err) => {
+            log0("Error connecting to database:", err);
+            log2("Error connecting to database:\n", err);
+        });
         this.dbClient.on('error', (err) => {
             new DB_Error("Database error: " + err);
             if (typeof err === 'string' && err.includes("Connection terminated unexpectedly")) this.dbClient.connect();
@@ -675,6 +713,7 @@ class Database {
                 ]
             );
         } catch (err) {
+            log0("insertImage() error: Error inserting image into database. Image ID: " + image.id + "Error: " + err);
             new DB_Error("Error inserting image into database. Image ID: " + image.id + "Error: " + err);
             return null;
         }
@@ -698,6 +737,7 @@ class Database {
             }
             return undefined;
         } catch (err) {
+            log0("lookupByUUID() error: Error looking up image in database. Image ID: " + uuid + "Error: " + err);
             new DB_Error("Error looking up image in database. Image ID: " + uuid);
             return null;
         }
@@ -729,6 +769,7 @@ class Database {
             }
             return undefined;
         } catch (err) {
+            log0("getRandomImage() error: Error looking up random image in database. Error: " + err);
             new DB_Error("Error looking up random image in database");
             return null;
         }
@@ -781,7 +822,7 @@ class Database {
                 queryParts.push("AND do_not_download = " + (do_not_downloadOnly.do_not_download === true ? "true" : "false"));
             }
 
-            // console.log(queryParts.join(' '), queryParams); // TODO: remove this
+            // log2(queryParts.join(' '), queryParams); // TODO: remove this
 
             const res = await this.dbClient.query(queryParts.join(' '), queryParams);
             if (res.rows.length > 0) {
@@ -789,6 +830,7 @@ class Database {
             }
             return undefined;
         } catch (err) {
+            log0("lookupImagesByIndexRange() error: Error looking up images in database. Image index range: " + indexStart + " to " + indexEnd + "Error: " + err);
             new DB_Error("Error looking up images in database. Image index range: " + indexStart + " to " + indexEnd);
             return null;
         }
@@ -831,7 +873,7 @@ class Database {
 
             queryParts.push("LIMIT 1");
 
-            // console.log(queryParts.join(' '), queryParams); // TODO: remove this
+            // log2(queryParts.join(' '), queryParams); // TODO: remove this
 
             const res = await this.dbClient.query(queryParts.join(' '), queryParams);
             if (res.rows.length == 1) {
@@ -843,6 +885,7 @@ class Database {
             }
             return undefined;
         } catch (err) {
+            log0("lookupImageByIndex() error: Error looking up image in database. Image index: " + index + "Error: " + err);
             new DB_Error("Error looking up image in database. Image index: " + index);
             return null;
         }
@@ -886,6 +929,7 @@ class Database {
             );
             return res;
         } catch (err) {
+            log0("updateImage() error: Error updating image in database. Image ID: " + image.id + "Error: " + err);
             new DB_Error("Error updating image in database. Image ID: " + image.id);
             return null;
         }
@@ -903,6 +947,7 @@ class Database {
             );
             return res;
         } catch (err) {
+            log0("deleteImage() error: Error deleting image from database. Image ID: " + uuid + "Error: " + err);
             new DB_Error("Error deleting image from database. Image ID: " + uuid);
             return null;
         }
@@ -914,6 +959,7 @@ class Database {
             );
             return res.rows[0].count;
         } catch (err) {
+            log0("countImagesTotal() error: Error counting images in database. Error: " + err);
             new DB_Error("Error counting images in database");
             return null;
         }
@@ -925,6 +971,7 @@ class Database {
             );
             return res.rows[0].count;
         } catch (err) {
+            log0("countImagesDownloaded() error: Error counting downloaded images in database. Error: " + err);
             new DB_Error("Error counting downloaded images in database");
             return null;
         }
@@ -939,6 +986,7 @@ class Database {
             );
             return res;
         } catch (err) {
+            log0("setImageProcessed() error: Error setting image processed in database. Image ID: " + uuid + "Error: " + err);
             new DB_Error("Error setting image processed in database. Image ID: " + uuid);
             return null;
         }
@@ -959,6 +1007,7 @@ class Database {
                 [timesSelected, uuid]
             );
         } catch (err) {
+            log0("updateTimesSelectedPlusOne() error: Error updating times_selected in database. Image ID: " + uuid + "Error: " + err);
             new DB_Error("Error updating times_selected in database. Image ID: " + uuid);
             return null;
         }
@@ -971,6 +1020,7 @@ class Database {
             );
             return res;
         } catch (err) {
+            log0("setAllImagesSelectedCountZero() error: Error setting all images selected count to zero. Error: " + err);
             new DB_Error("Error setting all images selected count to zero");
             return null;
         }
@@ -1002,6 +1052,7 @@ class Database {
             );
             return res.rows;
         } catch (err) {
+            log0("getEntriesOrderedByEnqueueTime() error: Error getting entries ordered by enqueue_time. Error: " + err);
             new DB_Error("Error getting entries ordered by enqueue_time");
             return null;
         }
@@ -1085,17 +1136,18 @@ class DatabaseUpdateManager {
         let data;
         this.puppeteerClient.getUsersJobsData().then(async (dataTemp) => {
             data = dataTemp;
-            console.log(typeof data);
-            console.log("Size of data: ", data.length, "\nCalling buildImageData()");
+            log2(typeof data);
+            log2("Size of data: ", data.length, "\nCalling buildImageData()");
             let imageData = buildImageData(data);
-            console.log("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
+            log2("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
             for (let i = 0; i < imageData.length; i++) {
                 if (updateDB) await imageDB.insertImage(imageData[i], i);
             }
-            console.log("Done updating database");
+            log2("Done updating database");
         }).catch((err) => {
-            console.log(err);
+            log2(err);
             this.systemLogger.log("Error getting user's jobs data", err);
+            log0(["DatabaseUpdateManager.run() error: Error getting user's jobs data", err]);
         }).finally(() => {
             this.updateInProgress = false;
             this.start();
@@ -1127,6 +1179,7 @@ class DownloadManager {
         try {
             if (!fs.existsSync(this.downloadLocation)) fs.mkdirSync(this.downloadLocation, { recursive: true });
         } catch (err) {
+            log0(["DownloadManager.setDownloadLocation() error: Error creating download location directory", err]);
             return false;
         }
         return true;
@@ -1137,6 +1190,7 @@ class DownloadManager {
             try {
                 time = parseInt(time);
             } catch {
+                log0(["DownloadManager.setTimeToDownload() error: Error parsing time to download", time]);
                 return false;
             }
         }
@@ -1152,6 +1206,7 @@ class DownloadManager {
         try {
             response = await fetch(url);
         } catch (err) {
+            log0(["DownloadManager.downloadImage() error: Error downloading image", err, image]);
             return ({ success: false, error: err });
         }
 
@@ -1189,10 +1244,11 @@ class DownloadManager {
         fileSize = parseInt(fileSize);
         contentLength = parseInt(contentLength);
         if (fileSize != contentLength) {
+            log0(["DownloadManager.downloadImage() error: File size mismatch: " + fileSize + " != " + contentLength, image]);
             return ({ success: false, error: "File size mismatch: " + fileSize + " != " + contentLength });
             // return; 
         }
-        console.log("Downloaded image " + destFileName + " of size " + fileSize + " bytes");
+        log2("Downloaded image " + destFileName + " of size " + fileSize + " bytes");
         image.downloaded = true;
         image.storageLocation = path.join(destFolder, destFileName);
         image.processed = true;
@@ -1224,15 +1280,16 @@ class DownloadManager {
         await this.verifyDownloads();
         this.concurrentDownloads = 0;
         let imageCount = await this.dbClient.countImagesTotal();
-        console.log("Image count: " + imageCount);
+        log2("Image count: " + imageCount);
         let success = true;
         for (let i = 0; i < imageCount; i += 100) {
             if (!(await this.lookupAndDownloadImageByIndex(i))) success = false;
         }
         if (success) {
-            console.log("Done downloading images");
+            log2("Done downloading images");
         } else {
-            console.log("One or more errors occurred while downloading images");
+            log0("One or more errors occurred while downloading images");
+            log2("One or more errors occurred while downloading images");
             this.systemLogger.log("One or more errors occurred while downloading images");
             DownloadError.sendErrorCountToSystemLogger();
             DownloadError.resetCount();
@@ -1257,6 +1314,7 @@ class DownloadManager {
                 try {
                     imageResult = await this.downloadImage(image.urlAlt, image);
                 } catch (err) {
+                    log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", err, image]);
                     // this.systemLogger.log("Error downloading image", err, image);
                     success = false;
                     new DownloadError("Error downloading image", err, image);
@@ -1269,6 +1327,7 @@ class DownloadManager {
                 } else {
                     // this.systemLogger?.log("Error downloading image", imageResult.error, image);
                     new DownloadError("Error downloading image", imageResult.error, image);
+                    log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", imageResult.error, image]);
                     let url = image.urlFull;
                     if (typeof imageResult.error == 'string' && imageResult.error.includes("File size mismatch")) {
                         url = image.urlAlt;
@@ -1278,6 +1337,7 @@ class DownloadManager {
                     try {
                         altImageResult = await this.downloadImage(url, image);
                     } catch (err) {
+                        log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", err, image]);
                         // this.systemLogger.log("Error downloading image", err, image);
                         new DownloadError("Error downloading image", err, image);
                         success = false;
@@ -1287,6 +1347,7 @@ class DownloadManager {
                     if (altImageResult.success === true) {
                         await this.dbClient.updateImage(altImageResult);
                     } else {
+                        log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", altImageResult.error, image]);
                         // this.systemLogger.log("Error downloading image", altImageResult.error, image);
                         new DownloadError("Error downloading image", altImageResult.error, image);
                         success = false;
@@ -1383,15 +1444,16 @@ class UpscaleManager {
         this.queue = [];
         this.upscaleRunInprogress = true;
         let imageCount = await this.dbClient.countImagesTotal();
-        console.log("Image count: " + imageCount);
+        log2("Image count: " + imageCount);
         let success = true;
         for (let i = 0; i < imageCount; i++) {
             if (!(await this.lookupAndUpscaleImageByIndex(i))) success = false;
         }
         if (success) {
-            console.log("Done upscaling images");
+            log2("Done upscaling images");
         } else {
-            console.log("One or more errors occurred while upscaling images");
+            log0("One or more errors occurred while upscaling images");
+            log2("One or more errors occurred while upscaling images");
             this.systemLogger.log("One or more errors occurred while upscaling images");
         }
         this.checkForFinishedJobs();
@@ -1415,13 +1477,13 @@ class UpscaleManager {
         let destFileName = image.storage_location.split('\\').pop();
         destFileName = destFileName.substring(0, destFileName.lastIndexOf('.')) + "-upscaled.jpg";
         image.upscale_location = path.join(destFolder, destFileName);
-        // console.log({ image });
-        // console.log({ destFileName });
-        // console.log({ destFolder });
+        // log2({ image });
+        // log2({ destFileName });
+        // log2({ destFolder });
         this.upscaler.upscale(image.storage_location.replaceAll('\\', '/').replaceAll('\\\\', '/'), destFolder.replaceAll('\\', '/').replaceAll('\\\\', '/')).then((jobID) => {
             image.jobID = jobID;
             this.queue.push(image);
-            // console.log("Queued image ", { image });
+            // log2("Queued image ", { image });
         });
     }
 
@@ -1441,8 +1503,8 @@ class UpscaleManager {
         (() => {
             finishedJobs.forEach(async (image) => {
                 image.id = image.uuid;
-                console.log("Finished job: ", image.jobID);
-                console.log("Image: ", image);
+                log2("Finished job: ", image.jobID);
+                log2("Image: ", image);
                 // TODO: verify file exists and is valid jpg
                 await this.dbClient.updateImage(image);
                 this.queue = this.queue.filter((image2) => {
@@ -1478,9 +1540,9 @@ const downloadManager = new DownloadManager(imageDB, systemLogger, upscalerManag
     while (Database.DB_connected === false) {
         await waitSeconds(1);
     }
-    console.log("Verifying downloads");
+    log2("Verifying downloads");
     await downloadManager.verifyDownloads();
-    console.log("Done verifying downloads");
+    log2("Done verifying downloads");
 })()
 
 
@@ -1536,7 +1598,7 @@ app.listen(port, () => {
         });
     });
     ipAddresses.forEach((ip) => {
-        console.log(`Server running at http://${ip}:${port}/`);
+        log2(`Server running at http://${ip}:${port}/`);
     });
 });
 
@@ -1595,7 +1657,7 @@ app.get('/show/:uuid', async (req, res) => {
     const { uuid } = req.params;
     if (uuid === "" || uuid === undefined) res.render('show');
     else {
-        console.log("looking up uuid: ", uuid);
+        log2("looking up uuid: ", uuid);
         const image = await imageDB.lookupByUUID(uuid);
         const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height, image.storage_location, image.upscale_location);
         imageDB.updateTimesSelectedPlusOne(uuid);
@@ -1678,7 +1740,7 @@ app.get('/set-run-enabled/:dl/:db/:up', (req, res) => {
  */
 app.get('/loggerGet/:entries/:remove', (req, res) => {
     const { entries, remove } = req.params;
-    if (remove === "true") console.log("removing entries from log");
+    if (remove === "true") log2("removing entries from log");
     let log = systemLogger.getRecentEntries(entries, remove === "true");
     res.json(log);
 });
@@ -1859,7 +1921,7 @@ systemLogger.log("Server started", new Date().toLocaleString());
 
 process.on('exit', (code) => {
     saveSettings();
-    console.log('exiting');
+    log2('exiting');
     imageDB.dbClient.end();
     systemLogger?.log("Server exited", new Date().toLocaleString());
 });
