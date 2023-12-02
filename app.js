@@ -99,31 +99,31 @@ winstonLogger[log_level_names[logLevel]](["Verify Downloads on Startup set to " 
 /**
  * @var {function} log0 - Alias for winstonLogger.error()
  */
-let log0 = winstonLogger[log_level_names[0]];
+let log0 = (...args) => { winstonLogger[log_level_names[0]](JSON.stringify(args, null, 2)) };
 /**
  * @var {function} log1 - Alias for winstonLogger.warn()
  */
-let log1 = winstonLogger[log_level_names[1]];
+let log1 = (...args) => { winstonLogger[log_level_names[1]](JSON.stringify(args, null, 2)) };
 /**
  * @var {function} log2 - Alias for winstonLogger.info()
  */
-let log2 = winstonLogger[log_level_names[2]];
+let log2 = (...args) => { winstonLogger[log_level_names[2]](JSON.stringify(args, null, 2)) };
 /**
  * @var {function} log3 - Alias for winstonLogger.http()
  */
-let log3 = winstonLogger[log_level_names[3]];
+let log3 = (...args) => { winstonLogger[log_level_names[3]](JSON.stringify(args, null, 2)) };
 /**
  * @var {function} log4 - Alias for winstonLogger.verbose()
  */
-let log4 = winstonLogger[log_level_names[4]];
+let log4 = (...args) => { winstonLogger[log_level_names[4]](JSON.stringify(args, null, 2)) };
 /**
  * @var {function} log5 - Alias for winstonLogger.debug()
  */
-let log5 = winstonLogger[log_level_names[5]];
+let log5 = (...args) => { winstonLogger[log_level_names[5]](JSON.stringify(args, null, 2)) };
 /**
  * @var {function} log6 - Alias for winstonLogger.silly()
  */
-let log6 = winstonLogger[log_level_names[6]];
+let log6 = (...args) => { winstonLogger[log_level_names[6]](JSON.stringify(args, null, 2)) };
 
 class DB_Error extends Error {
     static count = 0;
