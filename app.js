@@ -40,19 +40,52 @@ const bodyParser = require('body-parser');
 const sharp = require('sharp');
 const PNG = require('pngjs').PNG;
 const app = express();
-const port = 3001;
+const port = process.env.mj_dl_server_port | 3000;
 app.use(bodyParser.json({ limit: '100mb' }));
 const pgClient = require('pg');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 const Upscaler = require('ai-upscale-module');
+const winston = require('winston');
 
-let updateDB = true;
-
-let verifyDownloadsOnStartup = true;
+const logLevel = process.env.mj_dl_server.log_level | 0;
+let updateDB = process.env.mj_dl_server_updateDB | true;
+let verifyDownloadsOnStartup = process.env.mj_dl_server_verifyDlOnStartup | true;
 
 let settings = {};
+
+const log_levels = {
+    error: 0,
+    warn: 1,
+    info: 2,
+    http: 3,
+    verbose: 4,
+    debug: 5,
+    silly: 6
+};
+
+const logFileTransport = new winston.transports.File({
+    filename: 'mj_dl_server.log',
+    datePattern: 'YYYY-MM-DD-HH',
+    maxSize: '1m',
+    maxFiles: '14d'
+});
+
+const winstonLogger = winston.createLogger({
+    level: logLevel,
+    format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
+    ),
+    transports: [
+        new winston.transports.Console(),
+        logFileTransport
+    ]
+});
+
+winstonLogger[log_levels[silly]]("Silly log level enabled");
+
 
 class DB_Error extends Error {
     static count = 0;
@@ -172,6 +205,10 @@ class PuppeteerClient {
         this.discordLoginComplete = false;
     }
 
+    /**
+     * Loads the session data from the session files and attempts to restore the session.
+     * @returns {Promise<void>} - nothing
+     */
     async loadSession() {
         return new Promise(async (resolve, reject) => {
             if (fs.existsSync('mjSession.json') && fs.existsSync('discordSession.json')) {
@@ -214,6 +251,11 @@ class PuppeteerClient {
         });
     }
 
+    /**
+     * Attempts to log into Midjourney. If the user is not logged in, it will attempt to log in using the credentials_cb function.
+     * @param {CallableFunction} credentials_cb function to call to get login credentials
+     * @returns {Promise<void>} - nothing
+     */
     async loginToMJ(credentials_cb) {
         return new Promise(async (resolve, reject) => {
             if ((!this.loggedIntoMJ || this.browser == null) && !this.loginInProgress) {
@@ -286,6 +328,12 @@ class PuppeteerClient {
         });
     }
 
+    /**
+     * Attempts to log into Discord. If the user is not logged in, it will attempt to log in using the credentials_cb function.
+     * @param {puppeteer page} discordLoginPage 
+     * @param {CallableFunction} credentials_cb 
+     * @returns nothing
+     */
     async loginToDiscord(discordLoginPage, credentials_cb) {
         let credentials = await credentials_cb();
         let username = credentials.uName;
@@ -330,6 +378,12 @@ class PuppeteerClient {
 
     }
 
+    /**
+     * Attempts to get the user's jobs data from Midjourney. If the user is not logged in, it will attempt to log in. 
+     * If the user is logged in, but the login is in progress, it will wait for the login to complete before attempting to get the user's jobs data.
+     * If the user is logged in, but the login is not in progress, it will attempt to get the user's jobs data.
+     * @returns {Promise<object>} - the user's jobs data
+     */
     getUsersJobsData() {
         return new Promise(async (resolve, reject) => {
             if (!this.loggedIntoMJ) {
@@ -448,6 +502,10 @@ class PuppeteerClient {
         });
     }
 
+    /**
+     * @param {string} jobID 
+     * @returns {Promise<object>} - the job status data
+     */
     getSingleJobStatus(jobID) {
         return new Promise(async (resolve, reject) => {
             if (!this.loggedIntoMJ) reject("Not logged into MJ");
@@ -558,6 +616,12 @@ class Database {
         });
     }
 
+    /**
+     * Inserts an image into the database. If the image already exists, it will update the image.
+     * @param {ImageInfo} image 
+     * @param {number} index 
+     * @returns query response
+     */
     insertImage = async (image, index) => {
         // find if image exists in database
         // if it does, update it
@@ -601,6 +665,11 @@ class Database {
         return res;
     }
 
+    /**
+     * Looks up an image in the database by uuid.
+     * @param {string} uuid 
+     * @returns Query response. If the image is found, it will return the image. If the image is not found, it will return undefined.
+     */
     lookupByUUID = async (uuid) => {
         try {
             const res = await this.dbClient.query(
@@ -617,6 +686,12 @@ class Database {
             return null;
         }
     }
+
+    /**
+     * Get a random image from the database. If downloadedOnly is true, it will only return images that have been downloaded.
+     * @param {boolean} downloadedOnly 
+     * @returns Query response. If the image is found, it will return the image. If the image is not found, it will return undefined.
+     */
     getRandomImage = async (downloadedOnly = false) => {
         if (downloadedOnly === "true") downloadedOnly = true;
         if (downloadedOnly === "false") downloadedOnly = false;
@@ -642,6 +717,16 @@ class Database {
             return null;
         }
     }
+
+    /**
+     * Look up images in the database by range of indexes.
+     * @param {number | string} indexStart 
+     * @param {number | string} indexEnd 
+     * @param {object} processedOnly { processed: false, enabled: false}
+     * @param {object} downloadedOnly { downloaded: false, enabled: false}
+     * @param {object} do_not_downloadOnly { do_not_download: false, enabled: false}
+     * @returns Query response. If the images are found, it will return the images. If the range is invalid, it will return null. If the images are not found, it will return undefined.
+     */
     lookupImagesByIndexRange = async (indexStart, indexEnd, processedOnly = { processed: false, enabled: false }, downloadedOnly = { downloaded: false, enabled: false }, do_not_downloadOnly = { do_not_download: false, enabled: false }) => {
         if (typeof indexStart === 'number') indexStart = indexStart.toString();
         if (typeof indexStart === "string") {
@@ -692,6 +777,15 @@ class Database {
             return null;
         }
     }
+
+    /**
+     * Look up image in the database by index.
+     * @param {number | string} index 
+     * @param {object} processedOnly { processed: false, enabled: false}
+     * @param {object} downloadedOnly { downloaded: false, enabled: false}
+     * @param {object} do_not_downloadOnly { do_not_download: false, enabled: false}
+     * @returns Query response. If the image is found, it will return the image. If the image is not found, it will return undefined.
+     */
     lookupImageByIndex = async (index, processedOnly = { processed: false, enabled: false }, downloadedOnly = { downloaded: false, enabled: false }, do_not_downloadOnly = { do_not_download: false, enabled: false }) => {
         if (typeof index === 'number') index = index.toString();
         if (typeof index === "string") {
@@ -737,6 +831,12 @@ class Database {
             return null;
         }
     }
+
+    /**
+     * Update an image in the database
+     * @param {ImageInfo} image 
+     * @returns Query response
+     */
     updateImage = async (image) => {
         try {
             const res = await this.dbClient.query(
@@ -774,6 +874,11 @@ class Database {
             return null;
         }
     }
+    /**
+     * Delete an image in the database
+     * @param {string} uuid 
+     * @returns Query response
+     */
     deleteImage = async (uuid) => {
         try {
             const res = await this.dbClient.query(
