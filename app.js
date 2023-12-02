@@ -50,9 +50,12 @@ const Upscaler = require('ai-upscale-module');
 const winston = require('winston');
 require('winston-daily-rotate-file');
 
-const logLevel = process.env.mj_dl_server_log_level | 0;
+let logLevel = process.env.mj_dl_server_log_level | 0;
+if (typeof logLevel === "string") logLevel = parseInt(logLevel);
 let updateDB = process.env.mj_dl_server_updateDB | true;
+if (typeof updateDB === "string") updateDB = updateDB === "true";
 let verifyDownloadsOnStartup = process.env.mj_dl_server_verifyDlOnStartup | true;
+if (typeof verifyDownloadsOnStartup === "string") verifyDownloadsOnStartup = verifyDownloadsOnStartup === "true";
 
 let settings = {};
 
@@ -65,6 +68,7 @@ const log_levels = {
     debug: 5,
     silly: 6
 };
+const log_level_names = Object.keys(log_levels);
 
 const logFileTransport = new winston.transports.DailyRotateFile({
     filename: 'log/%DATE%.log',
@@ -74,7 +78,7 @@ const logFileTransport = new winston.transports.DailyRotateFile({
 });
 
 const winstonLogger = winston.createLogger({
-    level: logLevel,
+    level: log_level_names[logLevel],
     format: winston.format.combine(
         winston.format.timestamp(),
         winston.format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
