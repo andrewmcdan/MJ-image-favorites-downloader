@@ -61,6 +61,80 @@ if (typeof verifyDownloadsOnStartup === "string") verifyDownloadsOnStartup = ver
 
 let settings = {};
 
+const log_levels = {
+    error: 0,
+    warn: 1,
+    info: 2,
+    http: 3,
+    verbose: 4,
+    debug: 5,
+    silly: 6
+};
+const log_level_names = Object.keys(log_levels);
+
+const logFileTransport = new winston.transports.DailyRotateFile({
+    filename: 'log/%DATE%.log',
+    datePattern: 'YYYY-MM-DD-HH',
+    maxSize: '1m',
+    maxFiles: '14d'
+});
+
+const winstonLogger = winston.createLogger({
+    level: log_level_names[logLevel],
+    format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
+    ),
+    transports: [
+        new winston.transports.Console(),
+        logFileTransport
+    ]
+});
+
+winstonLogger[log_level_names[logLevel]](["Server Starting..."]);
+winstonLogger[log_level_names[logLevel]](["Log level set to " + log_level_names[logLevel]]);
+winstonLogger[log_level_names[logLevel]](["Update DB set to " + updateDB]);
+winstonLogger[log_level_names[logLevel]](["Verify Downloads on Startup set to " + verifyDownloadsOnStartup]);
+
+let log0 = winstonLogger[log_level_names[0]];
+let log1 = winstonLogger[log_level_names[1]];
+let log2 = winstonLogger[log_level_names[2]];
+let log3 = winstonLogger[log_level_names[3]];
+let log4 = winstonLogger[log_level_names[4]];
+let log5 = winstonLogger[log_level_names[5]];
+let log6 = winstonLogger[log_level_names[6]];
+
+class DB_Error extends Error {
+    static count = 0;
+    constructor(message) {
+        log6("DB_Error: " + message);
+        super(message);
+        this.name = "DB_Error";
+        Error.captureStackTrace?.(this, DB_Error);
+        systemLogger?.log("DB_Error", message);
+        DB_Error.count++;
+        log6("DB_Error count: " + DB_Error.count);
+    }
+}
+
+class DownloadError extends Error {
+    static count = 0;
+    constructor(message) {
+        super(message);
+        this.name = "DownloadError";
+        Error.captureStackTrace?.(this, DownloadError);
+        DownloadError.count++;
+    }
+
+    static resetCount() {
+        DownloadError.count = 0;
+    }
+
+    static sendErrorCountToSystemLogger() {
+        systemLogger?.log("DownloadError!!! ", "DownloadError count: " + DownloadError.count);
+    }
+}
+
 class SystemLogger {
     constructor() {
         this.logArr = [];
@@ -68,6 +142,7 @@ class SystemLogger {
     }
 
     log(...message) {
+        winstonLogger?.log('error', message.join(' : '));
         let entry = {};
         entry.time = new Date();
         entry.message = message;
@@ -85,12 +160,6 @@ class SystemLogger {
 
     printLog() {
         console.log(this.logArr);
-    }
-
-    printLogToFile() {
-        // serialize the log
-        console.log("Not implemented");
-        // fs.writeFileSync('log.txt', this.log);
     }
 
     getMostRecentLog(remove = false) {
@@ -135,86 +204,6 @@ class SystemLogger {
 };
 
 const systemLogger = new SystemLogger();
-
-const log_levels = {
-    error: 0,
-    warn: 1,
-    info: 2,
-    http: 3,
-    verbose: 4,
-    debug: 5,
-    silly: 6
-};
-const log_level_names = Object.keys(log_levels);
-
-const logFileTransport = new winston.transports.DailyRotateFile({
-    filename: 'log/%DATE%.log',
-    datePattern: 'YYYY-MM-DD-HH',
-    maxSize: '1m',
-    maxFiles: '14d'
-});
-
-class WinstonToSystemLoggerTransport extends Transport {
-    constructor(opts) {
-        super(opts);
-    }
-
-    log(info, callback) {
-        setImmediate(() => {
-            this.emit('logged', info);
-        });
-        systemLogger?.log(info.message);
-        callback();
-    }
-}
-
-const winstonLogger = winston.createLogger({
-    level: log_level_names[logLevel],
-    format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
-    ),
-    transports: [
-        new winston.transports.Console(),
-        logFileTransport,
-        new WinstonToSystemLoggerTransport()
-    ]
-});
-
-winstonLogger.silly(["Silly log level enabled", { silly: "silly" }, ["silly", "silly", "silly"]]);
-
-
-
-class DB_Error extends Error {
-    static count = 0;
-    constructor(message) {
-        super(message);
-        this.name = "DB_Error";
-        Error.captureStackTrace?.(this, DB_Error);
-        systemLogger?.log("DB_Error", message);
-        DB_Error.count++;
-    }
-}
-
-class DownloadError extends Error {
-    static count = 0;
-    constructor(message) {
-        super(message);
-        this.name = "DownloadError";
-        Error.captureStackTrace?.(this, DownloadError);
-        DownloadError.count++;
-    }
-
-    static resetCount() {
-        DownloadError.count = 0;
-    }
-
-    static sendErrorCountToSystemLogger() {
-        systemLogger?.log("DownloadError!!! ", "DownloadError count: " + DownloadError.count);
-    }
-}
-
-
 
 class PuppeteerClient {
     constructor() {
