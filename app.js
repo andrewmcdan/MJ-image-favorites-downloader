@@ -96,34 +96,42 @@ winstonLogger[log_level_names[logLevel]](["Log level set to " + log_level_names[
 winstonLogger[log_level_names[logLevel]](["Update DB set to " + updateDB]);
 winstonLogger[log_level_names[logLevel]](["Verify Downloads on Startup set to " + verifyDownloadsOnStartup]);
 
+const logX_to_winston = (x, ...args) => {
+    if (args.length === 1 && typeof args[0] === "string") {
+        winstonLogger[log_level_names[x]](args[0]);
+    } else {
+        winstonLogger[log_level_names[x]](JSON.stringify(args, null, 2))
+    }
+}
+
 /**
  * @var {function} log0 - Alias for winstonLogger.error()
  */
-let log0 = (...args) => { winstonLogger[log_level_names[0]](JSON.stringify(args, null, 2)) };
+let log0 = (...args) => { logX_to_winston(0, ...args) };
 /**
  * @var {function} log1 - Alias for winstonLogger.warn()
  */
-let log1 = (...args) => { winstonLogger[log_level_names[1]](JSON.stringify(args, null, 2)) };
+let log1 = (...args) => { logX_to_winston(1, ...args) };
 /**
  * @var {function} log2 - Alias for winstonLogger.info()
  */
-let log2 = (...args) => { winstonLogger[log_level_names[2]](JSON.stringify(args, null, 2)) };
+let log2 = (...args) => { logX_to_winston(2, ...args) };
 /**
  * @var {function} log3 - Alias for winstonLogger.http()
  */
-let log3 = (...args) => { winstonLogger[log_level_names[3]](JSON.stringify(args, null, 2)) };
+let log3 = (...args) => { logX_to_winston(3, ...args) };
 /**
  * @var {function} log4 - Alias for winstonLogger.verbose()
  */
-let log4 = (...args) => { winstonLogger[log_level_names[4]](JSON.stringify(args, null, 2)) };
+let log4 = (...args) => { logX_to_winston(4, ...args) };
 /**
  * @var {function} log5 - Alias for winstonLogger.debug()
  */
-let log5 = (...args) => { winstonLogger[log_level_names[5]](JSON.stringify(args, null, 2)) };
+let log5 = (...args) => { logX_to_winston(5, ...args) };
 /**
  * @var {function} log6 - Alias for winstonLogger.silly()
  */
-let log6 = (...args) => { winstonLogger[log_level_names[6]](JSON.stringify(args, null, 2)) };
+let log6 = (...args) => { logX_to_winston(6, ...args) };
 
 class DB_Error extends Error {
     static count = 0;
