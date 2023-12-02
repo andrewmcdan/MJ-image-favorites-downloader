@@ -48,6 +48,7 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 const Upscaler = require('ai-upscale-module');
 const winston = require('winston');
+require('winston-daily-rotate-file');
 
 const logLevel = process.env.mj_dl_server_log_level | 0;
 let updateDB = process.env.mj_dl_server_updateDB | true;
