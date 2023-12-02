@@ -97,8 +97,8 @@ winstonLogger[log_level_names[logLevel]](["Update DB set to " + updateDB]);
 winstonLogger[log_level_names[logLevel]](["Verify Downloads on Startup set to " + verifyDownloadsOnStartup]);
 
 const logX_to_winston = (x, ...args) => {
-    if (args.length === 1 && typeof args[0] === "string") {
-        winstonLogger[log_level_names[x]](args[0]);
+    if (args.every((arg) => typeof arg === "string")) {
+        winstonLogger[log_level_names[x]](args.join(" "));
     } else {
         winstonLogger[log_level_names[x]](JSON.stringify(args, null, 2))
     }
