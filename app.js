@@ -49,7 +49,7 @@ puppeteer.use(StealthPlugin());
 const Upscaler = require('ai-upscale-module');
 const winston = require('winston');
 
-const logLevel = process.env.mj_dl_server.log_level | 0;
+const logLevel = process.env.mj_dl_server_log_level | 0;
 let updateDB = process.env.mj_dl_server_updateDB | true;
 let verifyDownloadsOnStartup = process.env.mj_dl_server_verifyDlOnStartup | true;
 
