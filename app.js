@@ -65,7 +65,7 @@ const log_levels = {
     silly: 6
 };
 
-const logFileTransport = new winston.transports.File({
+const logFileTransport = new winston.transports.DailyRotateFile({
     filename: 'log/%DATE%.log',
     datePattern: 'YYYY-MM-DD-HH',
     maxSize: '1m',
