@@ -1295,33 +1295,21 @@ class ImageInfo {
     }
 
     get id() {
-        log5("ImageInfo get id() called");
-        log6(this.parent_id + '_' + this.grid_index);
         return this.parent_id + '_' + this.grid_index;
     }
     get urlFull() {
-        log5("ImageInfo get urlFull() called");
-        log6(`https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.png`);
         return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.png`;
     }
     get urlSmall() {
-        log5("ImageInfo get urlSmall() called");
-        log6(`https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_32_N.webp`);
         return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_32_N.webp`;
     }
     get urlMedium() {
-        log5("ImageInfo get urlMedium() called");
-        log6(`https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_384_N.webp`);
         return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_384_N.webp`;
     }
     get urlAlt() {
-        log5("ImageInfo get urlAlt() called");
-        log6(`https://storage.googleapis.com/dream-machines-output/${this.parent_id}/0_${this.grid_index}.png`);
         return `https://storage.googleapis.com/dream-machines-output/${this.parent_id}/0_${this.grid_index}.png`;
     }
     get urlParentGrid() {
-        log5("ImageInfo get urlParentGrid() called");
-        log6(`https://cdn.midjourney.com/${this.parent_id}/grid_0.webp`);
         return `https://cdn.midjourney.com/${this.parent_id}/grid_0.webp`;
     }
 };
