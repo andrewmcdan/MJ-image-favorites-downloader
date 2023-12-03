@@ -13,11 +13,6 @@
  * TODO: 
  * - add weekly reset to selected count
  * 
- * 
- * 
- * 
- * 
- * 
  * //////////////// NEED to evaluate these TODO's ////////////////
  * 1. Add ExifTool capability to add metadata to images
  * 2. Add upscale capability to images using Ai-Upscale-Module
@@ -74,8 +69,8 @@ const log_level_names = Object.keys(log_levels);
 
 const logFileTransport = new winston.transports.DailyRotateFile({
     filename: 'log/%DATE%.log',
-    datePattern: 'YYYY-MM-DD-HH',
-    maxSize: '1m',
+    datePattern: 'YYYY-MM-DD',
+    maxSize: '10m',
     maxFiles: '14d'
 });
 
@@ -170,20 +165,24 @@ class DownloadError extends Error {
 
 class SystemLogger {
     constructor() {
+        log5("SystemLogger constructor called");
         this.logArr = [];
         this.idIndex = 0;
     }
 
     log(...message) {
+        log5("systemLogger.log called with message: " + message.join(' : '));
         winstonLogger?.log('error', message.join(' : '));
         let entry = {};
         entry.time = new Date();
         entry.message = message;
         entry.id = this.idIndex++;
+        log6("systemLogger.log entry: " + JSON.stringify(entry));
         this.logArr.push(entry);
     }
 
     getLog() {
+        log5("systemLogger.getLog called");
         return this.logArr;
     }
 
@@ -193,16 +192,19 @@ class SystemLogger {
     }
 
     printLog() {
+        log5("systemLogger.printLog called");
         console.log(this.logArr);
     }
 
     getMostRecentLog(remove = false) {
         log5("systemLogger.getMostRecentLog called with remove = " + remove);
         if (this.logArr.length === 0) return null;
+        log6("systemLogger.getMostRecentLog logArr: " + JSON.stringify(this.logArr));
         let logTemp = this.logArr[this.logArr.length - 1];
         if (remove) {
             this.logArr.pop();
         }
+        log6("systemLogger.getMostRecentLog logTemp: " + JSON.stringify(logTemp));
         return logTemp;
     }
 
@@ -211,6 +213,7 @@ class SystemLogger {
         let entries = [];
         if (typeof numberOfEntries === "string") numberOfEntries = parseInt(numberOfEntries);
         numberOfEntries = Math.min(numberOfEntries, this.logArr.length);
+        log6("systemLogger.getRecentEntries numberOfEntries = " + numberOfEntries);
         if (remove) {
             log1("Removing "+ numberOfEntries +" entries from systemLogger")
             for (let i = 0; i < numberOfEntries; i++) {
@@ -221,21 +224,26 @@ class SystemLogger {
                 entries.push(this.logArr[this.logArr.length - 1 - i]);
             }
         }
+        log6("systemLogger.getRecentEntries entries = " + JSON.stringify(entries));
         return entries;
     }
 
     deleteEntry(id) {
+        log5("systemLogger.deleteEntry called with id = " + id);
         if (typeof id === "string") id = parseInt(id);
         for (let i = 0; i < this.logArr.length; i++) {
             if (this.logArr[i].id === id) {
                 this.logArr.splice(i, 1);
+                log6("systemLogger.deleteEntry deleted entry with id = " + id);
                 return true;
             }
         }
+        log6("systemLogger.deleteEntry did not find entry with id = " + id);
         return false;
     }
 
     getNumberOfEntries() {
+        log5("systemLogger.getNumberOfEntries called");
         return this.logArr.length;
     }
 };
@@ -244,6 +252,7 @@ const systemLogger = new SystemLogger();
 
 class PuppeteerClient {
     constructor() {
+        log5("PuppeteerClient constructor called");
         this.browser = null;
         this.page = null;
         this.pageURL = null;
@@ -263,8 +272,10 @@ class PuppeteerClient {
      * @returns {Promise<void>} - nothing
      */
     async loadSession() {
+        log5("loadSession() called");
         return new Promise(async (resolve, reject) => {
             if (fs.existsSync('mjSession.json') && fs.existsSync('discordSession.json')) {
+                log6("Session files found. Loading session data.");
                 let sessionData = JSON.parse(fs.readFileSync('mjSession.json'));
                 this.mj_cookies = sessionData.cookies;
                 this.mj_localStorage = sessionData.localStorage;
@@ -273,6 +284,7 @@ class PuppeteerClient {
                 this.discord_cookies = sessionData.cookies;
                 this.discord_localStorage = sessionData.localStorage;
                 this.discord_sessionStorage = sessionData.sessionStorage;
+                log6("Session data loaded.");
             } else {
                 log0("LoadSession error. Session file not found.")
                 reject("Session file not found");
@@ -282,9 +294,12 @@ class PuppeteerClient {
             if (this.browser == null) {
                 log1("Browser is null. Launching new browser.");
                 this.browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--enable-javascript'] });
+                log6("Browser launched.");
                 this.page = (await this.browser.pages())[0];
+                log6("Page set.");
             }
 
+            log6("Setting cookies.");
             await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
             let discordPage = await this.browser.newPage();
             await discordPage.goto('https://discord.com/');
@@ -292,18 +307,26 @@ class PuppeteerClient {
             await this.page.setCookie(...this.mj_cookies);
             await discordPage.setCookie(...this.discord_cookies);
             // await waitSeconds(1);
+            log6("Cookies set.");
+            log6("Closing discord page.");
             await discordPage?.close();
+            log6("Discord page closed.");
 
+            log6("Navigating to MJ home page.");
             await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
             // await waitSeconds(2);
             if (this.page.url().includes("https://www.midjourney.com/imagine")) {
+                log6("Successfully navigated to MJ home page.");
+                log6("Session restore successful.");
                 this.loggedIntoMJ = true;
                 resolve();
             } else {
+                log6("Session restore failed.");
                 this.loggedIntoMJ = false;
                 log0("loadSession() error. Session restore failed.")
                 reject("Session restore failed");
             }
+            log6("loadSession() complete.");
         });
     }
 
@@ -313,17 +336,25 @@ class PuppeteerClient {
      * @returns {Promise<void>} - nothing
      */
     async loginToMJ(credentials_cb) {
+        log5("loginToMJ() called");
         return new Promise(async (resolve, reject) => {
             if ((!this.loggedIntoMJ || this.browser == null) && !this.loginInProgress) {
+                log6("Not logged into MJ and not currently logging in. Attempting to restore session.");
                 // attempt to restore session
                 this.loadSession().then(() => { resolve(); }).catch(async () => {
                     log1("Session restore failed. Attempting to log in.");
                     this.loginInProgress = true;
-                    if (this.browser !== null) await this.browser.close();
+                    if (this.browser !== null) {
+                        log6("Browser is not null. Closing browser.");
+                        await this.browser.close();
+                    }
                     log1("Launching new browser.");
                     this.browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--enable-javascript'] });
+                    log6("Browser launched.");
                     this.page = (await this.browser.pages())[0];
+                    log6("Page set.");
 
+                    log6("Setting up targetcreated event listener for discord.com/login.");
                     this.browser.on('targetcreated', async (target) => {
                         const pageList = await this.browser.pages();
                         let discordLoginPage = pageList[pageList.length - 1];
@@ -332,16 +363,19 @@ class PuppeteerClient {
                         }
                     });
 
+                    log6("Navigating to MJ home page.");
                     await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
+                    log6("Navigated to MJ home page.");
                     let html = await this.page.content();
-                    // log2(html);
                     // await waitSeconds(5);  
+                    log6("Moving mouse to (0,0) and then to (100,100) to make sure the 'Sign In' button appears.")
                     await this.page.mouse.move(0, 0);
                     await this.page.mouse.move(100, 100);
                     await this.page.mouse.wheel({ deltaY: 100 });
                     await waitSeconds(1);
                     await this.page.mouse.wheel({ deltaY: -200 });
                     await waitSeconds(1);
+                    log6("Clicking 'Sign In' button.");
                     await this.page.click('span ::-p-text(Sign In)').catch(() => {
                         log0("loginToMJ() error. Sign In button not found.");
                         reject("Sign In button not found");
@@ -357,33 +391,44 @@ class PuppeteerClient {
                             return;
                         }
                     }
+                    log6("Login process complete or failed.");
                     this.loginInProgress = false;
+                    log6("Navigating to MJ home page.");
                     await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
                     await waitSeconds(5);
+                    log6("Navigated to MJ home page.");
+                    log6("Checking to see if login was successful by checking the URL.");
                     this.pageURL = this.page.url();
                     if (this.pageURL.includes("imagine") || this.pageURL.includes("explore")) {
+                        log6("Login successful.");
                         this.loggedIntoMJ = true;
+                        log6("Getting/saving cookies and local/session storage.");
                         this.mj_cookies = await this.page.cookies();
                         this.mj_localStorage = await this.page.evaluate(() => { return window.localStorage; });
                         this.mj_sessionStorage = await this.page.evaluate(() => { return window.sessionStorage; });
                         try{
+                            log6("Writing mjSession.json file.");
                             fs.writeFileSync('mjSession.json', JSON.stringify({ cookies: this.mj_cookies, localStorage: this.mj_localStorage, sessionStorage: this.mj_sessionStorage }));
                         } catch(err) {
                             log0("Error writing mjSession.json file. Error: " + err);
                         }
 
+                        log6("Navigating to discord.com/channels/@me to get discord cookies and local/session storage.");
                         let discordPage = await this.browser.newPage();
                         await discordPage.goto('https://discord.com/channels/@me');
                         await waitSeconds(2);
+                        log6("Getting/saving cookies and local/session storage.");
                         this.discord_cookies = await discordPage.cookies();
                         this.discord_localStorage = await discordPage.evaluate(() => { return window.localStorage; });
                         this.discord_sessionStorage = await discordPage.evaluate(() => { return window.sessionStorage; });
                         try{
+                            log6("Writing discordSession.json file.");
                             fs.writeFileSync('discordSession.json', JSON.stringify({ cookies: this.discord_cookies, localStorage: this.discord_localStorage, sessionStorage: this.discord_sessionStorage }));
                         } catch(err) {
                             log0("Error writing discordSession.json file. Error: " + err);
                         }
                         await waitSeconds(15);
+                        log6("Closing discord page.");
                         await discordPage?.close();
                         resolve();
                     } else {
@@ -408,6 +453,7 @@ class PuppeteerClient {
      * @returns nothing
      */
     async loginToDiscord(discordLoginPage, credentials_cb) {
+        log5("loginToDiscord() called");
         let credentials = await credentials_cb();
         let username = credentials.uName;
         let password = credentials.pWord;
@@ -416,8 +462,10 @@ class PuppeteerClient {
             this.discordLoginComplete = false;
             return;
         }
+        log6("Logging into Discord with username: " + username + " and password: " + password);
         let MFA_cb = credentials.mfaCb;
         await waitSeconds(1);
+        log6("Typing username and password.");
         await discordLoginPage.waitForSelector('input[name="email"]');
         let typingRandomTimeMin = 0.03;
         let typingRandomTimeMax = 0.15;
@@ -426,19 +474,21 @@ class PuppeteerClient {
             let randomTime = Math.random() * (typingRandomTimeMin) + typingRandomTimeMax;
             await waitSeconds(randomTime);
         }
-
         await discordLoginPage.keyboard.press('Tab');
         for (let i = 0; i < password.length; i++) {
             await discordLoginPage.type('input[name="password"]', password.charAt(i));
             let randomTime = Math.random() * (typingRandomTimeMin) + typingRandomTimeMax;
             await waitSeconds(randomTime);
         }
-
+        log6("Username and password typed.");
         await waitSeconds(1);
+        log6("Clicking login button.");
         await discordLoginPage.click('button[type="submit"]');
+        log6("Login button clicked. Waiting for MFA code input field");
         discordLoginPage.waitForSelector('input[placeholder="6-digit authentication code"]', { timeout: 60000 }).then(async () => {
             let data = "";
             if (MFA_cb !== null) {
+                log6("MFA_cb is not null. Calling MFA_cb.");
                 data = await MFA_cb();
             }
             if (data === "") {
@@ -446,12 +496,19 @@ class PuppeteerClient {
                 this.discordLoginComplete = false;
                 return;
             }
+            log6("Typing MFA code.");
             await discordLoginPage.type('input[placeholder="6-digit authentication code"]', data.toString());
+            log6("MFA code typed.");
+            log6("Clicking submit button.");
             await discordLoginPage.click('button[type="submit"]');
             await waitSeconds(3);
+            log6("Submit button clicked.");
+            log6("Waiting for authorize button.");
             await discordLoginPage.waitForSelector('button ::-p-text(Authorize)', { timeout: 60000 });
+            log6("Authorize button found. Clicking authorize button.");
             await discordLoginPage.click('button ::-p-text(Authorize)');
             await waitSeconds(3);
+            log6("Authorize button clicked.");
             this.discordLoginComplete = true;
         }).catch(() => {
             this.discordLoginComplete = true;
@@ -466,8 +523,10 @@ class PuppeteerClient {
      * @returns {Promise<object>} - the user's jobs data
      */
     getUsersJobsData() {
+        log5("getUsersJobsData() called");
         return new Promise(async (resolve, reject) => {
             if (!this.loggedIntoMJ) {
+                log6("Not logged into MJ. Attempting to log in.");
                 let uNamePWordCb = async () => {
                     systemLogger.log("Not logged into MJ. Please send login credentials.");
                     let uName = "";
@@ -481,7 +540,9 @@ class PuppeteerClient {
                      * @returns {string} - "ok" once credentials have been entered
                      */
                     app.get('/login/:username/:password', async (req, res) => {
+                        log3("GET /login/:username/:password called");
                         const { username, password } = req.params;
+                        log6("Username: " + username + " Password: " + password);
                         uName = username;
                         pWord = password;
                         mfaCb = async () => {
@@ -494,7 +555,9 @@ class PuppeteerClient {
                              * @returns {string} - the MFA code
                              */
                             app.get('/mfa/:data', (req, res) => {
+                                log3("GET /mfa/:data called");
                                 const { data } = req.params;
+                                log6("MFA code: " + data);
                                 res.send(data);
                                 retData = data;
                             });
@@ -535,6 +598,8 @@ class PuppeteerClient {
                 }
             }
             this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 }).then(async () => {
+                log6("Navigated to MJ home page.");
+                log6("Getting user's jobs data.");
                 let data = await this.page.evaluate(async () => {
                     const getUserUUID = async () => {
                         let homePage = await fetch("https://www.midjourney.com/imagine");
@@ -590,7 +655,9 @@ class PuppeteerClient {
                         returnedData.push(...(data.data));
                         cursor = data.cursor;
                         loopCount++;
-                        if (loopCount > 100) break; // if we've returned more than 1,000,000 jobs, there's probably something wrong, and there's gonna be problems
+                        if (loopCount > 100) {
+                            break; // if we've returned more than 1,000,000 jobs, there's probably something wrong, and there's gonna be problems
+                        }
                     } while (numberOfJobsReturned == 10000)
                     return returnedData;
                 });
@@ -604,11 +671,14 @@ class PuppeteerClient {
      * @returns {Promise<object>} - the job status data
      */
     getSingleJobStatus(jobID) {
+        log5("getSingleJobStatus() called");
         return new Promise(async (resolve, reject) => {
             if (!this.loggedIntoMJ) reject("Not logged into MJ");
             if (this.loginInProgress) reject("Login in progress");
+            log6("Navigating to MJ home page.");
             await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
-
+            log6("Navigated to MJ home page.");
+            log6("Getting job status data for jobID: " + jobID);
             let data = await this.page.evaluate(async (jobID) => {
                 let res1 = await fetch("https://www.midjourney.com/api/app/job-status", {
                     "headers": {
@@ -639,6 +709,7 @@ class PuppeteerClient {
 
 class ServerStatusMonitor {
     constructor(SystemLogger, PuppeteerClient, DownloadManager, DatabaseManager, UpscaleManager, DatabaseUpdateManager) {
+        log5("ServerStatusMonitor constructor called");
         this.systemLogger = SystemLogger;
         this.puppeteerClient = PuppeteerClient;
         this.downloadManager = DownloadManager;
@@ -649,6 +720,7 @@ class ServerStatusMonitor {
     }
 
     async checkServerStatus() {
+        log5("checkServerStatus() called");
         let status = {};
         status.serverStartTime = this.serverStartTime;
         status.upTime = new Date() - this.serverStartTime;
@@ -691,7 +763,7 @@ class ServerStatusMonitor {
         status.databaseUpdateManager.updateInProgress = this.databaseUpdateManager.updateInProgress;
         status.databaseUpdateManager.timeToUpdate = this.databaseUpdateManager.timeToUpdate;
         status.databaseUpdateManager.runEnabled = this.databaseUpdateManager.runEnabled;
-
+        log6("checkServerStatus() complete");
         return status;
     }
 };
@@ -699,6 +771,7 @@ class ServerStatusMonitor {
 class Database {
     static DB_connected = false;
     constructor() {
+        log5("Database constructor called");
         this.dbClient = new pgClient.Client({
             user: 'mjuser',
             host: 'postgresql.lan',
@@ -708,7 +781,6 @@ class Database {
         });
         this.dbClient.connect().then(() => { log2("Connected to database"); Database.DB_connected = true; }).catch((err) => {
             log0("Error connecting to database:", err);
-            log2("Error connecting to database:\n", err);
         });
         this.dbClient.on('error', (err) => {
             new DB_Error("Database error: " + err);
@@ -723,6 +795,8 @@ class Database {
      * @returns query response
      */
     insertImage = async (image, index) => {
+        log5("insertImage() called");
+        log6("insertImage()\nindex: " + index + "\nimage: " + JSON.stringify(image));
         // find if image exists in database
         // if it does, update it
         let lookup = await this.lookupByUUID(image.id);
@@ -736,7 +810,7 @@ class Database {
             return;
         }
 
-        // if it doesn't, insert it
+        // if it doesn't exist, insert it
         image.processed = false;
         let res;
         try {
@@ -763,6 +837,7 @@ class Database {
             new DB_Error("Error inserting image into database. Image ID: " + image.id + "Error: " + err);
             return null;
         }
+        log6("insertImage() complete");
         return res;
     }
 
@@ -772,6 +847,8 @@ class Database {
      * @returns Query response. If the image is found, it will return the image. If the image is not found, it will return undefined.
      */
     lookupByUUID = async (uuid) => {
+        log5("lookupByUUID() called");
+        log6("lookupByUUID()\nuuid: " + uuid);
         try {
             const res = await this.dbClient.query(
                 `SELECT * FROM images WHERE uuid = $1`,
@@ -779,12 +856,17 @@ class Database {
             );
 
             if (res.rows.length > 0) {
+                if(res.rows.length > 1) log1("lookupByUUID() warning: Multiple images found in database. Image ID: " + uuid);
+                log6("lookupByUUID() complete");
                 return res.rows[0];
             }
+            log1("lookupByUUID() Image not found in database. Image ID: " + uuid);
+            log6("lookupByUUID() complete");
             return undefined;
         } catch (err) {
             log0("lookupByUUID() error: Error looking up image in database. Image ID: " + uuid + "Error: " + err);
             new DB_Error("Error looking up image in database. Image ID: " + uuid);
+            log6("lookupByUUID() complete");
             return null;
         }
     }
@@ -795,6 +877,8 @@ class Database {
      * @returns Query response. If the image is found, it will return the image. If the image is not found, it will return undefined.
      */
     getRandomImage = async (downloadedOnly = false) => {
+        log5("getRandomImage() called");
+        log6("getRandomImage()\ndownloadedOnly: " + downloadedOnly);
         if (downloadedOnly === "true") downloadedOnly = true;
         if (downloadedOnly === "false") downloadedOnly = false;
         if (typeof downloadedOnly !== "boolean") downloadedOnly = false;
@@ -810,13 +894,19 @@ class Database {
                     `SELECT * FROM images ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`
                 );
             }
+            log6("getRandomImage() res.rows.length: " + res.rows.length + " res.rows: " + JSON.stringify(res.rows));
             if (res.rows.length > 0) {
+                if(res.rows.length > 1) log1("getRandomImage() warning: Multiple images found in database.");
+                log6("getRandomImage() complete");
                 return res.rows[0];
             }
+            log1("getRandomImage() Image not found in database.");
+            log6("getRandomImage() complete");
             return undefined;
         } catch (err) {
             log0("getRandomImage() error: Error looking up random image in database. Error: " + err);
             new DB_Error("Error looking up random image in database");
+            log6("getRandomImage() complete");
             return null;
         }
     }
@@ -831,15 +921,21 @@ class Database {
      * @returns Query response. If the images are found, it will return the images. If the range is invalid, it will return null. If the images are not found, it will return undefined.
      */
     lookupImagesByIndexRange = async (indexStart, indexEnd, processedOnly = { processed: false, enabled: false }, downloadedOnly = { downloaded: false, enabled: false }, do_not_downloadOnly = { do_not_download: false, enabled: false }) => {
+        log5("lookupImagesByIndexRange() called");
+        log6("lookupImagesByIndexRange()\nindexStart: " + indexStart + "\nindexEnd: " + indexEnd + "\nprocessedOnly: " + JSON.stringify(processedOnly) + "\ndownloadedOnly: " + JSON.stringify(downloadedOnly) + "\ndo_not_downloadOnly: " + JSON.stringify(do_not_downloadOnly));
         if (typeof indexStart === 'number') indexStart = indexStart.toString();
         if (typeof indexStart === "string") {
             try {
                 indexStart = parseInt(indexStart);
             } catch {
+                log1("lookupImagesByIndexRange() unable to parse indexStart. indexStart: " + indexStart);
+                log6("lookupImagesByIndexRange() complete");
                 return null;
             }
             indexStart = indexStart.toString();
         } else {
+            log1("lookupImagesByIndexRange() unable to parse indexStart. indexStart: " + indexStart);
+            log6("lookupImagesByIndexRange() complete");
             return null;
         }
         if (typeof indexEnd === 'number') indexEnd = indexEnd.toString();
@@ -847,10 +943,14 @@ class Database {
             try {
                 indexEnd = parseInt(indexEnd);
             } catch {
+                log1("lookupImagesByIndexRange() unable to parse indexEnd. indexEnd: " + indexEnd);
+                log6("lookupImagesByIndexRange() complete");
                 return null;
             }
             indexEnd = indexEnd.toString();
         } else {
+            log1("lookupImagesByIndexRange() unable to parse indexEnd. indexEnd: " + indexEnd);
+            log6("lookupImagesByIndexRange() complete");
             return null;
         }
         // at this point indexStart and indexEnd should be strings that are numbers. Anything else would have returned null
@@ -860,24 +960,32 @@ class Database {
 
             if (processedOnly.enabled === true) {
                 queryParts.push("AND processed = " + (processedOnly.processed === true ? "true" : "false"));
+                log6("lookupImagesByIndexRange() processedOnly enabled, processed: " + processedOnly.processed);
             }
             if (downloadedOnly.enabled === true) {
                 queryParts.push("AND downloaded = " + (downloadedOnly.downloaded === true ? "true" : "false"));
+                log6("lookupImagesByIndexRange() downloadedOnly enabled, downloaded: " + downloadedOnly.downloaded);
             }
             if (do_not_downloadOnly.enabled === true) {
                 queryParts.push("AND do_not_download = " + (do_not_downloadOnly.do_not_download === true ? "true" : "false"));
+                log6("lookupImagesByIndexRange() do_not_downloadOnly enabled, do_not_download: " + do_not_downloadOnly.do_not_download);
             }
 
             // log2(queryParts.join(' '), queryParams); // TODO: remove this
 
             const res = await this.dbClient.query(queryParts.join(' '), queryParams);
+            log6("lookupImagesByIndexRange() res.rows.length: " + res.rows.length + " res.rows: " + JSON.stringify(res.rows));
             if (res.rows.length > 0) {
+                log6("lookupImagesByIndexRange() complete");
                 return res.rows;
             }
+            log1("lookupImagesByIndexRange() Images not found in database. Image index range: " + indexStart + " to " + indexEnd);
+            log6("lookupImagesByIndexRange() complete");
             return undefined;
         } catch (err) {
             log0("lookupImagesByIndexRange() error: Error looking up images in database. Image index range: " + indexStart + " to " + indexEnd + "Error: " + err);
             new DB_Error("Error looking up images in database. Image index range: " + indexStart + " to " + indexEnd);
+            log6("lookupImagesByIndexRange() complete");
             return null;
         }
     }
@@ -891,15 +999,21 @@ class Database {
      * @returns Query response. If the image is found, it will return the image. If the image is not found, it will return undefined.
      */
     lookupImageByIndex = async (index, processedOnly = { processed: false, enabled: false }, downloadedOnly = { downloaded: false, enabled: false }, do_not_downloadOnly = { do_not_download: false, enabled: false }) => {
+        log5("lookupImageByIndex() called");
+        log6("lookupImageByIndex()\nindex: " + index + "\nprocessedOnly: " + JSON.stringify(processedOnly) + "\ndownloadedOnly: " + JSON.stringify(downloadedOnly) + "\ndo_not_downloadOnly: " + JSON.stringify(do_not_downloadOnly));
         if (typeof index === 'number') index = index.toString();
         if (typeof index === "string") {
             try {
                 index = parseInt(index);
             } catch {
+                log1("lookupImageByIndex() unable to parse index. index: " + index);
+                log6("lookupImageByIndex() complete");
                 return null;
             }
             index = index.toString();
         } else {
+            log1("lookupImageByIndex() unable to parse index. index: " + index);
+            log6("lookupImageByIndex() complete");
             return null;
         }
         // at this point index should be a string that is a number. Anything else would have returned null
@@ -909,12 +1023,15 @@ class Database {
 
             if (processedOnly.enabled === true) {
                 queryParts.push("AND processed = " + (processedOnly.processed === true ? "true" : "false"));
+                log6("lookupImageByIndex() processedOnly enabled, processed: " + processedOnly.processed);
             }
             if (downloadedOnly.enabled === true) {
                 queryParts.push("AND downloaded = " + (downloadedOnly.downloaded === true ? "true" : "false"));
+                log6("lookupImageByIndex() downloadedOnly enabled, downloaded: " + downloadedOnly.downloaded);
             }
             if (do_not_downloadOnly.enabled === true) {
                 queryParts.push("AND do_not_download = " + (do_not_downloadOnly.do_not_download === true ? "true" : "false"));
+                log6("lookupImageByIndex() do_not_downloadOnly enabled, do_not_download: " + do_not_downloadOnly.do_not_download);
             }
 
             queryParts.push("LIMIT 1");
@@ -923,16 +1040,22 @@ class Database {
 
             const res = await this.dbClient.query(queryParts.join(' '), queryParams);
             if (res.rows.length == 1) {
+                log6("lookupImageByIndex() complete");
                 return res.rows[0];
             } else if (res.rows.length > 1) {
                 new DB_Error("Error looking up image in database. Too many rows returned. Image index: " + index);
             } else if (res.rows.length == 0) {
+                log1("lookupImageByIndex() Image not found in database. Image index: " + index);
+                log6("lookupImageByIndex() complete");
                 return undefined;
             }
+            log1("lookupImageByIndex() Image not found in database. Image index: " + index);
+            log6("lookupImageByIndex() complete");
             return undefined;
         } catch (err) {
             log0("lookupImageByIndex() error: Error looking up image in database. Image index: " + index + "Error: " + err);
             new DB_Error("Error looking up image in database. Image index: " + index);
+            log6("lookupImageByIndex() complete");
             return null;
         }
     }
@@ -943,6 +1066,8 @@ class Database {
      * @returns Query response
      */
     updateImage = async (image) => {
+        log5("updateImage() called");
+        log6("updateImage()\nimage: " + JSON.stringify(image));
         try {
             const res = await this.dbClient.query(
                 `UPDATE images SET 
@@ -973,10 +1098,12 @@ class Database {
                     image.id !== null && image.id !== undefined ? image.id : (image.parent_uuid !== null && image.parent_uuid !== undefined && image.grid_index !== null && image.grid_index !== undefined ? image.parent_uuid + '_' + image.grid_index : null)
                 ]
             );
+            log6("updateImage() complete");
             return res;
         } catch (err) {
             log0("updateImage() error: Error updating image in database. Image ID: " + image.id + "Error: " + err);
             new DB_Error("Error updating image in database. Image ID: " + image.id);
+            log6("updateImage() complete");
             return null;
         }
     }
@@ -986,58 +1113,78 @@ class Database {
      * @returns Query response
      */
     deleteImage = async (uuid) => {
+        log5("deleteImage() called");
+        log6("deleteImage()\nuuid: " + uuid);
         try {
             const res = await this.dbClient.query(
                 `DELETE FROM images WHERE uuid = $1`,
                 [uuid]
             );
+            log6("deleteImage() complete");
             return res;
         } catch (err) {
             log0("deleteImage() error: Error deleting image from database. Image ID: " + uuid + "Error: " + err);
             new DB_Error("Error deleting image from database. Image ID: " + uuid);
+            log6("deleteImage() complete");
             return null;
         }
     }
     countImagesTotal = async () => {
+        log5("countImagesTotal() called");
         try {
             const res = await this.dbClient.query(
                 `SELECT COUNT(*) FROM images`
             );
+            log6("countImagesTotal() complete");
             return res.rows[0].count;
         } catch (err) {
             log0("countImagesTotal() error: Error counting images in database. Error: " + err);
             new DB_Error("Error counting images in database");
+            log6("countImagesTotal() complete");
             return null;
         }
     }
     countImagesDownloaded = async () => {
+        log5("countImagesDownloaded() called");
         try {
             const res = await this.dbClient.query(
                 `SELECT COUNT(*) FROM images WHERE downloaded = true`
             );
+            log6("countImagesDownloaded() complete");
             return res.rows[0].count;
         } catch (err) {
             log0("countImagesDownloaded() error: Error counting downloaded images in database. Error: " + err);
             new DB_Error("Error counting downloaded images in database");
+            log6("countImagesDownloaded() complete");
             return null;
         }
     }
     setImageProcessed = async (uuid, valueBool = true) => {
+        log5("setImageProcessed() called");
+        log6("setImageProcessed()\nuuid: " + uuid + "\nvalueBool: " + valueBool);
         if (typeof valueBool === "string") valueBool = (valueBool === "true");
-        if (typeof valueBool !== "boolean") throw new Error("valueBool must be a boolean");
+        if (typeof valueBool !== "boolean") {
+            log1("setImageProcessed() error: valueBool must be a boolean");
+            log6("setImageProcessed() complete");
+            throw new Error("valueBool must be a boolean");
+        }
         try {
             const res = await this.dbClient.query(
                 `UPDATE images SET processed = $1 WHERE uuid = $2`,
                 [valueBool, uuid]
             );
+            log6("setImageProcessed() complete");
             return res;
         } catch (err) {
             log0("setImageProcessed() error: Error setting image processed in database. Image ID: " + uuid + "Error: " + err);
             new DB_Error("Error setting image processed in database. Image ID: " + uuid);
+            log6("setImageProcessed() complete");
             return null;
         }
     }
     updateTimesSelectedPlusOne = async (uuid) => {
+        log5("updateTimesSelectedPlusOne() called");
+        log6("updateTimesSelectedPlusOne()\nuuid: " + uuid);
         try {
             // get times_selected for uuid
             let res = await this.dbClient.query(
@@ -1045,34 +1192,43 @@ class Database {
                 [uuid]
             );
             let timesSelected = res.rows[0].times_selected;
+            log6("updateTimesSelectedPlusOne() timesSelected: " + timesSelected);
             // add 1 to it
             timesSelected++;
+            log6("updateTimesSelectedPlusOne() timesSelected: " + timesSelected);
             // update times_selected for uuid
             res = await this.dbClient.query(
                 `UPDATE images SET times_selected = $1 WHERE uuid = $2`,
                 [timesSelected, uuid]
             );
+            log6("updateTimesSelectedPlusOne() complete");
         } catch (err) {
             log0("updateTimesSelectedPlusOne() error: Error updating times_selected in database. Image ID: " + uuid + "Error: " + err);
             new DB_Error("Error updating times_selected in database. Image ID: " + uuid);
+            log6("updateTimesSelectedPlusOne() complete");
             return null;
         }
     }
 
     setAllImagesSelectedCountZero = async () => {
+        log5("setAllImagesSelectedCountZero() called");
         try {
             const res = await this.dbClient.query(
                 `UPDATE images SET times_selected = 0`
             );
+            log6("setAllImagesSelectedCountZero() complete");
             return res;
         } catch (err) {
             log0("setAllImagesSelectedCountZero() error: Error setting all images selected count to zero. Error: " + err);
             new DB_Error("Error setting all images selected count to zero");
+            log6("setAllImagesSelectedCountZero() complete");
             return null;
         }
     }
 
     getEntriesOrderedByEnqueueTime = async (limit = 100, offset = 0) => {
+        log5("getEntriesOrderedByEnqueueTime() called");
+        log6("getEntriesOrderedByEnqueueTime()\nlimit: " + limit + "\noffset: " + offset);
         if (typeof limit === "string") {
             try {
                 limit = parseInt(limit);
@@ -1096,10 +1252,13 @@ class Database {
                 LIMIT $1 OFFSET $2`,
                 [limit, offset]
             );
+            log6("getEntriesOrderedByEnqueueTime() res.rows.length: " + res.rows.length + " res.rows: " + JSON.stringify(res.rows));
+            log6("getEntriesOrderedByEnqueueTime() complete");
             return res.rows;
         } catch (err) {
             log0("getEntriesOrderedByEnqueueTime() error: Error getting entries ordered by enqueue_time. Error: " + err);
             new DB_Error("Error getting entries ordered by enqueue_time");
+            log6("getEntriesOrderedByEnqueueTime() complete");
             return null;
         }
     }
@@ -1107,6 +1266,8 @@ class Database {
 
 class ImageInfo {
     constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height, storage_location = "", upscale_location = "") {
+        log5("ImageInfo constructor called");
+        log6("ImageInfo constructor\nparent_id: " + parent_id + "\ngrid_index: " + grid_index + "\nenqueue_time: " + enqueue_time + "\nfullCommand: " + fullCommand + "\nwidth: " + width + "\nheight: " + height + "\nstorage_location: " + storage_location + "\nupscale_location: " + upscale_location);
         this.parent_id = parent_id;
         this.grid_index = grid_index;
         this.enqueue_time = enqueue_time;
@@ -1122,37 +1283,53 @@ class ImageInfo {
     }
 
     toJSON() {
+        log5("ImageInfo toJSON() called");
         let t = { ...this };
         t.urlFull = this.urlFull;
         t.urlSmall = this.urlSmall;
         t.urlMedium = this.urlMedium;
         t.urlAlt = this.urlAlt;
         t.urlParentGrid = this.urlParentGrid;
+        log6("ImageInfo toJSON() complete");
         return t;
     }
 
     get id() {
+        log5("ImageInfo get id() called");
+        log6(this.parent_id + '_' + this.grid_index);
         return this.parent_id + '_' + this.grid_index;
     }
     get urlFull() {
+        log5("ImageInfo get urlFull() called");
+        log6(`https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.png`);
         return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.png`;
     }
     get urlSmall() {
+        log5("ImageInfo get urlSmall() called");
+        log6(`https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_32_N.webp`);
         return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_32_N.webp`;
     }
     get urlMedium() {
+        log5("ImageInfo get urlMedium() called");
+        log6(`https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_384_N.webp`);
         return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_384_N.webp`;
     }
     get urlAlt() {
+        log5("ImageInfo get urlAlt() called");
+        log6(`https://storage.googleapis.com/dream-machines-output/${this.parent_id}/0_${this.grid_index}.png`);
         return `https://storage.googleapis.com/dream-machines-output/${this.parent_id}/0_${this.grid_index}.png`;
     }
     get urlParentGrid() {
+        log5("ImageInfo get urlParentGrid() called");
+        log6(`https://cdn.midjourney.com/${this.parent_id}/grid_0.webp`);
         return `https://cdn.midjourney.com/${this.parent_id}/grid_0.webp`;
     }
 };
 
 class DatabaseUpdateManager {
     constructor(DatabaseManager = null, SystemLogger = null, PuppeteerClient = null) {
+        log5("DatabaseUpdateManager constructor called");
+        log6("DatabaseUpdateManager constructor\nDatabaseManager: " + DatabaseManager + "\nSystemLogger: " + SystemLogger + "\nPuppeteerClient: " + PuppeteerClient);
         this.dbClient = DatabaseManager;
         this.puppeteerClient = PuppeteerClient;
         this.systemLogger = SystemLogger;
@@ -1161,29 +1338,39 @@ class DatabaseUpdateManager {
         this.timeToUpdate = 0; // minutes after midnight
         this.runEnabled = false;
         this.start();
+        log6("DatabaseUpdateManager constructor complete");
     }
 
     start() {
+        log5("DatabaseUpdateManager.start() called");
         if (this.runTimeout !== null) clearTimeout(this.runTimeout);
         let now = new Date();
+        log6("now: " + now);
         let timeToUpdate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), this.timeToUpdate / 60, this.timeToUpdate % 60, 0, 0);
+        log6("timeToUpdate: " + timeToUpdate);
         let timeUntilUpdate = timeToUpdate - now;
+        log6("timeUntilUpdate: " + timeUntilUpdate);
         if (timeUntilUpdate < 0) timeUntilUpdate += 1000 * 60 * 60 * 24;
+        log6("timeUntilUpdate: " + timeUntilUpdate);
         this.runTimeout = setTimeout(() => this.run(), timeUntilUpdate);
+        log6("DatabaseUpdateManager.start() complete");
     }
 
     run() {
+        log5("DatabaseUpdateManager.run() called");
         if (!this.runEnabled) {
+            log1("DatabaseUpdateManager.run() warning: Run is disabled. Run will not start.");
             this.start();
             return;
         }
         if (this.updateInProgress === true) return;
         this.updateInProgress = true;
+        log6("DatabaseUpdateManager.run() updateInProgress: " + this.updateInProgress);
         let data;
         this.puppeteerClient.getUsersJobsData().then(async (dataTemp) => {
             data = dataTemp;
-            log2(typeof data);
-            log2("Size of data: ", data.length, "\nCalling buildImageData()");
+            log4(typeof data);
+            log4("Size of data: ", data.length, "\nCalling buildImageData()");
             let imageData = buildImageData(data);
             log2("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
             for (let i = 0; i < imageData.length; i++) {
@@ -1195,6 +1382,7 @@ class DatabaseUpdateManager {
             this.systemLogger.log("Error getting user's jobs data", err);
             log0(["DatabaseUpdateManager.run() error: Error getting user's jobs data", err]);
         }).finally(() => {
+            log6("DatabaseUpdateManager.run() complete");
             this.updateInProgress = false;
             this.start();
         });
@@ -1203,6 +1391,8 @@ class DatabaseUpdateManager {
 
 class DownloadManager {
     constructor(DatabaseManager = null, SystemLogger = null, UpscaleManager = null) {
+        log5("DownloadManager constructor called");
+        log6("DownloadManager constructor\nDatabaseManager: " + DatabaseManager + "\nSystemLogger: " + SystemLogger + "\nUpscaleManager: " + UpscaleManager);
         this.upscaleManager = UpscaleManager;
         this.downloadLocation = "output";
         this.timeToDownload = 0; // minutes past midnight
@@ -1214,12 +1404,16 @@ class DownloadManager {
         this.systemLogger = SystemLogger;
         this.start();
         this.verifyDownloadsInProgress = false;
+        log6("DownloadManager constructor complete");
     }
 
     setDownloadLocation(location) {
+        log5("DownloadManager.setDownloadLocation() called");
+        log6("DownloadManager.setDownloadLocation()\nlocation: " + location);
         this.downloadLocation = location;
         let stats = fs.statSync(this.downloadLocation);
         if (!stats.isDirectory()) {
+            log1("DownloadManager.setDownloadLocation() warning: Download location is not a directory. Download location: " + this.downloadLocation);
             return false;
         }
         try {
@@ -1232,6 +1426,8 @@ class DownloadManager {
     }
 
     setTimeToDownload(time) {
+        log5("DownloadManager.setTimeToDownload() called");
+        log6("DownloadManager.setTimeToDownload()\ntime: " + time);
         if (typeof time === "string") {
             try {
                 time = parseInt(time);
@@ -1240,14 +1436,20 @@ class DownloadManager {
                 return false;
             }
         }
-        if (typeof time !== "number") return false;
+        if (typeof time !== "number") {
+            log1("DownloadManager.setTimeToDownload(): Time to download is not a number. time: " + time);
+            return false;
+        }
         this.timeToDownload = time;
         if (this.timeToDownload < 0) this.timeToDownload = 0;
         if (this.timeToDownload > 1440) this.timeToDownload = this.timeToDownload % 1440;
+        log6("DownloadManager.setTimeToDownload() complete");
         return true;
     }
 
     async downloadImage(url, image) {
+        log5("DownloadManager.downloadImage() called");
+        log6("DownloadManager.downloadImage()\nurl: " + url + "\nimage: " + JSON.stringify(image));
         let response;
         try {
             response = await fetch(url);
@@ -1257,27 +1459,39 @@ class DownloadManager {
         }
 
         if (!response.ok) {
+            log0(["DownloadManager.downloadImage() error: Bad response code", response.status, image]);
             return ({ success: false, error: "Bad response code: " + response.status });
         }
         if (response.headers.get('content-type') !== "image/png") {
+            log0(["DownloadManager.downloadImage() error: Bad content type", response.headers.get('content-type'), image]);
             return ({ success: false, error: "Bad content type: " + response.headers['content-type'] });
         }
         if (parseInt(response.headers.get('content-length'), 10) < 1000) {
+            log0(["DownloadManager.downloadImage() error: Bad content length", response.headers.get('content-length'), image]);
             return ({ success: false, error: "Bad content length: " + response.headers['content-length'] });
         }
+        log6("DownloadManager.downloadImage() Fetch successful");
 
         let contentLength = parseInt(response.headers.get('content-length'), 10);
+        log6("DownloadManager.downloadImage() contentLength: " + contentLength);
         let imageDate = new Date(image.enqueue_time);
+        log6("DownloadManager.downloadImage() imageDate: " + imageDate);
         let year = imageDate.getFullYear();
         let month = imageDate.getMonth() + 1;
         let day = imageDate.getDate();
         let destFolder = this.downloadLocation + "/" + year + "/" + month + "/" + day;
-        if (!fs.existsSync(destFolder)) fs.mkdirSync(destFolder, { recursive: true });
+        log6("DownloadManager.downloadImage() destFolder: " + destFolder);
+        if (!fs.existsSync(destFolder)) {
+            log1("DownloadManager.downloadImage() warning: Destination folder does not exist. Creating it now. Folder: " + destFolder);
+            fs.mkdirSync(destFolder, { recursive: true });
+        }
         let splitImage = url.split('/');
         let destFileName = splitImage[splitImage.length - 2] + "-" + splitImage[splitImage.length - 1];
+        log6("DownloadManager.downloadImage() destFileName: " + destFileName);
 
         if (fs.existsSync(path.join(destFolder, destFileName))) {
             // delete file
+            log1("DownloadManager.downloadImage() warning: File already exists. Deleting it now. File: " + path.join(destFolder, destFileName));
             fs.unlinkSync(path.join(destFolder, destFileName));
         }
         let data = await response.arrayBuffer();
@@ -1288,41 +1502,54 @@ class DownloadManager {
         let file = fs.statSync(path.join(destFolder, destFileName));
         fileSize = file.size;
         fileSize = parseInt(fileSize);
+        log6("DownloadManager.downloadImage() fileSize: " + fileSize);
         contentLength = parseInt(contentLength);
         if (fileSize != contentLength) {
             log0(["DownloadManager.downloadImage() error: File size mismatch: " + fileSize + " != " + contentLength, image]);
             return ({ success: false, error: "File size mismatch: " + fileSize + " != " + contentLength });
             // return; 
         }
-        log2("Downloaded image " + destFileName + " of size " + fileSize + " bytes");
+        log4("Downloaded image " + destFileName + " of size " + fileSize + " bytes");
         image.downloaded = true;
         image.storageLocation = path.join(destFolder, destFileName);
         image.processed = true;
         image.fileSize = fileSize;
         image.success = true;
+        log6("DownloadManager.downloadImage() complete");
         return (image);
     }
 
     start() {
+        log5("DownloadManager.start() called");
         if (this.runTimeout !== null) clearTimeout(this.runTimeout);
         let now = new Date();
+        log6("now: " + now);
         let timeToDownload = new Date(now.getFullYear(), now.getMonth(), now.getDate(), this.timeToDownload / 60, this.timeToDownload % 60, 0, 0);
+        log6("timeToDownload: " + timeToDownload);
         let timeUntilDownload = timeToDownload - now;
+        log6("timeUntilDownload: " + timeUntilDownload);
         if (timeUntilDownload < 0) timeUntilDownload += 1000 * 60 * 60 * 24;
+        log6("timeUntilDownload: " + timeUntilDownload);
         this.runTimeout = setTimeout(() => this.run(), timeUntilDownload);
+        log6("DownloadManager.start() complete");
     }
 
     async run() {
+        log5("DownloadManager.run() called");
         if (!this.downloadRunEnabled) {
+            log1("DownloadManager.run() warning: Run is disabled. Run will not start.");
             this.start();
             return;
         }
         if (this.verifyDownloadsInProgress) {
+            log1("DownloadManager.run() warning: Verify downloads is in progress. Will try again in 10 seconds.");
             setTimeout(() => this.run(), 10000);
             return;
         }
         if (this.downloadInProgress === true) return;
         this.downloadInProgress = true;
+        log6("DownloadManager.run() downloadInProgress: " + this.downloadInProgress);
+        log6("DownloadManager.run() Verifying downloads");
         await this.verifyDownloads();
         this.concurrentDownloads = 0;
         let imageCount = await this.dbClient.countImagesTotal();
@@ -1335,20 +1562,33 @@ class DownloadManager {
             log2("Done downloading images");
         } else {
             log0("One or more errors occurred while downloading images");
-            log2("One or more errors occurred while downloading images");
             this.systemLogger.log("One or more errors occurred while downloading images");
             DownloadError.sendErrorCountToSystemLogger();
             DownloadError.resetCount();
         }
         this.downloadInProgress = false;
         this.start();
+        log6("DownloadManager.run() complete");
     }
 
     async lookupAndDownloadImageByIndex(index) {
-        if (!this.downloadRunEnabled) return true;
+        log5("DownloadManager.lookupAndDownloadImageByIndex() called");
+        log6("DownloadManager.lookupAndDownloadImageByIndex()\nindex: " + index);
+        if (!this.downloadRunEnabled) {
+            log1("DownloadManager.lookupAndDownloadImageByIndex() warning: Run is disabled. Run will not start.");
+            return true;
+        }
         let images = await this.dbClient.lookupImagesByIndexRange(index, index + 100, { processed: true, enabled: true }, { downloaded: false, enabled: true }, { do_not_download: false, enabled: true });
-        if (images === undefined) return true;
-        if (images === null) return true;
+        if (images === undefined) {
+            log6("DownloadManager.lookupAndDownloadImageByIndex() Image range not found in database. Image index range: " + index + " to " + (index + 100));
+            log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
+            return true;
+        }
+        if (images === null) {
+            log6("DownloadManager.lookupAndDownloadImageByIndex() Image range not found in database. Image index range: " + index + " to " + (index + 100));
+            log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
+            return true;
+        }
         let success = true;
         for (let i = 0; i < images.length; i++) {
             while (this.concurrentDownloads >= 10) await waitSeconds(1);
@@ -1364,6 +1604,7 @@ class DownloadManager {
                     // this.systemLogger.log("Error downloading image", err, image);
                     success = false;
                     new DownloadError("Error downloading image", err, image);
+                    log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
                     return;
                 }
                 this.concurrentDownloads--;
@@ -1387,6 +1628,7 @@ class DownloadManager {
                         // this.systemLogger.log("Error downloading image", err, image);
                         new DownloadError("Error downloading image", err, image);
                         success = false;
+                        log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
                         return;
                     }
                     this.concurrentDownloads--;
@@ -1397,63 +1639,85 @@ class DownloadManager {
                         // this.systemLogger.log("Error downloading image", altImageResult.error, image);
                         new DownloadError("Error downloading image", altImageResult.error, image);
                         success = false;
+                        log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
                         return;
                     }
                 }
             })(images[i]);
         }
+        log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
         return success;
     }
 
     checkFileExistsPath(path) {
-        if (typeof path !== "string") return false;
-        if (path === "") return false;
+        log5("DownloadManager.checkFileExistsPath() called");
+        log6("DownloadManager.checkFileExistsPath()\npath: " + path);
+        if (typeof path !== "string") {
+            log1("DownloadManager.checkFileExistsPath() warning: path is not a string. path: " + path);
+            log6("DownloadManager.checkFileExistsPath() complete");
+            return false;
+        }
+        if (path === "") {
+            log1("DownloadManager.checkFileExistsPath() warning: path is empty");
+            log6("DownloadManager.checkFileExistsPath() complete");
+            return false;
+        }
         let stats;
         try {
             stats = fs.statSync(path);
         } catch (err) {
+            log6("DownloadManager.checkFileExistsPath() complete");
             return false;
         }
-        if (stats.isFile()) return true;
+        if (stats.isFile()) {
+            log6("DownloadManager.checkFileExistsPath() complete");
+            return true;
+        }
+        log6("DownloadManager.checkFileExistsPath() complete");
         return false;
     }
 
     async verifyDownloads() {
-        if (this.verifyDownloadsInProgress) return;
+        log5("DownloadManager.verifyDownloads() called");
+        if (this.verifyDownloadsInProgress) {
+            log2("DownloadManager.verifyDownloads() warning: Verify downloads is already in progress. Will not start another.");
+            return;
+        }
         this.verifyDownloadsInProgress = true;
         let imageCount = await this.dbClient.countImagesTotal();
+        log6("Image count: " + imageCount);
         let images = null;
         for (let i = 0; i < imageCount; i += 100) {
             images = await this.dbClient.lookupImagesByIndexRange(i, i + 100, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
-            if (i % 10 === 0) {
-                if (typeof process.stdout.clearLine === 'function' && typeof process.stdout.cursorTo === 'function' && typeof process.stdout.write === 'function') {
-                    process.stdout.clearLine();
-                    process.stdout.cursorTo(0);
-                    process.stdout.write(i.toString());
-                }
-            }
             if (images === undefined) continue;
             if (images === null) continue;
             for (let p = 0; p < images.length; p++) {
                 let image = images[p];
                 if (image === undefined) continue;
                 if (image === null) continue;
-                if (image.downloaded !== true) continue;
+                if (image.downloaded !== true) {
+                    log6("Image not downloaded. Skipping. Image: " + JSON.stringify(image));
+                    continue;
+                }
                 if (this.checkFileExistsPath(image.storage_location) === false) {
                     image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
                     image.downloaded = false;
                     image.processed = true;
                     image.storageLocation = "";
+                    log6("Image file does not exist. Updating database. Image: " + JSON.stringify(image));
                     await this.dbClient.updateImage(image);
+                    log6("Done updating database");
                 }
             }
         }
         this.verifyDownloadsInProgress = false;
+        log6("DownloadManager.verifyDownloads() complete");
     }
 };
 
 class UpscaleManager {
     constructor(DatabaseManager = null, SystemLogger = null) {
+        log5("UpscaleManager constructor called");
         this.dbClient = DatabaseManager;
         this.systemLogger = SystemLogger;
         this.queue = [];
@@ -1472,6 +1736,7 @@ class UpscaleManager {
     }
 
     start() {
+        log5("UpscaleManager.start() called");
         if (this.runTimeout !== null) clearTimeout(this.runTimeout);
         let now = new Date();
         let timeToUpscale = new Date(now.getFullYear(), now.getMonth(), now.getDate(), this.timeToUpscale / 60, this.timeToUpscale % 60, 0, 0);
@@ -1481,7 +1746,9 @@ class UpscaleManager {
     }
 
     async run() {
+        log5("UpscaleManager.run() called");
         if (!this.runEnabled) {
+            log1("UpscaleManager.run() warning: Run is disabled. Run will not start.");
             this.start();
             return;
         }
@@ -1499,7 +1766,6 @@ class UpscaleManager {
             log2("Done upscaling images");
         } else {
             log0("One or more errors occurred while upscaling images");
-            log2("One or more errors occurred while upscaling images");
             this.systemLogger.log("One or more errors occurred while upscaling images");
         }
         this.checkForFinishedJobs();
@@ -1507,7 +1773,11 @@ class UpscaleManager {
     }
 
     async lookupAndUpscaleImageByIndex(index) {
-        if (!this.runEnabled) return true;
+        log5("UpscaleManager.lookupAndUpscaleImageByIndex() called");
+        if (!this.runEnabled) {
+            log1("UpscaleManager.lookupAndUpscaleImageByIndex() warning: Run is disabled.");
+            return true;
+        }
         let image = await this.dbClient.lookupImageByIndex(index, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
         if (image === undefined) return true;
         if (image === null) return true;
@@ -1516,16 +1786,17 @@ class UpscaleManager {
     }
 
     queueImage(image) {
+        log5("UpscaleManager.queueImage() called");
         // get folder name from image.storageLocation
         let folder = image.storage_location.substring(0, image.storage_location.lastIndexOf('\\'));
         let destFolder = path.join(folder, "upscaled");
-        if (!fs.existsSync(destFolder)) fs.mkdirSync(destFolder, { recursive: true });
+        if (!fs.existsSync(destFolder)) {
+            log1("UpscaleManager.queueImage() warning: Destination folder does not exist. Creating it now. Folder: " + destFolder);
+            fs.mkdirSync(destFolder, { recursive: true });
+        }
         let destFileName = image.storage_location.split('\\').pop();
         destFileName = destFileName.substring(0, destFileName.lastIndexOf('.')) + "-upscaled.jpg";
         image.upscale_location = path.join(destFolder, destFileName);
-        // log2({ image });
-        // log2({ destFileName });
-        // log2({ destFolder });
         this.upscaler.upscale(image.storage_location.replaceAll('\\', '/').replaceAll('\\\\', '/'), destFolder.replaceAll('\\', '/').replaceAll('\\\\', '/')).then((jobID) => {
             image.jobID = jobID;
             this.queue.push(image);
@@ -1534,6 +1805,7 @@ class UpscaleManager {
     }
 
     async checkForFinishedJobs() {
+        log5("UpscaleManager.checkForFinishedJobs() called");
         if (this.queue.length === 0) {
             this.upscaleRunInprogress = false;
             return;
@@ -1550,7 +1822,7 @@ class UpscaleManager {
             finishedJobs.forEach(async (image) => {
                 image.id = image.uuid;
                 log2("Finished job: ", image.jobID);
-                log2("Image: ", image);
+                log4("Image: ", image);
                 // TODO: verify file exists and is valid jpg
                 await this.dbClient.updateImage(image);
                 this.queue = this.queue.filter((image2) => {
@@ -1564,14 +1836,17 @@ class UpscaleManager {
     }
 
     get queuedUpscales() {
+        log5("UpscaleManager.get queuedUpscales() called");
         return this.upscaler.getNumberOfWaitingJobs();
     }
 
     get runningUpscales() {
+        log5("UpscaleManager.get runningUpscales() called");
         return this.upscaler.getNumberOfRunningJobs();
     }
 
     get upscaleInProgress() {
+        log5("UpscaleManager.get upscaleInProgress() called");
         return this.upscaler.getNumberOfRunningJobs() > 0;
     }
 };
@@ -1583,18 +1858,18 @@ const downloadManager = new DownloadManager(imageDB, systemLogger, upscalerManag
 
 (async () => {
     if (!verifyDownloadsOnStartup) return;
+    log6("Verifying downloads on startup");
+    log6("Waiting for database to connect");
     while (Database.DB_connected === false) {
         await waitSeconds(1);
     }
+    log6("Database connected");
     log2("Verifying downloads");
     await downloadManager.verifyDownloads();
     log2("Done verifying downloads");
 })()
 
-
-
 const databaseUpdateManager = new DatabaseUpdateManager(imageDB, systemLogger, puppeteerClient);
-
 const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager, imageDB, upscalerManager, databaseUpdateManager);
 
 
@@ -1618,18 +1893,15 @@ upscalerManager.runEnabled = settings.upscaleRunEnabled;
 
 updateDB = settings.updateDB;
 
-
 /////////////////////////////////////////////////////////////////////////////////////////
 app.use(express.static('public'));
 app.use(express.static('./'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-
-
 // Start the server on port 3000 and print all the ip addresses of this server
 app.listen(port, () => {
+    log3("Server listening on port " + port);
     // get this server's ip address
     const os = require('os');
     const ifaces = os.networkInterfaces();
@@ -1658,6 +1930,7 @@ app.set('view engine', 'ejs');
  * Home page
  */
 app.get('/', (req, res) => {
+    log3("GET /");
     res.render('index');
 });
 
@@ -1666,10 +1939,12 @@ app.get('/', (req, res) => {
  * Images page for viewing images and selecting them for download
  */
 app.get('/images', (req, res) => {
+    log3("GET /images");
     res.render('images');
 });
 
 app.get('/tools', (req, res) => {
+    log3("GET /tools");
     res.render('tools');
 });
 
@@ -1681,6 +1956,7 @@ app.get('/tools', (req, res) => {
  * @returns {string} - "ok" once the update has been triggered
  */
 app.get('/updateDB', async (req, res) => {
+    log3("GET /updateDB");
     databaseUpdateManager.run();
     res.send("ok");
 });
@@ -1690,6 +1966,7 @@ app.get('/updateDB', async (req, res) => {
  * Shows a slideshow of images from the database
  */
 app.get('/show', (req, res) => {
+    log3("GET /show");
     res.render('show');
 });
 
@@ -1700,13 +1977,20 @@ app.get('/show', (req, res) => {
  * @returns {string} - html that shows the image and is a link to another random image. JSON is also embedded in the html.
  */
 app.get('/show/:uuid', async (req, res) => {
+    log3("GET /show/:uuid");
     const { uuid } = req.params;
-    if (uuid === "" || uuid === undefined) res.render('show');
+    if (uuid === "" || uuid === undefined) {
+        log6("uuid is empty or undefined. Rendering show.ejs");
+        res.render('show');
+    }
     else {
-        log2("looking up uuid: ", uuid);
+        log4("looking up uuid: ", uuid);
         const image = await imageDB.lookupByUUID(uuid);
+        log6("got image from DB. Converting to ImageInfo object");
         const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height, image.storage_location, image.upscale_location);
+        log6("updating times selected");
         imageDB.updateTimesSelectedPlusOne(uuid);
+        log6("Sending html with image and json embedded")
         res.send(`<a href="/randomUUID"><img src="${imageInfo.urlFull}" /></a><script type="application/json">${JSON.stringify(imageInfo)}</script>`);
     }
 });
@@ -1716,18 +2000,25 @@ app.get('/show/:uuid', async (req, res) => {
  * Redirects to a random image
  */
 app.get('/randomUUID/:dlOnly', async (req, res) => {
+    log3("GET /randomUUID");
     const { dlOnly } = req.params;
+    log6("dlOnly: " + dlOnly);
     let _dlOnly;
     if (dlOnly === "true") _dlOnly = true;
     else _dlOnly = false;
+    log6("_dlOnly: " + _dlOnly);
     let imageInfo = null;
+    log6("Getting random image");
     do {
         imageInfo = await imageDB.getRandomImage(_dlOnly);
     } while (imageInfo === undefined || imageInfo === null);
+    log6("Got random image");
+    log6("Redirecting to /show/" + imageInfo.uuid);
     res.redirect(`/show/${imageInfo.uuid}`);
 });
 
 app.get('/randomUUID', async (req, res) => {
+    log3("GET /randomUUID");
     res.redirect(`/randomUUID/false`);
 });
 
@@ -1736,7 +2027,9 @@ app.get('/randomUUID', async (req, res) => {
  * Gets a list of folders in the working directory
  */
 app.get('/available-folders', (req, res) => {
+    log3("GET /available-folders");
     const folders = fs.readdirSync('./').filter(file => fs.lstatSync(path.join('./', file)).isDirectory());
+    log6("Folders: " + folders);
     res.json(folders);
 });
 
@@ -1745,8 +2038,11 @@ app.get('/available-folders', (req, res) => {
  * Sets the download location for the download manager
  */
 app.get('/set-download-location/:location', (req, res) => {
+    log3("GET /set-download-location/:location");
     const { location } = req.params;
+    log6("location: " + location);
     const success = downloadManager.setDownloadLocation(location);
+    log6("success: " + success);
     res.json(success);
 });
 
@@ -1755,7 +2051,9 @@ app.get('/set-download-location/:location', (req, res) => {
  * Sets the time to download for the download manager
  */
 app.get('/set-time-to-download/:time', (req, res) => {
+    log3("GET /set-time-to-download/:time");
     const { time } = req.params;
+    log6("time: " + time);
     const success = downloadManager.setTimeToDownload(time);
     res.json(success);
 });
@@ -1765,6 +2063,7 @@ app.get('/set-time-to-download/:time', (req, res) => {
  * Sets whether or not the download manager should run
  */
 app.get('/set-run-enabled/:dl/:db/:up', (req, res) => {
+    log3("GET /set-run-enabled/:dl/:db/:up");
     const { dl, db, up } = req.params;
     downloadManager.downloadRunEnabled = dl === "true";
     databaseUpdateManager.runEnabled = db === "true";
@@ -1773,6 +2072,10 @@ app.get('/set-run-enabled/:dl/:db/:up', (req, res) => {
     settings.dbUpdateRunEnabled = db === "true";
     settings.downloadRunEnabled = dl === "true";
     settings.upscaleRunEnabled = up === "true";
+
+    log6("downloadRunEnabled: " + downloadManager.downloadRunEnabled);
+    log6("dbUpdateRunEnabled: " + databaseUpdateManager.runEnabled);
+    log6("upscaleRunEnabled: " + upscalerManager.runEnabled);
 
     res.json({ downloadRunEnabled: downloadManager.downloadRunEnabled, dbUpdateRunEnabled: databaseUpdateManager.runEnabled, upscaleRunEnabled: upscalerManager.runEnabled });
 });
@@ -1785,9 +2088,13 @@ app.get('/set-run-enabled/:dl/:db/:up', (req, res) => {
  * @returns {json} - the entries from the logger
  */
 app.get('/loggerGet/:entries/:remove', (req, res) => {
+    log3("GET /loggerGet/:entries/:remove");
     const { entries, remove } = req.params;
+    log6("entries: " + entries);
+    log6("remove: " + remove);
     if (remove === "true") log2("removing entries from log");
     let log = systemLogger.getRecentEntries(entries, remove === "true");
+    log6("log: " + log);
     res.json(log);
 });
 
@@ -1797,7 +2104,9 @@ app.get('/loggerGet/:entries/:remove', (req, res) => {
  * @param {number} id - the id of the entry to delete
  */
 app.get('/loggerDelete/:id', (req, res) => {
+    log3("GET /loggerDelete/:id");
     const { id } = req.params;
+    log6("id: " + id);
     const success = systemLogger.deleteEntry(id);
     res.json(success);
 });
@@ -1808,19 +2117,28 @@ app.get('/loggerDelete/:id', (req, res) => {
  * @param {string} message - the message to log * 
  */
 app.post('/logger', (req, res) => {
+    log3("POST /logger");
     const { message } = req.body;
+    log6("message: " + message);
     systemLogger.log(message);
     res.send('ok');
 });
 
 app.get('/image/recent/:limit/:offset', async (req, res) => {
+    log3("GET /image/recent/:limit/:offset");
     const { limit, offset } = req.params;
+    log6("limit: " + limit);
+    log6("offset: " + offset);
     const data = await imageDB.getEntriesOrderedByEnqueueTime(limit, offset);
+    log6("data: " + data);
     res.json(data);
 });
 
 app.get('/image/update/:id/:do_not_download', async (req, res) => {
+    log3("GET /image/update/:id/:do_not_download");
     const { id, do_not_download } = req.params;
+    log6("id: " + id);
+    log6("do_not_download: " + do_not_download);
     let image = await imageDB.lookupByUUID(id);
     if (image === undefined) {
         res.status(404).send('Image not found');
@@ -1842,17 +2160,24 @@ app.get('/image/update/:id/:do_not_download', async (req, res) => {
  * @returns {image} - the image
  */
 app.get('/image/:imageUuid', async (req, res) => {
+    log3("GET /image/:imageUuid");
     const { imageUuid } = req.params;
     const { width, height } = req.query;
+    log6("imageUuid: " + imageUuid);
+    log6("width: " + width);
+    log6("height: " + height);
 
     const imagePath = path.join(__dirname, 'output/all', imageUuid);
+    log6("imagePath: " + imagePath);
 
     // Ensure the file exists
     if (!fs.existsSync(imagePath)) {
         res.status(404).send('Image not found');
+        log6("Image not found");
         return;
     }
     try {
+        log6("Validating PNG");
         const image = sharp(imagePath);
 
         image.on('error', (error) => {
@@ -1882,30 +2207,36 @@ app.get('/image/:imageUuid', async (req, res) => {
  * @returns {json} - the status of the server
  */
 app.get('/status', async (req, res) => {
+    log3("GET /status");
     res.json(await serverStatusMonitor.checkServerStatus());
 });
 
 app.get('/downloadRun', async (req, res) => {
+    log3("GET /downloadRun");
     res.send("ok");
     await downloadManager.run();
 });
 
 app.get('/upscaleRun', async (req, res) => {
+    log3("GET /upscaleRun");
     res.send("ok");
     await upscalerManager.run();
 });
 
 app.get('/resetSelectCount', async (req, res) => {
+    log3("GET /resetSelectCount");
     res.send("ok");
     await imageDB.setAllImagesSelectedCountZero();
 });
 
 app.get('/saveSettings', async (req, res) => {
+    log3("GET /saveSettings");
     res.send("ok");
     saveSettings();
 });
 
 app.get('/showOptions', async (req, res) => {
+    log3("GET /showOptions");
     res.json({ enableAutoAdjustUpdateInterval: false, updateInterval: 12, fadeDuration: 3.5, timeToRestart: 60, timeToRestartEnabled: true, showPrompt: false });
 });
 
@@ -1914,6 +2245,7 @@ app.get('/showOptions', async (req, res) => {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 function validatePNG(imagePath) {
+    log5("validatePNG() called");
     return new Promise((resolve) => {
         fs.createReadStream(imagePath)
             .pipe(new PNG())
@@ -1928,6 +2260,8 @@ function validatePNG(imagePath) {
 }
 
 function buildImageData(data) {
+    log5("buildImageData() called");
+    log6("buildImageData()\ndata.length: " + data.length);
     let imageData = [];
     data.forEach((job) => {
         if (job.batch_size == 4) {
@@ -1948,11 +2282,13 @@ function waitSeconds(seconds) {
 }
 
 function loadSettings() {
+    log5("loadSettings() called");
     if (fs.existsSync("settings.json")) {
         try {
             settings = JSON.parse(fs.readFileSync("settings.json"));
             return true;
         } catch (err) {
+            log0(["loadSettings() error: Error loading settings file", err]);
             return false;
         }
     } else {
@@ -1961,6 +2297,7 @@ function loadSettings() {
 }
 
 function saveSettings() {
+    log5("saveSettings() called");
     fs.writeFileSync("settings.json", JSON.stringify(settings, null, 4));
     systemLogger?.log("Setting saved", new Date().toLocaleString());
 }
