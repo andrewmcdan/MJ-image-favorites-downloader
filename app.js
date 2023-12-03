@@ -1868,7 +1868,7 @@ app.get('/saveSettings', async (req, res) => {
 });
 
 app.get('/showOptions', async (req, res) => {
-    res.json({ enableautoAdjustUpdateInterval: false, updateInterval: 11, fadeDuration: 3.5, timeToRestart: 0, timeToRestartEnabled: true, showPrompt: false });
+    res.json({ enableautoAdjustUpdateInterval: false, updateInterval: 3, fadeDuration: 2, timeToRestart: 0, timeToRestartEnabled: true, showPrompt: false });
 });
 
 ////////////////////////////////////////////////////////////////////////////////////////
