@@ -212,6 +212,7 @@ class SystemLogger {
         if (typeof numberOfEntries === "string") numberOfEntries = parseInt(numberOfEntries);
         numberOfEntries = Math.min(numberOfEntries, this.logArr.length);
         if (remove) {
+            log1("Removing "+ numberOfEntries +" entries from systemLogger")
             for (let i = 0; i < numberOfEntries; i++) {
                 entries.push(this.getMostRecentLog(remove));
             }
@@ -279,6 +280,7 @@ class PuppeteerClient {
             }
 
             if (this.browser == null) {
+                log1("Browser is null. Launching new browser.");
                 this.browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--enable-javascript'] });
                 this.page = (await this.browser.pages())[0];
             }
@@ -315,8 +317,10 @@ class PuppeteerClient {
             if ((!this.loggedIntoMJ || this.browser == null) && !this.loginInProgress) {
                 // attempt to restore session
                 this.loadSession().then(() => { resolve(); }).catch(async () => {
+                    log1("Session restore failed. Attempting to log in.");
                     this.loginInProgress = true;
                     if (this.browser !== null) await this.browser.close();
+                    log1("Launching new browser.");
                     this.browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--enable-javascript'] });
                     this.page = (await this.browser.pages())[0];
 
@@ -350,6 +354,7 @@ class PuppeteerClient {
                         if (waitCount > 120) {
                             log0("loginToMJ() error. Timed out waiting for login.");
                             reject("Timed out waiting for login");
+                            return;
                         }
                     }
                     this.loginInProgress = false;
@@ -361,7 +366,11 @@ class PuppeteerClient {
                         this.mj_cookies = await this.page.cookies();
                         this.mj_localStorage = await this.page.evaluate(() => { return window.localStorage; });
                         this.mj_sessionStorage = await this.page.evaluate(() => { return window.sessionStorage; });
-                        fs.writeFileSync('mjSession.json', JSON.stringify({ cookies: this.mj_cookies, localStorage: this.mj_localStorage, sessionStorage: this.mj_sessionStorage }));
+                        try{
+                            fs.writeFileSync('mjSession.json', JSON.stringify({ cookies: this.mj_cookies, localStorage: this.mj_localStorage, sessionStorage: this.mj_sessionStorage }));
+                        } catch(err) {
+                            log0("Error writing mjSession.json file. Error: " + err);
+                        }
 
                         let discordPage = await this.browser.newPage();
                         await discordPage.goto('https://discord.com/channels/@me');
@@ -369,7 +378,11 @@ class PuppeteerClient {
                         this.discord_cookies = await discordPage.cookies();
                         this.discord_localStorage = await discordPage.evaluate(() => { return window.localStorage; });
                         this.discord_sessionStorage = await discordPage.evaluate(() => { return window.sessionStorage; });
-                        fs.writeFileSync('discordSession.json', JSON.stringify({ cookies: this.discord_cookies, localStorage: this.discord_localStorage, sessionStorage: this.discord_sessionStorage }));
+                        try{
+                            fs.writeFileSync('discordSession.json', JSON.stringify({ cookies: this.discord_cookies, localStorage: this.discord_localStorage, sessionStorage: this.discord_sessionStorage }));
+                        } catch(err) {
+                            log0("Error writing discordSession.json file. Error: " + err);
+                        }
                         await waitSeconds(15);
                         await discordPage?.close();
                         resolve();
@@ -380,6 +393,7 @@ class PuppeteerClient {
                     }
                 });
                 if (this.loggedIntoMJ) {
+                    log2("Already logged into MJ");
                     await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
                     resolve();
                 }
@@ -397,6 +411,11 @@ class PuppeteerClient {
         let credentials = await credentials_cb();
         let username = credentials.uName;
         let password = credentials.pWord;
+        if(username === "" || password === "") {
+            log1("loginToDiscord() error. Username or password is empty.");
+            this.discordLoginComplete = false;
+            return;
+        }
         let MFA_cb = credentials.mfaCb;
         await waitSeconds(1);
         await discordLoginPage.waitForSelector('input[name="email"]');
@@ -421,6 +440,11 @@ class PuppeteerClient {
             let data = "";
             if (MFA_cb !== null) {
                 data = await MFA_cb();
+            }
+            if (data === "") {
+                log1("loginToDiscord() error. MFA code is empty.");
+                this.discordLoginComplete = false;
+                return;
             }
             await discordLoginPage.type('input[placeholder="6-digit authentication code"]', data.toString());
             await discordLoginPage.click('button[type="submit"]');
@@ -474,12 +498,26 @@ class PuppeteerClient {
                                 res.send(data);
                                 retData = data;
                             });
-                            while (retData == "") await waitSeconds(1);
+                            let waitCount = 0;
+                            while (retData == ""){
+                                if(waitCount++ > 60 * 5) {
+                                    log1("getUsersJobsData(): Timed out waiting for MFA code.");
+                                    break;
+                                }
+                                await waitSeconds(1);
+                            }
                             return retData;
                         };
                         res.send("ok");
                     });
-                    while (uName == "" || pWord == "") await waitSeconds(1);
+                    let waitCount = 0;
+                    while (uName == "" || pWord == "") {
+                        if(waitCount++ > 60 * 5) {
+                            log1("getUsersJobsData(): Timed out waiting for login credentials.");
+                            break;
+                        }
+                        await waitSeconds(1);
+                    }
                     return { uName, pWord, mfaCb };
                 }
                 await this.loginToMJ(uNamePWordCb).catch((err) => {
