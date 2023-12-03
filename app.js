@@ -974,7 +974,7 @@ class Database {
             // log2(queryParts.join(' '), queryParams); // TODO: remove this
 
             const res = await this.dbClient.query(queryParts.join(' '), queryParams);
-            log6("lookupImagesByIndexRange() res.rows.length: " + res.rows.length + " res.rows: " + JSON.stringify(res.rows));
+            log6("lookupImagesByIndexRange() res.rows.length: " + res.rows.length);
             if (res.rows.length > 0) {
                 log6("lookupImagesByIndexRange() complete");
                 return res.rows;
