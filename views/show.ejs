@@ -283,6 +283,10 @@
                 for (let i = 0; i < images.length; i++) {
                     images[i].style.transition = `opacity ${newTime}s ease-in-out`;
                 }
+                let promptContainers = document.getElementsByClassName('prompt-container');
+                for (let i = 0; i < promptContainers.length; i++) {
+                    promptContainers[i].style.transition = `${newTime}s ease-in-out all`;
+                }
             }
             document.getElementById('fadeDuration').addEventListener('change', (event) => {
                 if ((document.getElementById('updateInterval').value / minimumFadeUpdateRatio) < event.target.value) {
