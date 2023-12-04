@@ -2118,7 +2118,6 @@ app.get('/image/recent/:limit/:offset', async (req, res) => {
     log6("limit: " + limit);
     log6("offset: " + offset);
     const data = await imageDB.getEntriesOrderedByEnqueueTime(limit, offset);
-    log6("data: " + data);
     res.json(data);
 });
 
