@@ -239,16 +239,12 @@
                     getLogsFromServer();
                 });
         }
-        let prompt_text = document.getElementById('prompt-text');
         (async () => {
             const params = new URLSearchParams(window.location.search);
             let enableAutoAdjustUpdateInterval = params.get('enableAutoAdjustUpdateInterval');
             let fadeDurationParam = params.get('fadeDuration');
             let updateIntervalParam = params.get('updateInterval');
             let showPromptParam = params.get('showPrompt');
-            if(showPromptParam == 'true'){
-                document.getElementById('prompt-container').classList.remove('hidden');
-            }
             const minimumFadeUpdateRatio = 1.2;
             let allImages = false;
             let cdnSource = false;
@@ -335,6 +331,20 @@
 
             let image1Container = document.createElement('div');
             image1Container.className = 'image-container';
+            let promptContainer1 = document.createElement('div');
+            promptContainer1.id = 'prompt-container';
+            if(showPromptParam === 'true'){
+                promptContainer1.className = '';
+            }else{
+                promptContainer1.className = 'hidden';
+            }
+            let promptText1 = document.createElement('div');
+            promptText1.className = 'lower-text';
+            let promptText2 = document.createElement('div');
+            promptText2.id = 'prompt-text';
+            promptText1.appendChild(promptText2);
+            promptContainer1.appendChild(promptText1);
+            image1Container.appendChild(promptContainer1);
             let image1 = document.createElement('img');
             image1.className = 'image';
             image1.style.height = '100%';
@@ -343,6 +353,20 @@
 
             let image2Container = document.createElement('div');
             image2Container.className = 'image-container';
+            let promptContainer2 = document.createElement('div');
+            promptContainer2.id = 'prompt-container';
+            if(showPromptParam === 'true'){
+                promptContainer2.className = '';
+            }else{
+                promptContainer2.className = 'hidden';
+            }
+            let promptText3 = document.createElement('div');
+            promptText3.className = 'lower-text';
+            let promptText4 = document.createElement('div');
+            promptText4.id = 'prompt-text';
+            promptText3.appendChild(promptText4);
+            promptContainer2.appendChild(promptText3);
+            image2Container.appendChild(promptContainer2);
             let image2 = document.createElement('img');
             image2.className = 'image hidden'; // Initially hidden
             image2.style.height = '100%';
@@ -351,6 +375,20 @@
 
             let image3Container = document.createElement('div');
             image3Container.className = 'image-container';
+            let promptContainer3 = document.createElement('div');
+            promptContainer3.id = 'prompt-container';
+            if(showPromptParam === 'true'){
+                promptContainer3.className = '';
+            }else{
+                promptContainer3.className = 'hidden';
+            }
+            let promptText5 = document.createElement('div');
+            promptText5.className = 'lower-text';
+            let promptText6 = document.createElement('div');
+            promptText6.id = 'prompt-text';
+            promptText5.appendChild(promptText6);
+            promptContainer3.appendChild(promptText5);
+            image3Container.appendChild(promptContainer3);
             let image3 = document.createElement('img');
             image3.className = 'image hidden'; // Initially hidden
             image3.style.height = '100%';
@@ -362,6 +400,7 @@
             let prevImage = image3;
 
             let imageEls = [image1, image2, image3];
+            let prompts = [promptText2, promptText4, promptText6];
             let imageElsIndex = 0;
 
             let intervalId;
@@ -390,6 +429,7 @@
                 console.log(randomImageObj);
                 let imageInfo = new ImageInfo(randomImageObj.parent_id, randomImageObj.grid_index, randomImageObj.enqueue_time, randomImageObj.fullCommand, randomImageObj.width, randomImageObj.height, randomImageObj.storageLocation, randomImageObj.upscale_location);
                 while (!imageEls[imageElsIndex].complete) await waitSeconds(1);
+                prompts[imageElsIndex].innerHTML = imageInfo.fullCommand;
                 if (cdnSource) {
                     imageEls[imageElsIndex++].src = imageInfo.urlFull;
                 } else {
