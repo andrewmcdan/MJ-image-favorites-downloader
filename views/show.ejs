@@ -42,6 +42,10 @@
         opacity: 0;
     }
 
+    .alwaysHidden {
+        opacity: 0;
+    }
+
     #top-nav {
         position: absolute;
         top: 0px;
@@ -336,7 +340,7 @@
             if(showPromptParam === 'true'){
                 promptContainer1.className = '';
             }else{
-                promptContainer1.className = 'hidden';
+                promptContainer1.className = 'alwaysHidden';
             }
             let promptText1 = document.createElement('div');
             promptText1.className = 'lower-text';
@@ -358,7 +362,7 @@
             if(showPromptParam === 'true'){
                 promptContainer2.className = '';
             }else{
-                promptContainer2.className = 'hidden';
+                promptContainer2.className = 'alwaysHidden';
             }
             let promptText3 = document.createElement('div');
             promptText3.className = 'lower-text';
@@ -380,7 +384,7 @@
             if(showPromptParam === 'true'){
                 promptContainer3.className = '';
             }else{
-                promptContainer3.className = 'hidden';
+                promptContainer3.className = 'alwaysHidden';
             }
             let promptText5 = document.createElement('div');
             promptText5.className = 'lower-text';
@@ -401,6 +405,7 @@
 
             let imageEls = [image1, image2, image3];
             let prompts = [promptText2, promptText4, promptText6];
+            let promptContainers = [promptContainer1, promptContainer2, promptContainer3];
             let imageElsIndex = 0;
 
             let intervalId;
@@ -451,10 +456,10 @@
                 })(imageEls[imageElsIndex - 1], startTime);
 
                 if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
-                prompts[imageElsIndex].classList.remove('hidden');
+                promptContainers[imageElsIndex].classList.remove('hidden');
                 imageEls[imageElsIndex++].classList.remove('hidden');
                 if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
-                prompts[imageElsIndex].classList.add('hidden');
+                promptContainers[imageElsIndex].classList.add('hidden');
                 imageEls[imageElsIndex].classList.add('hidden');
             }
 
