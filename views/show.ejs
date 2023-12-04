@@ -90,7 +90,31 @@
         align-items: center;
     }
 
-    #logger-container .logger {
+    #logger-container .lower-text {
+        position: relative;
+        bottom: 2px;
+        width: 50%;
+        height: 100%;
+        overflow-y: hidden;
+        background-color: rgba(138, 138, 138, 0.747);
+        color: rgb(0, 0, 0);
+        font-size: 16px;
+        border-radius: 20px;
+        border: black 1px solid;
+    }
+
+    #prompt-container{
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        width: 100vw;
+        height: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #prompt-container .lower-text {
         position: relative;
         bottom: 2px;
         width: 50%;
@@ -108,6 +132,14 @@
         height: 100%;
         padding-left: 15px;
         padding-right: 15px;
+    }
+
+    #prompt-text{
+        overflow-y: hidden;
+        height: 100%;
+        padding-left: 15px;
+        padding-right: 15px;
+        transition: ease-in-out 2s all;
     }
 
     .hide-cursor {
@@ -133,8 +165,14 @@
     </div>
     <div id="main-container">
     </div>
+    <div id="prompt-container" class="hidden">
+        <div class="lower-text">
+            <div id="prompt-text">
+            </div>
+        </div>
+    </div>
     <div id="logger-container" class="hidden">
-        <div class="logger">
+        <div class="lower-text">
             <div id="logger-text">
             </div>
         </div>
@@ -194,11 +232,16 @@
                     getLogsFromServer();
                 });
         }
+        let prompt_text = document.getElementById('prompt-text');
         (async () => {
             const params = new URLSearchParams(window.location.search);
             let enableAutoAdjustUpdateInterval = params.get('enableAutoAdjustUpdateInterval');
             let fadeDurationParam = params.get('fadeDuration');
             let updateIntervalParam = params.get('updateInterval');
+            let showPromptParam = params.get('showPrompt');
+            if(showPromptParam == 'true'){
+                document.getElementById('prompt-container').classList.remove('hidden');
+            }
             const minimumFadeUpdateRatio = 1.2;
             let allImages = false;
             let cdnSource = false;
