@@ -1654,14 +1654,14 @@ class DownloadManager {
         try {
             stats = fs.statSync(path);
         } catch (err) {
-            log6("DownloadManager.checkFileExistsPath() complete");
+            log6("DownloadManager.checkFileExistsPath() complete. Error: " + err);
             return false;
         }
         if (stats.isFile()) {
-            log6("DownloadManager.checkFileExistsPath() complete");
+            log6("DownloadManager.checkFileExistsPath() complete. File exists.");
             return true;
         }
-        log6("DownloadManager.checkFileExistsPath() complete");
+        log6("DownloadManager.checkFileExistsPath() complete. File does not exist.");
         return false;
     }
 
