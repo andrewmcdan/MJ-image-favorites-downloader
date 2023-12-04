@@ -1252,7 +1252,7 @@ class Database {
                 LIMIT $1 OFFSET $2`,
                 [limit, offset]
             );
-            log6("getEntriesOrderedByEnqueueTime() res.rows.length: " + res.rows.length + " res.rows: " + JSON.stringify(res.rows));
+            log6("getEntriesOrderedByEnqueueTime() res.rows.length: " + res.rows.length);
             log6("getEntriesOrderedByEnqueueTime() complete");
             return res.rows;
         } catch (err) {
