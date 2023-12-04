@@ -451,8 +451,10 @@
                 })(imageEls[imageElsIndex - 1], startTime);
 
                 if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
+                prompts[imageElsIndex].classList.remove('hidden');
                 imageEls[imageElsIndex++].classList.remove('hidden');
                 if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
+                prompts[imageElsIndex].classList.add('hidden');
                 imageEls[imageElsIndex].classList.add('hidden');
             }
 
