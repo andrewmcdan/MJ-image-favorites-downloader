@@ -145,6 +145,13 @@
     .hide-cursor {
         cursor: none;
     }
+
+    .image-container {
+        display: flex;
+        justify-content: center; /* Centers horizontally */
+        align-items: center; /* Centers vertically */
+    }
+
 </style>
 
 <body>
@@ -327,6 +334,7 @@
             const mainContainer = document.getElementById('main-container');
 
             let image1Container = document.createElement('div');
+            image1Container.className = 'image-container';
             let image1 = document.createElement('img');
             image1.className = 'image';
             image1.style.height = '100%';
@@ -334,6 +342,7 @@
             mainContainer.appendChild(image1Container);
 
             let image2Container = document.createElement('div');
+            image2Container.className = 'image-container';
             let image2 = document.createElement('img');
             image2.className = 'image hidden'; // Initially hidden
             image2.style.height = '100%';
@@ -341,6 +350,7 @@
             mainContainer.appendChild(image2Container);
 
             let image3Container = document.createElement('div');
+            image3Container.className = 'image-container';
             let image3 = document.createElement('img');
             image3.className = 'image hidden'; // Initially hidden
             image3.style.height = '100%';
