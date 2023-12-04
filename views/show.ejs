@@ -81,7 +81,7 @@
 
     #logger-container {
         position: absolute;
-        bottom: 0px;
+        bottom: 20px;
         left: 0px;
         width: 100vw;
         height: 100px;
@@ -112,6 +112,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
+        transition: ease-in-out 2s all;
     }
 
     #prompt-container .lower-text {
@@ -139,7 +140,6 @@
         height: 100%;
         padding-left: 15px;
         padding-right: 15px;
-        transition: ease-in-out 2s all;
     }
 
     .hide-cursor {
@@ -326,20 +326,26 @@
             ////////////////////////////////
             const mainContainer = document.getElementById('main-container');
 
+            let image1Container = document.createElement('div');
             let image1 = document.createElement('img');
             image1.className = 'image';
             image1.style.height = '100%';
-            mainContainer.appendChild(image1);
+            image1Container.appendChild(image1);
+            mainContainer.appendChild(image1Container);
 
+            let image2Container = document.createElement('div');
             let image2 = document.createElement('img');
             image2.className = 'image hidden'; // Initially hidden
             image2.style.height = '100%';
-            mainContainer.appendChild(image2);
+            image2Container.appendChild(image2);
+            mainContainer.appendChild(image2Container);
 
+            let image3Container = document.createElement('div');
             let image3 = document.createElement('img');
             image3.className = 'image hidden'; // Initially hidden
             image3.style.height = '100%';
-            mainContainer.appendChild(image3);
+            image3Container.appendChild(image3);
+            mainContainer.appendChild(image3Container);
 
             let currentImage = image1;
             let nextImage = image2;
