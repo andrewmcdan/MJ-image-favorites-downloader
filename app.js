@@ -1541,8 +1541,8 @@ class DownloadManager {
             return;
         }
         if(this.databaseUpdateManager.updateInProgress){
-            log1("DownloadManager.run() warning: Database update is in progress. Will try again in 10 seconds.");
-            setTimeout(() => this.run(), 10000);
+            log1("DownloadManager.run() warning: Database update is in progress. Will try again in 5 minutes.");
+            setTimeout(() => this.run(), 1000 * 60 * 5);
             return;
         }
         if (this.downloadInProgress === true) return;
