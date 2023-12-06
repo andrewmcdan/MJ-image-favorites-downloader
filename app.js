@@ -955,7 +955,7 @@ class Database {
         }
         // at this point indexStart and indexEnd should be strings that are numbers. Anything else would have returned null
         try {
-            let queryParts = ['SELECT * FROM images WHERE index >= $1 AND index < $2'];
+            let queryParts = ['SELECT * FROM images WHERE id >= $1 AND id < $2'];
             let queryParams = [indexStart, indexEnd];
 
             if (processedOnly.enabled === true) {
