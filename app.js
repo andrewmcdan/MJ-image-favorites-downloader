@@ -1315,6 +1315,7 @@ class ImageInfo {
 };
 
 class DatabaseUpdateManager {
+    static updateInProgress_static = false;
     constructor(DatabaseManager = null, SystemLogger = null, PuppeteerClient = null) {
         log5("DatabaseUpdateManager constructor called");
         log6("DatabaseUpdateManager constructor\nDatabaseManager: " + DatabaseManager + "\nSystemLogger: " + SystemLogger + "\nPuppeteerClient: " + PuppeteerClient);
@@ -1358,6 +1359,7 @@ class DatabaseUpdateManager {
         }
         if (this.updateInProgress === true) return;
         this.updateInProgress = true;
+        updateInProgress_static = true;
         log6("DatabaseUpdateManager.run() updateInProgress: " + this.updateInProgress);
         let data;
         this.puppeteerClient.getUsersJobsData().then(async (dataTemp) => {
@@ -1377,6 +1379,7 @@ class DatabaseUpdateManager {
         }).finally(() => {
             log6("DatabaseUpdateManager.run() complete");
             this.updateInProgress = false;
+            updateInProgress_static = false;
             this.start();
         });
     }
@@ -1540,7 +1543,7 @@ class DownloadManager {
             setTimeout(() => this.run(), 10000);
             return;
         }
-        if(this.databaseUpdateManager.updateInProgress){
+        if(DatabaseUpdateManager.updateInProgress_static === true){
             log1("DownloadManager.run() warning: Database update is in progress. Will try again in 5 minutes.");
             setTimeout(() => this.run(), 1000 * 60 * 5);
             return;
