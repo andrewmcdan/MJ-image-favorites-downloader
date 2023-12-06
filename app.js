@@ -81,7 +81,7 @@ const winstonLogger = winston.createLogger({
         winston.format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
     ),
     transports: [
-        new winston.transports.Console(),
+        // new winston.transports.Console(),
         logFileTransport
     ]
 });
@@ -1166,7 +1166,7 @@ class Database {
         if (typeof valueBool !== "boolean") {
             log1("setImageProcessed() error: valueBool must be a boolean");
             log6("setImageProcessed() complete");
-            throw new Error("valueBool must be a boolean");
+            return null;
         }
         try {
             const res = await this.dbClient.query(
