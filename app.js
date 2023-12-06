@@ -1359,7 +1359,7 @@ class DatabaseUpdateManager {
         }
         if (this.updateInProgress === true) return;
         this.updateInProgress = true;
-        updateInProgress_static = true;
+        DatabaseUpdateManager.updateInProgress_static = true;
         log6("DatabaseUpdateManager.run() updateInProgress: " + this.updateInProgress);
         let data;
         this.puppeteerClient.getUsersJobsData().then(async (dataTemp) => {
@@ -1379,7 +1379,7 @@ class DatabaseUpdateManager {
         }).finally(() => {
             log6("DatabaseUpdateManager.run() complete");
             this.updateInProgress = false;
-            updateInProgress_static = false;
+            DatabaseUpdateManager.updateInProgress_static = false;
             this.start();
         });
     }
@@ -1550,7 +1550,7 @@ class DownloadManager {
         }
         if (this.downloadInProgress === true) return;
         this.downloadInProgress = true;
-        downloadInProgress_static = true;
+        DownloadManager.downloadInProgress_static = true;
         log6("DownloadManager.run() downloadInProgress: " + this.downloadInProgress);
         log6("DownloadManager.run() Verifying downloads");
         await this.verifyDownloads();
@@ -1570,7 +1570,7 @@ class DownloadManager {
             DownloadError.resetCount();
         }
         this.downloadInProgress = false;
-        downloadInProgress_static = false;
+        DownloadManager.downloadInProgress_static = false;
         this.start();
         log6("DownloadManager.run() complete");
     }
