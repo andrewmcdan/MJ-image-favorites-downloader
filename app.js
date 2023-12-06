@@ -215,7 +215,7 @@ class SystemLogger {
         numberOfEntries = Math.min(numberOfEntries, this.logArr.length);
         log6("systemLogger.getRecentEntries numberOfEntries = " + numberOfEntries);
         if (remove) {
-            log1("Removing "+ numberOfEntries +" entries from systemLogger")
+            log1("Removing " + numberOfEntries + " entries from systemLogger")
             for (let i = 0; i < numberOfEntries; i++) {
                 entries.push(this.getMostRecentLog(remove));
             }
@@ -406,10 +406,10 @@ class PuppeteerClient {
                         this.mj_cookies = await this.page.cookies();
                         this.mj_localStorage = await this.page.evaluate(() => { return window.localStorage; });
                         this.mj_sessionStorage = await this.page.evaluate(() => { return window.sessionStorage; });
-                        try{
+                        try {
                             log6("Writing mjSession.json file.");
                             fs.writeFileSync('mjSession.json', JSON.stringify({ cookies: this.mj_cookies, localStorage: this.mj_localStorage, sessionStorage: this.mj_sessionStorage }));
-                        } catch(err) {
+                        } catch (err) {
                             log0("Error writing mjSession.json file. Error: " + err);
                         }
 
@@ -421,10 +421,10 @@ class PuppeteerClient {
                         this.discord_cookies = await discordPage.cookies();
                         this.discord_localStorage = await discordPage.evaluate(() => { return window.localStorage; });
                         this.discord_sessionStorage = await discordPage.evaluate(() => { return window.sessionStorage; });
-                        try{
+                        try {
                             log6("Writing discordSession.json file.");
                             fs.writeFileSync('discordSession.json', JSON.stringify({ cookies: this.discord_cookies, localStorage: this.discord_localStorage, sessionStorage: this.discord_sessionStorage }));
-                        } catch(err) {
+                        } catch (err) {
                             log0("Error writing discordSession.json file. Error: " + err);
                         }
                         await waitSeconds(15);
@@ -457,7 +457,7 @@ class PuppeteerClient {
         let credentials = await credentials_cb();
         let username = credentials.uName;
         let password = credentials.pWord;
-        if(username === "" || password === "") {
+        if (username === "" || password === "") {
             log1("loginToDiscord() error. Username or password is empty.");
             this.discordLoginComplete = false;
             return;
@@ -562,8 +562,8 @@ class PuppeteerClient {
                                 retData = data;
                             });
                             let waitCount = 0;
-                            while (retData == ""){
-                                if(waitCount++ > 60 * 5) {
+                            while (retData == "") {
+                                if (waitCount++ > 60 * 5) {
                                     log1("getUsersJobsData(): Timed out waiting for MFA code.");
                                     break;
                                 }
@@ -575,7 +575,7 @@ class PuppeteerClient {
                     });
                     let waitCount = 0;
                     while (uName == "" || pWord == "") {
-                        if(waitCount++ > 60 * 5) {
+                        if (waitCount++ > 60 * 5) {
                             log1("getUsersJobsData(): Timed out waiting for login credentials.");
                             break;
                         }
@@ -856,7 +856,7 @@ class Database {
             );
 
             if (res.rows.length > 0) {
-                if(res.rows.length > 1) log1("lookupByUUID() warning: Multiple images found in database. Image ID: " + uuid);
+                if (res.rows.length > 1) log1("lookupByUUID() warning: Multiple images found in database. Image ID: " + uuid);
                 log6("lookupByUUID() complete");
                 return res.rows[0];
             }
@@ -896,7 +896,7 @@ class Database {
             }
             log6("getRandomImage() res.rows.length: " + res.rows.length + " res.rows: " + JSON.stringify(res.rows));
             if (res.rows.length > 0) {
-                if(res.rows.length > 1) log1("getRandomImage() warning: Multiple images found in database.");
+                if (res.rows.length > 1) log1("getRandomImage() warning: Multiple images found in database.");
                 log6("getRandomImage() complete");
                 return res.rows[0];
             }
@@ -2224,7 +2224,7 @@ app.get('/saveSettings', async (req, res) => {
 
 app.get('/showOptions', async (req, res) => {
     log3("GET /showOptions");
-    res.json({ enableAutoAdjustUpdateInterval: false, updateInterval: 12, fadeDuration: 3.5, timeToRestart: 60, timeToRestartEnabled: true, showPrompt: false });
+    res.json({ enableAutoAdjustUpdateInterval: false, updateInterval: 12, fadeDuration: 3.4, timeToRestart: 60, timeToRestartEnabled: true, showPrompt: false });
 });
 
 ////////////////////////////////////////////////////////////////////////////////////////
