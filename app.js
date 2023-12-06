@@ -1351,6 +1351,11 @@ class DatabaseUpdateManager {
             this.start();
             return;
         }
+        if(DownloadManager.downloadInProgress_static === true) {
+            log1("DatabaseUpdateManager.run() warning: Download is in progress. Will try again in 5 minutes.");
+            this.runTimeout = setTimeout(() => this.run(), 1000 * 60 * 5);
+            return;
+        }
         if (this.updateInProgress === true) return;
         this.updateInProgress = true;
         log6("DatabaseUpdateManager.run() updateInProgress: " + this.updateInProgress);
@@ -1378,6 +1383,7 @@ class DatabaseUpdateManager {
 }
 
 class DownloadManager {
+    static downloadInProgress_static = false;
     constructor(DatabaseManager = null, SystemLogger = null, UpscaleManager = null) {
         log5("DownloadManager constructor called");
         log6("DownloadManager constructor\nDatabaseManager: " + DatabaseManager + "\nSystemLogger: " + SystemLogger + "\nUpscaleManager: " + UpscaleManager);
@@ -1541,6 +1547,7 @@ class DownloadManager {
         }
         if (this.downloadInProgress === true) return;
         this.downloadInProgress = true;
+        downloadInProgress_static = true;
         log6("DownloadManager.run() downloadInProgress: " + this.downloadInProgress);
         log6("DownloadManager.run() Verifying downloads");
         await this.verifyDownloads();
@@ -1560,6 +1567,7 @@ class DownloadManager {
             DownloadError.resetCount();
         }
         this.downloadInProgress = false;
+        downloadInProgress_static = false;
         this.start();
         log6("DownloadManager.run() complete");
     }
