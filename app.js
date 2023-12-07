@@ -295,6 +295,14 @@ class PuppeteerClient {
                 log1("Browser is null. Launching new browser.");
                 this.browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--enable-javascript'] });
                 log6("Browser launched.");
+                this.browser.on('disconnected', () => {
+                    log6("Browser disconnected. Setting browser and page to null. Setting loggedIntoMJ to false. Setting loginInProgress to false. Killing all chrome processes.");
+                    this.browser = null;
+                    this.page = null;
+                    this.loggedIntoMJ = false;
+                    this.loginInProgress = false;
+                    spawn('killall', ['chrome']);
+                });
                 this.page = (await this.browser.pages())[0];
                 log6("Page set.");
             }
@@ -356,11 +364,21 @@ class PuppeteerClient {
 
                     log6("Setting up targetcreated event listener for discord.com/login.");
                     this.browser.on('targetcreated', async (target) => {
+                        log6("Target created. Checking if target is discord.com/login.");
                         const pageList = await this.browser.pages();
                         let discordLoginPage = pageList[pageList.length - 1];
                         if (discordLoginPage.url().includes("discord.com/login")) {
+                            log6("Target is discord.com/login. Logging into Discord.");
                             await this.loginToDiscord(discordLoginPage, credentials_cb);
                         }
+                    });
+                    this.browser.on('disconnected', () => {
+                        log6("Browser disconnected. Setting browser and page to null. Setting loggedIntoMJ to false. Setting loginInProgress to false. Killing all chrome processes.");
+                        this.browser = null;
+                        this.page = null;
+                        this.loggedIntoMJ = false;
+                        this.loginInProgress = false;
+                        spawn('killall', ['chrome']);
                     });
 
                     log6("Navigating to MJ home page.");
