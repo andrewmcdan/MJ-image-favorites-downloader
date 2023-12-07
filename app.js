@@ -597,6 +597,7 @@ class PuppeteerClient {
                     reject("Login in progress for too long");
                 }
             }
+            await waitSeconds(2);
             this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 }).then(async () => {
                 log6("Navigated to MJ home page.");
                 log6("Getting user's jobs data.");
