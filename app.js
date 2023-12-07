@@ -525,7 +525,7 @@ class PuppeteerClient {
     getUsersJobsData() {
         log5("getUsersJobsData() called");
         return new Promise(async (resolve, reject) => {
-            if (!this.loggedIntoMJ) {
+            if (!this.loggedIntoMJ || this.browser == null) {
                 log6("Not logged into MJ. Attempting to log in.");
                 let uNamePWordCb = async () => {
                     systemLogger.log("Not logged into MJ. Please send login credentials.");
@@ -598,7 +598,7 @@ class PuppeteerClient {
                 }
             }
             await waitSeconds(2);
-            this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 }).then(async () => {
+            this.page?.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 }).then(async () => {
                 log6("Navigated to MJ home page.");
                 log6("Getting user's jobs data.");
                 let data = await this.page.evaluate(async () => {
@@ -663,6 +663,10 @@ class PuppeteerClient {
                     return returnedData;
                 });
                 resolve(data);
+            }).catch((err) => {
+                log0("getUsersJobsData() error. Error: " + err);
+                systemLogger.log("getUsersJobsData() error. Error: " + err);
+                reject("Error: " + err);
             });
         });
     }
@@ -1353,7 +1357,7 @@ class DatabaseUpdateManager {
             this.start();
             return;
         }
-        if(DownloadManager.downloadInProgress_static === true) {
+        if (DownloadManager.downloadInProgress_static === true) {
             log1("DatabaseUpdateManager.run() warning: Download is in progress. Will try again in 5 minutes.");
             this.runTimeout = setTimeout(() => this.run(), 1000 * 60 * 5);
             return;
@@ -1544,7 +1548,7 @@ class DownloadManager {
             setTimeout(() => this.run(), 10000);
             return;
         }
-        if(DatabaseUpdateManager.updateInProgress_static === true){
+        if (DatabaseUpdateManager.updateInProgress_static === true) {
             log1("DownloadManager.run() warning: Database update is in progress. Will try again in 5 minutes.");
             setTimeout(() => this.run(), 1000 * 60 * 5);
             return;
