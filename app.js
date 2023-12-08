@@ -1816,7 +1816,8 @@ class UpscaleManager {
         log5("UpscaleManager.queueImage() called");
         console.log("Upscailing image");
         // get folder name from image.storageLocation
-        let folder = image.storage_location.substring(0, image.storage_location.lastIndexOf('\\'));
+        if (image.storage_location.includes("\\")) image.storage_location = image.storage_location.replaceAll('\\', '/');
+        let folder = image.storage_location.substring(0, image.storage_location.lastIndexOf('/'));
         console.log("folder: " + folder);
         let destFolder = path.join(folder, "upscaled");
         console.log("destFolder: " + destFolder);
@@ -1825,7 +1826,7 @@ class UpscaleManager {
             console.log("Creating folder: " + destFolder);
             fs.mkdirSync(destFolder, { recursive: true });
         }
-        let destFileName = image.storage_location.split('\\').pop();
+        let destFileName = image.storage_location.split('/').pop();
         console.log("destFileName: " + destFileName);
         destFileName = destFileName.substring(0, destFileName.lastIndexOf('.')) + "-upscaled.jpg";
         console.log("destFileName: " + destFileName);
