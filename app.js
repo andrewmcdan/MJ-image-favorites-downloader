@@ -1814,24 +1814,24 @@ class UpscaleManager {
 
     queueImage(image) {
         log5("UpscaleManager.queueImage() called");
-        console.log("Upscailing image");
+        // console.log("Upscailing image");
         // get folder name from image.storageLocation
         if (image.storage_location.includes("\\")) image.storage_location = image.storage_location.replaceAll('\\', '/');
         let folder = image.storage_location.substring(0, image.storage_location.lastIndexOf('/'));
-        console.log("folder: " + folder);
+        // console.log("folder: " + folder);
         let destFolder = path.join(folder, "upscaled");
-        console.log("destFolder: " + destFolder);
+        // console.log("destFolder: " + destFolder);
         if (!fs.existsSync(destFolder)) {
             log1("UpscaleManager.queueImage() warning: Destination folder does not exist. Creating it now. Folder: " + destFolder);
-            console.log("Creating folder: " + destFolder);
+            // console.log("Creating folder: " + destFolder);
             fs.mkdirSync(destFolder, { recursive: true });
         }
         let destFileName = image.storage_location.split('/').pop();
-        console.log("destFileName: " + destFileName);
+        // console.log("destFileName: " + destFileName);
         destFileName = destFileName.substring(0, destFileName.lastIndexOf('.')) + "-upscaled.jpg";
-        console.log("destFileName: " + destFileName);
+        // console.log("destFileName: " + destFileName);
         image.upscale_location = path.join(destFolder, destFileName);
-        console.log("image.upscale_location: " + image.upscale_location);
+        // console.log("image.upscale_location: " + image.upscale_location);
         this.upscaler.upscale(image.storage_location.replaceAll('\\', '/').replaceAll('\\\\', '/'), destFolder.replaceAll('\\', '/').replaceAll('\\\\', '/')).then((jobID) => {
             image.jobID = jobID;
             this.queue.push(image);
