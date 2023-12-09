@@ -46,6 +46,7 @@ const winston = require('winston');
 require('winston-daily-rotate-file');
 const Transport = require('winston-transport');
 const util = require('util');
+const { spawn } = require('child_process');
 
 let logLevel = process.env.mj_dl_server_log_level | 0;
 if (typeof logLevel === "string") logLevel = parseInt(logLevel);
