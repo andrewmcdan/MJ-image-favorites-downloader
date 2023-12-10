@@ -99,7 +99,7 @@ class LogDB {
         this.dbClient = new pgClient.Client({
             user: 'mjuser',
             host: 'postgresql.lan',
-            database: 'logs',
+            database: 'mjimages',
             password: 'mjImagesPassword',
             port: 9543,
         });
