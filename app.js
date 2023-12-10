@@ -535,6 +535,27 @@ class PuppeteerClient {
 
     }
 
+    async killBrowser(){
+        log5("killBrowser() called");
+        if (this.browser !== null) {
+            log6("Browser is not null. Closing browser.");
+            await this.browser.close();
+            this.browser = null;
+            this.page = null;
+            this.loggedIntoMJ = false;
+            this.loginInProgress = false;
+            this.discordLoginComplete = false;
+            this.discord_cookies = null;
+            this.discord_localStorage = null;
+            this.discord_sessionStorage = null;
+            this.mj_cookies = null;
+            this.mj_localStorage = null;
+            this.mj_sessionStorage = null;
+            this.pageURL = null;
+            spawn('killall', ['chrome']);
+        }
+    }
+
     /**
      * Attempts to get the user's jobs data from Midjourney. If the user is not logged in, it will attempt to log in. 
      * If the user is logged in, but the login is in progress, it will wait for the login to complete before attempting to get the user's jobs data.
@@ -1404,6 +1425,7 @@ class DatabaseUpdateManager {
             log6("DatabaseUpdateManager.run() complete");
             this.updateInProgress = false;
             DatabaseUpdateManager.updateInProgress_static = false;
+            this.puppeteerClient.killBrowser();
             this.start();
         });
     }
