@@ -95,7 +95,7 @@ class LogToDatabaseTransport extends Transport{
 class LogDB {
     static DB_connected = false;
     constructor() {
-        log5("LogDB constructor called");
+        console.log("LogDB constructor called");
         this.dbClient = new pgClient.Client({
             user: 'mjuser',
             host: 'postgresql.lan',
@@ -104,7 +104,7 @@ class LogDB {
             port: 9543,
         });
         this.dbClient.connect().then(() => { log2("Connected to database"); Database.DB_connected = true; }).catch((err) => {
-            log0("Error connecting to database:", err);
+            console.log("Error connecting to database:", err);
         });
         this.dbClient.on('error', (err) => {
             new DB_Error("Database error: " + err);
@@ -113,13 +113,12 @@ class LogDB {
     }
 
     log(level, message) {
-        log5("LogDB.log called with level = " + level + " and message = " + message);
         if (typeof level === "string") level = log_levels[level];
         if (typeof level !== "number") level = 2;
         if (typeof message !== "string") message = JSON.stringify(message);
         let timeNow = new Date();
         this.dbClient.query("INSERT INTO logs (level, message, time_stamp) VALUES ($1, $2, $3)", [level, message, timeNow]).catch((err) => {
-            log0("Error inserting into database:", err);
+            console.log("Error inserting into database:", err);
         });
     }
 }
