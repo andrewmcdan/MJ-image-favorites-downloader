@@ -47,6 +47,7 @@ require('winston-daily-rotate-file');
 const Transport = require('winston-transport');
 const util = require('util');
 const { spawn } = require('child_process');
+const { log } = require('console');
 
 let logLevel = process.env.mj_dl_server_log_level | 0;
 if (typeof logLevel === "string") logLevel = parseInt(logLevel);
@@ -75,6 +76,57 @@ const logFileTransport = new winston.transports.DailyRotateFile({
     maxFiles: '14d'
 });
 
+class LogToDatabaseTransport extends Transport{
+    constructor(opts) {
+        super(opts);
+        this.name = 'LogToDatabaseTransport';
+        this.dbClient = opts.dbClient;
+    }
+
+    log(info, callback) {
+        setImmediate(() => {
+            this.emit('logged', info);
+        });
+        this.dbClient.log(info.level, info.message);
+        callback();
+    }
+}
+
+class LogDB {
+    static DB_connected = false;
+    constructor() {
+        log5("LogDB constructor called");
+        this.dbClient = new pgClient.Client({
+            user: 'mjuser',
+            host: 'postgresql.lan',
+            database: 'logs',
+            password: 'mjImagesPassword',
+            port: 9543,
+        });
+        this.dbClient.connect().then(() => { log2("Connected to database"); Database.DB_connected = true; }).catch((err) => {
+            log0("Error connecting to database:", err);
+        });
+        this.dbClient.on('error', (err) => {
+            new DB_Error("Database error: " + err);
+            if (typeof err === 'string' && err.includes("Connection terminated unexpectedly")) this.dbClient.connect();
+        });
+    }
+
+    log(level, message) {
+        log5("LogDB.log called with level = " + level + " and message = " + message);
+        if (typeof level === "string") level = log_levels[level];
+        if (typeof level !== "number") level = 2;
+        if (typeof message !== "string") message = JSON.stringify(message);
+        let timeNow = new Date();
+        this.dbClient.query("INSERT INTO logs (level, message, time_stamp) VALUES ($1, $2, $3)", [level, message, timeNow]).catch((err) => {
+            log0("Error inserting into database:", err);
+        });
+    }
+}
+
+const logDBClient = new LogDB();
+const dbTransport = new LogToDatabaseTransport({dbClient: logDBClient});
+
 const winstonLogger = winston.createLogger({
     level: log_level_names[logLevel],
     format: winston.format.combine(
@@ -83,7 +135,8 @@ const winstonLogger = winston.createLogger({
     ),
     transports: [
         new winston.transports.Console(),
-        logFileTransport
+        logFileTransport,
+        dbTransport
     ]
 });
 
