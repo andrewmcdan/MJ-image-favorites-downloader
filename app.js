@@ -128,7 +128,7 @@ class LogDB {
         });
     }
     
-    async flushLogs() {
+    flushLogs() {
         if (LogDB.BUFFER.length === 0) return; // Do nothing if buffer is empty
 
         // Create a batch query with all log entries
@@ -144,7 +144,7 @@ class LogDB {
         }
 
         // Execute the batch query
-        await this.dbClient.query(queryText, queryValues).catch((err) => {
+        this.dbClient.query(queryText, queryValues).catch((err) => {
             console.log("Error inserting into database:", err);
         });
 
