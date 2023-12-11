@@ -83,11 +83,11 @@ class LogToDatabaseTransport extends Transport{
         this.dbClient = opts.dbClient;
     }
 
-    log(info, callback) {
+    async log(info, callback) {
         setImmediate(() => {
             this.emit('logged', info);
         });
-        this.dbClient.log(info.level, info.message);
+        await this.dbClient.log(info.level, info.message);
         callback();
     }
 }
