@@ -123,6 +123,9 @@ class LogDB {
         if (typeof message !== "string") message = JSON.stringify(message);
         let timeNow = new Date();
         LogDB.BUFFER.push({ level, message, timeNow });
+        this.dbClient.query("INSERT INTO logs (level, message, time_stamp) VALUES ($1, $2, $3)", [level, message, timeNow]).catch((err) => {
+            console.log("Error inserting into database:", err);
+        });
     }
     
     async flushLogs() {
@@ -131,14 +134,14 @@ class LogDB {
         // Create a batch query with all log entries
         let queryText = 'INSERT INTO logs (level, message, time_stamp) VALUES ';
         let queryValues = [];
-        LogDB.BUFFER.forEach((log, index) => {
+        for(let i = 0; i < LogDB.BUFFER.length; i++) {
             queryValues.push(log.level, log.message, log.timeNow);
-            if (index === 0) {
+            if (i === 0) {
                 queryText += '($1, $2, $3)';
             } else {
-                queryText += ',($' + (index * 3 + 1) + ', $' + (index * 3 + 2) + ', $' + (index * 3 + 3) + ')';
+                queryText += ',($' + (i * 3 + 1) + ', $' + (i * 3 + 2) + ', $' + (i * 3 + 3) + ')';
             }
-        });
+        }
 
         // Execute the batch query
         await this.dbClient.query(queryText, queryValues).catch((err) => {
