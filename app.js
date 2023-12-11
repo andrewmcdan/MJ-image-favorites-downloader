@@ -46,6 +46,8 @@ const winston = require('winston');
 require('winston-daily-rotate-file');
 const Transport = require('winston-transport');
 const util = require('util');
+const { spawn } = require('child_process');
+const { log } = require('console');
 
 let logLevel = process.env.mj_dl_server_log_level | 0;
 if (typeof logLevel === "string") logLevel = parseInt(logLevel);
@@ -71,8 +73,105 @@ const logFileTransport = new winston.transports.DailyRotateFile({
     filename: 'log/%DATE%.log',
     datePattern: 'YYYY-MM-DD',
     maxSize: '10m',
-    maxFiles: '14d'
+    maxFiles: '1d'
 });
+
+class LogToDatabaseTransport extends Transport{
+    constructor(opts) {
+        super(opts);
+        this.name = 'LogToDatabaseTransport';
+        this.dbClient = opts.dbClient;
+    }
+
+    async log(info, callback) {
+        setImmediate(() => {
+            this.emit('logged', info);
+        });
+        await this.dbClient.log(info.level, info.message);
+        callback();
+    }
+}
+
+class LogDB {
+    static DB_connected = false;
+    
+    static BUFFER = []; // Buffer for log entries
+    
+    static FLUSH_INTERVAL = 10 * 1000; // Time in milliseconds to flush the buffer, 60 seconds
+    constructor() {
+        console.log("LogDB constructor called");
+        this.dbClient = new pgClient.Client({
+            user: 'mjuser',
+            host: 'postgresql.lan',
+            database: 'mjimages',
+            password: 'mjImagesPassword',
+            port: 9543,
+        });
+        this.dbClient.connect().then(() => { log2("Connected to database"); LogDB.DB_connected = true; }).catch((err) => {
+            console.log("Error connecting to database:", err);
+        });
+        this.dbClient.on('error', (err) => {
+            new DB_Error("Database error: " + err);
+            if (typeof err === 'string' && err.includes("Connection terminated unexpectedly")) this.dbClient.connect();
+        });
+        setInterval(() => this.flushLogs(), LogDB.FLUSH_INTERVAL);
+    }
+
+    log(level, message) {
+        if (typeof level === "string") level = log_levels[level];
+        if (typeof level !== "number") level = 2;
+        if (typeof message !== "string") message = JSON.stringify(message);
+        let timeNow = new Date().toLocaleString();
+        LogDB.BUFFER.push({ level, message, timeNow });
+    }
+    
+    flushLogs() {
+        if(!LogDB.DB_connected) return; // Do nothing if not connected to database
+        if (LogDB.BUFFER.length === 0) return; // Do nothing if buffer is empty
+        if(LogDB.BUFFER.length > 100) {
+            // If buffer is large, write it to a csv, and then copy the csv to the database
+            let csv = "level,message,time_stamp\n";
+            for(let i = 0; i < LogDB.BUFFER.length; i++) {
+                csv += LogDB.BUFFER[i].level + "|\"" + LogDB.BUFFER[i].message + "\"|" + LogDB.BUFFER[i].timeNow + "\n";
+            }
+            fs.writeFileSync("log/postgres_transfer/log.csv", csv);
+            this.dbClient.query("COPY logs (level,message,time_stamp) FROM '/mnt/ingres/log.csv' DELIMITER '|' CSV HEADER").catch((err) => {
+                console.log("Error copying log.csv to database:", err);
+            });
+            return;
+        }else{
+            // Create a batch query with all log entries
+            let queryText = 'INSERT INTO logs (level, message, time_stamp) VALUES ';
+            let queryValues = [];
+            for(let i = 0; i < LogDB.BUFFER.length; i++) {
+                queryValues.push(LogDB.BUFFER[i].level, LogDB.BUFFER[i].message, LogDB.BUFFER[i].timeNow);
+                if (i === 0) {
+                    queryText += '($1, $2, $3)';
+                } else {
+                    queryText += ',($' + (i * 3 + 1) + ', $' + (i * 3 + 2) + ', $' + (i * 3 + 3) + ')';
+                }
+            }
+
+            // Execute the batch query
+            this.dbClient.query(queryText, queryValues).catch((err) => {
+                console.log("Error inserting into database:", err);
+            });
+        }
+        // Clear the buffer after flushing
+        LogDB.BUFFER = [];
+    }
+    
+
+    // TODO: Schedule nightly job to remove old logs
+    removeOldLogs() {
+        this.dbClient.query("DELETE FROM logs WHERE time_stamp < NOW() - INTERVAL '2 weeks'").catch((err) => {
+            console.log("Error deleting old logs from database:", err);
+        });
+    }
+}
+
+const logDBClient = new LogDB();
+const dbTransport = new LogToDatabaseTransport({dbClient: logDBClient});
 
 const winstonLogger = winston.createLogger({
     level: log_level_names[logLevel],
@@ -82,7 +181,8 @@ const winstonLogger = winston.createLogger({
     ),
     transports: [
         // new winston.transports.Console(),
-        logFileTransport
+        logFileTransport,
+        dbTransport
     ]
 });
 
@@ -532,6 +632,27 @@ class PuppeteerClient {
             this.discordLoginComplete = true;
         });
 
+    }
+
+    async killBrowser(){
+        log5("killBrowser() called");
+        if (this.browser !== null) {
+            log6("Browser is not null. Closing browser.");
+            await this.browser.close();
+            this.browser = null;
+            this.page = null;
+            this.loggedIntoMJ = false;
+            this.loginInProgress = false;
+            this.discordLoginComplete = false;
+            this.discord_cookies = null;
+            this.discord_localStorage = null;
+            this.discord_sessionStorage = null;
+            this.mj_cookies = null;
+            this.mj_localStorage = null;
+            this.mj_sessionStorage = null;
+            this.pageURL = null;
+            spawn('killall', ['chrome']);
+        }
     }
 
     /**
@@ -1403,6 +1524,7 @@ class DatabaseUpdateManager {
             log6("DatabaseUpdateManager.run() complete");
             this.updateInProgress = false;
             DatabaseUpdateManager.updateInProgress_static = false;
+            this.puppeteerClient.killBrowser();
             this.start();
         });
     }
