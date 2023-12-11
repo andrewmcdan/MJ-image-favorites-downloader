@@ -76,7 +76,7 @@ const logFileTransport = new winston.transports.DailyRotateFile({
     maxFiles: '1d'
 });
 
-class LogToDatabaseTransport extends Transport{
+class LogToDatabaseTransport extends Transport {
     constructor(opts) {
         super(opts);
         this.name = 'LogToDatabaseTransport';
@@ -94,9 +94,9 @@ class LogToDatabaseTransport extends Transport{
 
 class LogDB {
     static DB_connected = false;
-    
+
     static BUFFER = []; // Buffer for log entries
-    
+
     static FLUSH_INTERVAL = 10 * 1000; // Time in milliseconds to flush the buffer, 60 seconds
     constructor() {
         console.log("LogDB constructor called");
@@ -124,14 +124,15 @@ class LogDB {
         let timeNow = new Date().toLocaleString();
         LogDB.BUFFER.push({ level, message, timeNow });
     }
-    
+
     flushLogs() {
-        if(!LogDB.DB_connected) return; // Do nothing if not connected to database
+        if (!LogDB.DB_connected) return; // Do nothing if not connected to database
         if (LogDB.BUFFER.length === 0) return; // Do nothing if buffer is empty
-        if(LogDB.BUFFER.length > 100) {
+        if (LogDB.BUFFER.length > 100) {
             // If buffer is large, write it to a csv, and then copy the csv to the database
             let csv = "level,message,time_stamp\n";
-            for(let i = 0; i < LogDB.BUFFER.length; i++) {
+            for (let i = 0; i < LogDB.BUFFER.length; i++) {
+                LogDB.BUFFER[i].message = LogDB.BUFFER[i].message.replace(/"/g, '\'');
                 csv += LogDB.BUFFER[i].level + "|\"" + LogDB.BUFFER[i].message + "\"|" + LogDB.BUFFER[i].timeNow + "\n";
             }
             fs.writeFileSync("log/postgres_transfer/log.csv", csv);
@@ -139,11 +140,11 @@ class LogDB {
                 console.log("Error copying log.csv to database:", err);
             });
             return;
-        }else{
+        } else {
             // Create a batch query with all log entries
             let queryText = 'INSERT INTO logs (level, message, time_stamp) VALUES ';
             let queryValues = [];
-            for(let i = 0; i < LogDB.BUFFER.length; i++) {
+            for (let i = 0; i < LogDB.BUFFER.length; i++) {
                 queryValues.push(LogDB.BUFFER[i].level, LogDB.BUFFER[i].message, LogDB.BUFFER[i].timeNow);
                 if (i === 0) {
                     queryText += '($1, $2, $3)';
@@ -160,7 +161,7 @@ class LogDB {
         // Clear the buffer after flushing
         LogDB.BUFFER = [];
     }
-    
+
 
     // TODO: Schedule nightly job to remove old logs
     removeOldLogs() {
@@ -171,7 +172,7 @@ class LogDB {
 }
 
 const logDBClient = new LogDB();
-const dbTransport = new LogToDatabaseTransport({dbClient: logDBClient});
+const dbTransport = new LogToDatabaseTransport({ dbClient: logDBClient });
 
 const winstonLogger = winston.createLogger({
     level: log_level_names[logLevel],
@@ -634,7 +635,7 @@ class PuppeteerClient {
 
     }
 
-    async killBrowser(){
+    async killBrowser() {
         log5("killBrowser() called");
         if (this.browser !== null) {
             log6("Browser is not null. Closing browser.");
