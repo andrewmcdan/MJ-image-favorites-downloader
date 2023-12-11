@@ -94,6 +94,10 @@ class LogToDatabaseTransport extends Transport{
 
 class LogDB {
     static DB_connected = false;
+    
+    static BUFFER = []; // Buffer for log entries
+    
+    static FLUSH_INTERVAL = 60 * 1000; // Time in milliseconds to flush the buffer, e.g., 60000 for 1 minute
     constructor() {
         console.log("LogDB constructor called");
         this.dbClient = new pgClient.Client({
@@ -110,15 +114,46 @@ class LogDB {
             new DB_Error("Database error: " + err);
             if (typeof err === 'string' && err.includes("Connection terminated unexpectedly")) this.dbClient.connect();
         });
+        setInterval(() => this.flushLogs(), LogDB.FLUSH_INTERVAL);
     }
 
-    async log(level, message) {
+    log(level, message) {
         if (typeof level === "string") level = log_levels[level];
         if (typeof level !== "number") level = 2;
         if (typeof message !== "string") message = JSON.stringify(message);
         let timeNow = new Date();
-        await this.dbClient.query("INSERT INTO logs (level, message, time_stamp) VALUES ($1, $2, $3)", [level, message, timeNow]).catch((err) => {
+        LogDB.BUFFER.push({ level, message, timeNow });
+    }
+    
+    async flushLogs() {
+        if (LogDB.BUFFER.length === 0) return; // Do nothing if buffer is empty
+
+        // Create a batch query with all log entries
+        const queryText = 'INSERT INTO logs (level, message, time_stamp) VALUES ';
+        const queryValues = [];
+        LogDB.BUFFER.forEach((log, index) => {
+            queryValues.push(log.level, log.message, log.timeNow);
+            if (index === 0) {
+                queryText += '($1, $2, $3)';
+            } else {
+                queryText += ',($' + (index * 3 + 1) + ', $' + (index * 3 + 2) + ', $' + (index * 3 + 3) + ')';
+            }
+        });
+
+        // Execute the batch query
+        await this.dbClient.query(queryText, queryValues).catch((err) => {
             console.log("Error inserting into database:", err);
+        });
+
+        // Clear the buffer after flushing
+        LogDB.BUFFER = [];
+    }
+    
+
+    // TODO: Schedule nightly job to remove old logs
+    removeOldLogs() {
+        this.dbClient.query("DELETE FROM logs WHERE time_stamp < NOW() - INTERVAL '2 weeks'").catch((err) => {
+            console.log("Error deleting old logs from database:", err);
         });
     }
 }
