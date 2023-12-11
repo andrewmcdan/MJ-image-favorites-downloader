@@ -121,7 +121,7 @@ class LogDB {
         if (typeof level === "string") level = log_levels[level];
         if (typeof level !== "number") level = 2;
         if (typeof message !== "string") message = JSON.stringify(message);
-        let timeNow = new Date().toISOString();
+        let timeNow = new Date().toLocaleString();
         LogDB.BUFFER.push({ level, message, timeNow });
     }
     
