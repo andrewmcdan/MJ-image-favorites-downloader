@@ -133,10 +133,12 @@ class LogDB {
             let csv = "level,message,time_stamp\n";
             for(let i = 0; i < LogDB.BUFFER.length; i++) {
                 LogDB.BUFFER[i].message = LogDB.BUFFER[i].message.replace("\n", " **NL** ");
-                csv += LogDB.BUFFER[i].level + "," + LogDB.BUFFER[i].message + "," + LogDB.BUFFER[i].timeNow + "\n";
+                LogDB.BUFFER[i].message = LogDB.BUFFER[i].message.replace("\r", " **CR** ");
+                LogDB.BUFFER[i].message = LogDB.BUFFER[i].message.replace("\t", " **TAB** ");
+                csv += LogDB.BUFFER[i].level + "\t" + LogDB.BUFFER[i].message + "\t" + LogDB.BUFFER[i].timeNow + "\n";
             }
             fs.writeFileSync("log/postgres_transfer/log.csv", csv);
-            this.dbClient.query("COPY logs (level,message,time_stamp) FROM '/mnt/ingres/log.csv' DELIMITER ',' CSV HEADER").catch((err) => {
+            this.dbClient.query("COPY logs (level,message,time_stamp) FROM '/mnt/ingres/log.csv' DELIMITER '\t' CSV HEADER").catch((err) => {
                 console.log("Error copying log.csv to database:", err);
             });
             return;
