@@ -132,10 +132,10 @@ class LogDB {
             // If buffer is large, write it to a csv, and then copy the csv to the database
             let csv = "level,message,time_stamp\n";
             for(let i = 0; i < LogDB.BUFFER.length; i++) {
-                csv += "NULL," + LogDB.BUFFER[i].level + "," + LogDB.BUFFER[i].message + "," + LogDB.BUFFER[i].timeNow + "\n";
+                csv += LogDB.BUFFER[i].level + "," + LogDB.BUFFER[i].message + "," + LogDB.BUFFER[i].timeNow + "\n";
             }
             fs.writeFileSync("log/postgres_transfer/log.csv", csv);
-            this.dbClient.query("COPY logs FROM '/mnt/ingres/log.csv' DELIMITER ',' CSV HEADER").catch((err) => {
+            this.dbClient.query("COPY logs (level,message,time_stamp) FROM '/mnt/ingres/log.csv' DELIMITER ',' CSV HEADER").catch((err) => {
                 console.log("Error copying log.csv to database:", err);
             });
             return;
