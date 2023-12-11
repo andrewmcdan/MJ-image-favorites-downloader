@@ -121,7 +121,7 @@ class LogDB {
         if (typeof level === "string") level = log_levels[level];
         if (typeof level !== "number") level = 2;
         if (typeof message !== "string") message = JSON.stringify(message);
-        let timeNow = new Date();
+        let timeNow = new Date().toISOString();
         LogDB.BUFFER.push({ level, message, timeNow });
     }
     
@@ -144,7 +144,7 @@ class LogDB {
             let queryText = 'INSERT INTO logs (level, message, time_stamp) VALUES ';
             let queryValues = [];
             for(let i = 0; i < LogDB.BUFFER.length; i++) {
-                queryValues.push(log.level, log.message, log.timeNow);
+                queryValues.push(LogDB.BUFFER[i].level, LogDB.BUFFER[i].message, LogDB.BUFFER[i].timeNow);
                 if (i === 0) {
                     queryText += '($1, $2, $3)';
                 } else {
