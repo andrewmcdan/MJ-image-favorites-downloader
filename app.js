@@ -2320,9 +2320,18 @@ app.get('/saveSettings', async (req, res) => {
     saveSettings();
 });
 
+let restartShow = false;
+
 app.get('/showOptions', async (req, res) => {
     log3("GET /showOptions");
-    res.json({ enableAutoAdjustUpdateInterval: false, updateInterval: 12, fadeDuration: 3.4, timeToRestart: 60, timeToRestartEnabled: true, showPrompt: false });
+    res.json({ enableAutoAdjustUpdateInterval: false, updateInterval: 12, fadeDuration: 3.4, timeToRestart: 60, timeToRestartEnabled: true, showPrompt: false, restartShow: restartShow });
+    restartShow = false;
+});
+
+app.get('/restartShow', async (req, res) => {
+    log3("GET /restartShow");
+    res.send("ok");
+    restartShow = true;
 });
 
 ////////////////////////////////////////////////////////////////////////////////////////
