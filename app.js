@@ -97,7 +97,7 @@ class LogDB {
     
     static BUFFER = []; // Buffer for log entries
     
-    static FLUSH_INTERVAL = 60 * 1000; // Time in milliseconds to flush the buffer, e.g., 60000 for 1 minute
+    static FLUSH_INTERVAL = 15 * 1000; // Time in milliseconds to flush the buffer, 15 seconds
     constructor() {
         console.log("LogDB constructor called");
         this.dbClient = new pgClient.Client({
