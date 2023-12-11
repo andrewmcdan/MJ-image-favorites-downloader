@@ -73,7 +73,7 @@ const logFileTransport = new winston.transports.DailyRotateFile({
     filename: 'log/%DATE%.log',
     datePattern: 'YYYY-MM-DD',
     maxSize: '10m',
-    maxFiles: '14d'
+    maxFiles: '1d'
 });
 
 class LogToDatabaseTransport extends Transport{
@@ -112,12 +112,12 @@ class LogDB {
         });
     }
 
-    log(level, message) {
+    async log(level, message) {
         if (typeof level === "string") level = log_levels[level];
         if (typeof level !== "number") level = 2;
         if (typeof message !== "string") message = JSON.stringify(message);
         let timeNow = new Date();
-        this.dbClient.query("INSERT INTO logs (level, message, time_stamp) VALUES ($1, $2, $3)", [level, message, timeNow]).catch((err) => {
+        await this.dbClient.query("INSERT INTO logs (level, message, time_stamp) VALUES ($1, $2, $3)", [level, message, timeNow]).catch((err) => {
             console.log("Error inserting into database:", err);
         });
     }
