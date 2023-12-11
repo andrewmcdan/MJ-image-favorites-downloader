@@ -107,7 +107,7 @@ class LogDB {
             password: 'mjImagesPassword',
             port: 9543,
         });
-        this.dbClient.connect().then(() => { log2("Connected to database"); Database.DB_connected = true; }).catch((err) => {
+        this.dbClient.connect().then(() => { log2("Connected to database"); LogDB.DB_connected = true; }).catch((err) => {
             console.log("Error connecting to database:", err);
         });
         this.dbClient.on('error', (err) => {
