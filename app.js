@@ -129,8 +129,8 @@ class LogDB {
         if (LogDB.BUFFER.length === 0) return; // Do nothing if buffer is empty
 
         // Create a batch query with all log entries
-        const queryText = 'INSERT INTO logs (level, message, time_stamp) VALUES ';
-        const queryValues = [];
+        let queryText = 'INSERT INTO logs (level, message, time_stamp) VALUES ';
+        let queryValues = [];
         LogDB.BUFFER.forEach((log, index) => {
             queryValues.push(log.level, log.message, log.timeNow);
             if (index === 0) {
