@@ -132,6 +132,7 @@ class LogDB {
             // If buffer is large, write it to a csv, and then copy the csv to the database
             let csv = "level,message,time_stamp\n";
             for(let i = 0; i < LogDB.BUFFER.length; i++) {
+                LogDB.BUFFER[i].message = LogDB.BUFFER[i].message.replace("\n", " **NL** ");
                 csv += LogDB.BUFFER[i].level + "," + LogDB.BUFFER[i].message + "," + LogDB.BUFFER[i].timeNow + "\n";
             }
             fs.writeFileSync("log/postgres_transfer/log.csv", csv);
