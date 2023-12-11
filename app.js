@@ -97,7 +97,7 @@ class LogDB {
     
     static BUFFER = []; // Buffer for log entries
     
-    static FLUSH_INTERVAL = 15 * 1000; // Time in milliseconds to flush the buffer, 15 seconds
+    static FLUSH_INTERVAL = 60 * 1000; // Time in milliseconds to flush the buffer, 60 seconds
     constructor() {
         console.log("LogDB constructor called");
         this.dbClient = new pgClient.Client({
@@ -123,31 +123,41 @@ class LogDB {
         if (typeof message !== "string") message = JSON.stringify(message);
         let timeNow = new Date();
         LogDB.BUFFER.push({ level, message, timeNow });
-        this.dbClient.query("INSERT INTO logs (level, message, time_stamp) VALUES ($1, $2, $3)", [level, message, timeNow]).catch((err) => {
-            console.log("Error inserting into database:", err);
-        });
     }
     
     flushLogs() {
+        if(!LogDB.DB_connected) return; // Do nothing if not connected to database
         if (LogDB.BUFFER.length === 0) return; // Do nothing if buffer is empty
-
-        // Create a batch query with all log entries
-        let queryText = 'INSERT INTO logs (level, message, time_stamp) VALUES ';
-        let queryValues = [];
-        for(let i = 0; i < LogDB.BUFFER.length; i++) {
-            queryValues.push(log.level, log.message, log.timeNow);
-            if (i === 0) {
-                queryText += '($1, $2, $3)';
-            } else {
-                queryText += ',($' + (i * 3 + 1) + ', $' + (i * 3 + 2) + ', $' + (i * 3 + 3) + ')';
+        if(LogDB.BUFFER.length > 100) {
+            // If buffer is large, write it to a csv, and then copy the csv to the database
+            let csv = "level,message,time_stamp\n";
+            for(let i = 0; i < LogDB.BUFFER.length; i++) {
+                csv += LogDB.BUFFER[i].level + "," + LogDB.BUFFER[i].message + "," + LogDB.BUFFER[i].timeNow + "\n";
             }
+            fs.writeFileSync("log/postgres_transfer/log.csv", csv);
+            this.dbClient.query("COPY logs FROM '/mnt/ingres/log.csv' DELIMITER ',' CSV HEADER").catch((err) => {
+                console.log("Error copying log.csv to database:", err);
+            });
+            fs.unlinkSync("log.csv");
+            return;
+        }else{
+            // Create a batch query with all log entries
+            let queryText = 'INSERT INTO logs (level, message, time_stamp) VALUES ';
+            let queryValues = [];
+            for(let i = 0; i < LogDB.BUFFER.length; i++) {
+                queryValues.push(log.level, log.message, log.timeNow);
+                if (i === 0) {
+                    queryText += '($1, $2, $3)';
+                } else {
+                    queryText += ',($' + (i * 3 + 1) + ', $' + (i * 3 + 2) + ', $' + (i * 3 + 3) + ')';
+                }
+            }
+
+            // Execute the batch query
+            this.dbClient.query(queryText, queryValues).catch((err) => {
+                console.log("Error inserting into database:", err);
+            });
         }
-
-        // Execute the batch query
-        this.dbClient.query(queryText, queryValues).catch((err) => {
-            console.log("Error inserting into database:", err);
-        });
-
         // Clear the buffer after flushing
         LogDB.BUFFER = [];
     }
