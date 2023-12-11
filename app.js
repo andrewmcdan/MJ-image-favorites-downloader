@@ -183,7 +183,7 @@ const winstonLogger = winston.createLogger({
     transports: [
         // new winston.transports.Console(),
         logFileTransport,
-        // dbTransport
+        dbTransport
     ]
 });
 
