@@ -138,7 +138,7 @@ class LogDB {
                 csv += LogDB.BUFFER[i].level + "\t" + LogDB.BUFFER[i].message + "\t" + LogDB.BUFFER[i].timeNow + "\n";
             }
             fs.writeFileSync("log/postgres_transfer/log.csv", csv);
-            this.dbClient.query("COPY logs (level,message,time_stamp) FROM '/mnt/ingres/log.csv' DELIMITER '\t' CSV HEADER").catch((err) => {
+            this.dbClient.query("COPY logs (level,message,time_stamp) FROM '/mnt/ingres/log.csv' WITH (FORMAT csv, DELIMITER '\t'").catch((err) => {
                 console.log("Error copying log.csv to database:", err);
             });
             return;
