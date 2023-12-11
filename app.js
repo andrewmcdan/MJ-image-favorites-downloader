@@ -138,7 +138,6 @@ class LogDB {
             this.dbClient.query("COPY logs FROM '/mnt/ingres/log.csv' DELIMITER ',' CSV HEADER").catch((err) => {
                 console.log("Error copying log.csv to database:", err);
             });
-            fs.unlinkSync("log.csv");
             return;
         }else{
             // Create a batch query with all log entries
