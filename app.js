@@ -1866,8 +1866,35 @@ class UpscaleManager {
             })
         })();
 
-        await waitSeconds(30);
+        await waitSeconds(120);
         this.checkForFinishedJobs();
+    }
+
+    async stopRunningJobs() {
+        log5("UpscaleManager.stopRunningJobs() called");
+        let runningJobs = this.queue.filter((img) => {
+            let jobID = img.jobID;
+            if (jobID === null) return false;
+            let job = this.upscaler.getJob(jobID);
+            if (job === null) return false;
+            if (job.status == "complete") return false;
+            else return true;
+        });
+        (() => {
+            runningJobs.forEach(async (image) => {
+                image.id = image.uuid;
+                log2("Stopping job: ", image.jobID);
+
+                let jobID = image.jobID;
+                if (jobID === null) return;
+                let job = this.upscaler.getJob(jobID);
+                if (job === null) return;
+                else {
+                    this.upscaler.cancelJob(jobID);
+                }
+            })
+        })();
+        log6("UpscaleManager.stopRunningJobs() complete");
     }
 
     get queuedUpscales() {
