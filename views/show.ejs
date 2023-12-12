@@ -107,7 +107,7 @@
         border: black 1px solid;
     }
 
-    #prompt-container{
+    #prompt-container {
         position: absolute;
         bottom: 0px;
         left: 0px;
@@ -141,7 +141,7 @@
         text-align: center;
     }
 
-    #prompt-text{
+    #prompt-text {
         overflow-y: hidden;
         height: 100%;
         padding-left: 15px;
@@ -154,10 +154,11 @@
 
     .image-container {
         display: flex;
-        justify-content: center; /* Centers horizontally */
-        align-items: center; /* Centers vertically */
+        justify-content: center;
+        /* Centers horizontally */
+        align-items: center;
+        /* Centers vertically */
     }
-
 </style>
 
 <body>
@@ -245,6 +246,15 @@
                     getLogsFromServer();
                 });
         }
+
+        setInterval(() => {
+            if (document.fullscreenElement === null) {
+                document.body.requestFullscreen().then(() => { console.log('Fullscreen re-enabled.'); }).catch((err) => {
+                    fetch('http://localhost:3000/fullscreen').catch((err) => { console.log(err); });
+                })
+            }
+        }, 30000);
+
         (async () => {
             const params = new URLSearchParams(window.location.search);
             let enableAutoAdjustUpdateInterval = params.get('enableAutoAdjustUpdateInterval');
@@ -343,9 +353,9 @@
             image1Container.className = 'image-container';
             let promptContainer1 = document.createElement('div');
             promptContainer1.id = 'prompt-container';
-            if(showPromptParam === 'true'){
+            if (showPromptParam === 'true') {
                 promptContainer1.className = '';
-            }else{
+            } else {
                 promptContainer1.className = 'alwaysHidden';
             }
             let promptText1 = document.createElement('div');
@@ -365,9 +375,9 @@
             image2Container.className = 'image-container';
             let promptContainer2 = document.createElement('div');
             promptContainer2.id = 'prompt-container';
-            if(showPromptParam === 'true'){
+            if (showPromptParam === 'true') {
                 promptContainer2.className = '';
-            }else{
+            } else {
                 promptContainer2.className = 'alwaysHidden';
             }
             let promptText3 = document.createElement('div');
@@ -387,9 +397,9 @@
             image3Container.className = 'image-container';
             let promptContainer3 = document.createElement('div');
             promptContainer3.id = 'prompt-container';
-            if(showPromptParam === 'true'){
+            if (showPromptParam === 'true') {
                 promptContainer3.className = '';
-            }else{
+            } else {
                 promptContainer3.className = 'alwaysHidden';
             }
             let promptText5 = document.createElement('div');
