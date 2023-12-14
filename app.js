@@ -1852,7 +1852,7 @@ class UpscaleManager {
         }
         let destFileName = image.storage_location.split('/').pop();
         // console.log("destFileName: " + destFileName);
-        destFileName = destFileName.substring(0, destFileName.lastIndexOf('.')) + "-upscaled.jpg";
+        destFileName = destFileName.substring(0, destFileName.lastIndexOf('.')) + ".jpg";
         // console.log("destFileName: " + destFileName);
         image.upscale_location = path.join(destFolder, destFileName);
         // console.log("image.upscale_location: " + image.upscale_location);

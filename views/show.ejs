@@ -247,7 +247,7 @@
                 });
         }
 
-        setInterval(() => {
+        let fullscreenCheckInterval = setInterval(() => {
             if (document.fullscreenElement === null) {
                 document.body.requestFullscreen().then(() => { console.log('Fullscreen re-enabled.'); }).catch((err) => {
                     fetch('http://localhost:3000/fullscreen').catch((err) => { console.log(err); });
@@ -261,6 +261,10 @@
             let fadeDurationParam = params.get('fadeDuration');
             let updateIntervalParam = params.get('updateInterval');
             let showPromptParam = params.get('showPrompt');
+            let disableFullscreen = params.get('disableFullscreen');
+            if (disableFullscreen === 'true') {
+                clearInterval(fullscreenCheckInterval);
+            }
             const minimumFadeUpdateRatio = 1.2;
             let allImages = false;
             let cdnSource = false;
