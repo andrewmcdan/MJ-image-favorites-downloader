@@ -83,7 +83,7 @@ const winstonLogger = winston.createLogger({
         winston.format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
     ),
     transports: [
-        // new winston.transports.Console(),
+        new winston.transports.Console(),
         logFileTransport
     ]
 });
