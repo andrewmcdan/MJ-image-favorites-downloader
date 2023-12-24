@@ -823,7 +823,7 @@ class Database {
             host: 'postgresql.lan',
             database: 'mjimages',
             password: 'mjImagesPassword',
-            port: 9543,
+            port: 5432,
         });
         this.dbClient.connect().then(() => { log2("Connected to database"); Database.DB_connected = true; }).catch((err) => {
             log0("Error connecting to database:", err);
