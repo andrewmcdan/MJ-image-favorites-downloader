@@ -12,6 +12,7 @@
  * 
  * TODO: 
  * - add weekly reset to selected count
+ * - Add ability to manually upload images to the server
  * 
  * //////////////// NEED to evaluate these TODO's ////////////////
  * 1. Add ExifTool capability to add metadata to images
