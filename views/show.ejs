@@ -36,6 +36,7 @@
         position: absolute;
         opacity: 1;
         transition: opacity 5s ease-in-out;
+        object-fit: cover;
     }
 
     .hidden {
@@ -371,7 +372,7 @@
             image1Container.appendChild(promptContainer1);
             let image1 = document.createElement('img');
             image1.className = 'image';
-            image1.style.height = '100%';
+            // image1.style.height = '100%';
             image1Container.appendChild(image1);
             mainContainer.appendChild(image1Container);
 
@@ -393,7 +394,7 @@
             image2Container.appendChild(promptContainer2);
             let image2 = document.createElement('img');
             image2.className = 'image hidden'; // Initially hidden
-            image2.style.height = '100%';
+            // image2.style.height = '100%';
             image2Container.appendChild(image2);
             mainContainer.appendChild(image2Container);
 
@@ -415,7 +416,7 @@
             image3Container.appendChild(promptContainer3);
             let image3 = document.createElement('img');
             image3.className = 'image hidden'; // Initially hidden
-            image3.style.height = '100%';
+            // image3.style.height = '100%';
             image3Container.appendChild(image3);
             mainContainer.appendChild(image3Container);
 
