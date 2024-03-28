@@ -1,9 +1,9 @@
 {
     "downloadLocation": "output",
     "timeToDownload": 0,
-    "runEnabled": false,
+    "runEnabled": true,
     "updateDB": true,
     "dbUpdateRunEnabled": true,
-    "downloadRunEnabled": false,
+    "downloadRunEnabled": true,
     "upscaleRunEnabled": false
 }
