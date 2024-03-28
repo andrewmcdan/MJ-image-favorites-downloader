@@ -1,7 +1,7 @@
 {
     "name": "mj-image-favorites-downloader",
     "version": "0.0.1",
-    "description": "An Midjourney image downloader webapp.",
+    "description": "A Midjourney image downloader webapp.",
     "main": "app.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
