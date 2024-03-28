@@ -713,6 +713,154 @@ class PuppeteerClient {
         });
     }
 
+    getUsersLikesData() {
+        log5("getUsersLikesData() called");
+        return new Promise(async (resolve, reject) => {
+            if(!this.loggedIntoMJ || this.browser == null) {
+                log6("Not logged into MJ. Attempting to log in.");
+                let uNamePWordCb = async () => {
+                    systemLogger.log("Not logged into MJ. Please send login credentials.");
+                    let uName = "";
+                    let pWord = "";
+                    let mfaCb = null;
+                    /**
+                     * GET /login/:username/:password
+                     * Login endpoint for logging into Midjourney
+                     * @param {string} username - username for Midjourney
+                     * @param {string} password - password for Midjourney
+                     * @returns {string} - "ok" once credentials have been entered
+                     */
+                    app.get('/login/:username/:password', async (req, res) => {
+                        log3("GET /login/:username/:password called");
+                        const { username, password } = req.params;
+                        log6("Username: " + username + " Password: " + password);
+                        uName = username;
+                        pWord = password;
+                        mfaCb = async () => {
+                            systemLogger.log("MFA code requested. Please send MFA code.");
+                            let retData = "";
+                            /**
+                             * GET /mfa/:data
+                             * Endpoint for getting the MFA code from the user
+                             * @param {string} data - the MFA code
+                             * @returns {string} - the MFA code
+                             */
+                            app.get('/mfa/:data', (req, res) => {
+                                log3("GET /mfa/:data called");
+                                const { data } = req.params;
+                                log6("MFA code: " + data);
+                                res.send(data);
+                                retData = data;
+                            });
+                            let waitCount = 0;
+                            while (retData == "") {
+                                if (waitCount++ > 60 * 5) {
+                                    log1("getUsersLikesData(): Timed out waiting for MFA code.");
+                                    break;
+                                }
+                                await waitSeconds(1);
+                            }
+                            return retData;
+                        };
+                        res.send("ok");
+                    });
+                    let waitCount = 0;
+                    while (uName == "" || pWord == "") {
+                        if (waitCount++ > 60 * 5) {
+                            log1("getUsersLikesData(): Timed out waiting for login credentials.");
+                            break;
+                        }
+                        await waitSeconds(1);
+                    }
+                    return { uName, pWord, mfaCb };
+                }
+                await this.loginToMJ(uNamePWordCb).catch((err) => {
+                    log0("getUsersLikesData() error. Not logged into MJ. Error: " + err);
+                    reject("Not logged into MJ. Error: " + err);
+                });
+            }
+            let waitCount = 0;
+            while (this.loginInProgress) {
+                await waitSeconds(1);
+                waitCount++;
+                if (waitCount > 60 * 5) {
+                    log0("getUsersLikesData() error. Login in progress for too long");
+                    reject("Login in progress for too long");
+                }
+            }
+            await waitSeconds(2);
+            this.page?.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 }).then(async () => {
+                log6("Navigated to MJ home page.");
+                log6("Getting user's likes data.");
+                let data = await this.page.evaluate(async () => {
+                    const getUserUUID = async () => {
+                        let homePage = await fetch("https://www.midjourney.com/imagine");
+                        let homePageText = await homePage.text();
+                        let nextDataIndex = homePageText.indexOf("__NEXT_DATA__");
+                        let nextData = homePageText.substring(nextDataIndex);
+                        let startOfScript = nextData.indexOf("json\">");
+                        let endOfScript = nextData.indexOf("</script>");
+                        let script = nextData.substring(startOfScript + 6, endOfScript);
+                        let json = script.substring(script.indexOf("{"), script.lastIndexOf("}") + 1);
+                        let data = JSON.parse(json);
+                        imagineProps = data.props;
+                        let userUUID = data.props.initialAuthUser.midjourney_id;
+                        return userUUID;
+                    }
+                    let userUUID = await getUserUUID();
+                    let numberOfLikesReturned = 0;
+                    let page = "";
+                    let loopCount = 0;
+                    let returnedData = [];
+                    do {
+                        // let response = await fetch("https://www.midjourney.com/api/pg/thomas-likes?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
+
+                        let response = await fetch("https://www.midjourney.com/api/pg/user-likes?" + (page == "" ? "" : "&page=" + page + "&_ql=explore"), {
+                            "headers": {
+                                "accept": "*/*",
+                                "accept-language": "en-US,en;q=0.9",
+                                "cache-control": "no-cache",
+                                "content-type": "application/json",
+                                "pragma": "no-cache",
+                                "sec-ch-ua": "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
+                                "sec-ch-ua-mobile": "?0",
+                                "sec-ch-ua-platform": "\"Windows\"",
+                                "sec-fetch-dest": "empty",
+                                "sec-fetch-mode": "cors",
+                                "sec-fetch-site": "same-origin",
+                                "x-csrf-protection": "1"
+                            },
+                            "referrer": "https://www.midjourney.com/explore?tab=likes",
+                            "referrerPolicy": "origin-when-cross-origin",
+                            "body": null,
+                            "method": "GET",
+                            "mode": "cors",
+                            "credentials": "include"
+                        });
+
+                        let data = await response.json();
+                        // log2({data});
+                        if (data.jobs.length == 0) break;
+                        numberOfLikesReturned = data.jobs.length;
+                        // put all the returned data into the returnedData array
+                        returnedData.push(...(data.jobs));
+                        page++;
+                        loopCount++;
+                        if (loopCount > 100) {
+                            break; // if we've returned more than 1,000,000 likes, there's probably something wrong, and there's gonna be problems
+                        }
+                    } while (numberOfLikesReturned == 10000)
+                    return returnedData;
+                });
+                resolve(data);
+            }).catch((err) => {
+                log0("getUsersLikesData() error. Error: " + err);
+                systemLogger.log("getUsersLikesData() error. Error: " + err);
+                reject("Error: " + err);
+            });
+        });
+    }
+
     /**
      * @param {string} jobID 
      * @returns {Promise<object>} - the job status data
@@ -1423,6 +1571,27 @@ class DatabaseUpdateManager {
             log2(err);
             this.systemLogger.log("Error getting user's jobs data", err);
             log0(["DatabaseUpdateManager.run() error: Error getting user's jobs data", err]);
+        }).finally(() => {
+            log6("DatabaseUpdateManager.run() complete");
+            this.updateInProgress = false;
+            DatabaseUpdateManager.updateInProgress_static = false;
+            this.puppeteerClient.killBrowser();
+            this.start();
+        });
+        this.puppeteerClient.getUsersLikesData().then(async (dataTemp) => {
+            data = dataTemp;
+            log4(typeof data);
+            log4("Size of data: ", data.length, "\nCalling buildImageData()");
+            let imageData = buildImageData(data);
+            log2("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
+            for (let i = 0; i < imageData.length; i++) {
+                if (updateDB) await imageDB.insertImage(imageData[i], i);
+            }
+            log2("Done updating database");
+        }).catch((err) => {
+            log2(err);
+            this.systemLogger.log("Error getting user's likes data", err);
+            log0(["DatabaseUpdateManager.run() error: Error getting user's likes data", err]);
         }).finally(() => {
             log6("DatabaseUpdateManager.run() complete");
             this.updateInProgress = false;
