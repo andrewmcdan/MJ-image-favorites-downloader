@@ -1561,7 +1561,7 @@ class DatabaseUpdateManager {
         log6("DatabaseUpdateManager.run() complete");
     }
     async updateUsersJobs(){
-        this.puppeteerClient.getUsersJobsData().then(async (data) => {
+        await this.puppeteerClient.getUsersJobsData().then(async (data) => {
             log4(typeof data);
             log4("Size of data: ", data.length, "\nCalling buildImageData()");
             let imageData = buildImageData(data);
@@ -1875,7 +1875,7 @@ class DownloadManager {
     }
 
     checkFileExistsPath(path) {
-        log5("DownloadManager.checkFileExistsPath() called");
+        log6("DownloadManager.checkFileExistsPath() called");
         log6("DownloadManager.checkFileExistsPath()\npath: " + path);
         if (typeof path !== "string") {
             log1("DownloadManager.checkFileExistsPath() warning: path is not a string. path: " + path);
