@@ -1540,7 +1540,7 @@ class DatabaseUpdateManager {
         log6("DatabaseUpdateManager.start() complete");
     }
 
-    run() {
+    async run() {
         log5("DatabaseUpdateManager.run() called");
         if (!this.runEnabled) {
             log1("DatabaseUpdateManager.run() warning: Run is disabled. Run will not start.");
@@ -1556,9 +1556,12 @@ class DatabaseUpdateManager {
         this.updateInProgress = true;
         DatabaseUpdateManager.updateInProgress_static = true;
         log6("DatabaseUpdateManager.run() updateInProgress: " + this.updateInProgress);
-        let data;
-        this.puppeteerClient.getUsersJobsData().then(async (dataTemp) => {
-            data = dataTemp;
+        await this.updateUsersJobs();
+        await this.updateUsersLikes();
+        log6("DatabaseUpdateManager.run() complete");
+    }
+    async updateUsersJobs(){
+        this.puppeteerClient.getUsersJobsData().then(async (data) => {
             log4(typeof data);
             log4("Size of data: ", data.length, "\nCalling buildImageData()");
             let imageData = buildImageData(data);
@@ -1578,8 +1581,9 @@ class DatabaseUpdateManager {
             this.puppeteerClient.killBrowser();
             this.start();
         });
-        this.puppeteerClient.getUsersLikesData().then(async (dataTemp) => {
-            data = dataTemp;
+    }
+    async updateUsersLikes(){
+        await this.puppeteerClient.getUsersLikesData().then(async (data) => {
             log4(typeof data);
             log4("Size of data: ", data.length, "\nCalling buildImageData()");
             let imageData = buildImageData(data);
