@@ -1561,6 +1561,7 @@ class DatabaseUpdateManager {
         log6("DatabaseUpdateManager.run() complete");
     }
     async updateUsersJobs(){
+        log5("DatabaseUpdateManager.updateUsersJobs() called");
         await this.puppeteerClient.getUsersJobsData().then(async (data) => {
             log4(typeof data);
             log4("Size of data: ", data.length, "\nCalling buildImageData()");
@@ -1583,6 +1584,7 @@ class DatabaseUpdateManager {
         });
     }
     async updateUsersLikes(){
+        log5("DatabaseUpdateManager.updateUsersLikes() called");
         await this.puppeteerClient.getUsersLikesData().then(async (data) => {
             log4(typeof data);
             log4("Size of data: ", data.length, "\nCalling buildImageData()");
