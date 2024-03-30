@@ -809,38 +809,31 @@ class PuppeteerClient {
                     }
                     let userUUID = await getUserUUID();
                     let numberOfLikesReturned = 0;
-                    let page = "";
+                    let page = 1;
                     let loopCount = 0;
                     let returnedData = [];
                     do {
                         // let response = await fetch("https://www.midjourney.com/api/pg/thomas-likes?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
 
-                        let response = await fetch("https://www.midjourney.com/api/pg/user-likes?" + (page == "" ? "" : "&page=" + page + "&_ql=explore"), {
+                        let response = await fetch("https://www.midjourney.com/api/pg/user-likes?page=" + page + "&_ql=explore", {
                             "headers": {
-                                "accept": "*/*",
-                                "accept-language": "en-US,en;q=0.9",
-                                "cache-control": "no-cache",
-                                "content-type": "application/json",
-                                "pragma": "no-cache",
-                                "sec-ch-ua": "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
+                                "sec-ch-ua": "\"Google Chrome\";v=\"123\", \"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"123\"",
                                 "sec-ch-ua-mobile": "?0",
                                 "sec-ch-ua-platform": "\"Windows\"",
-                                "sec-fetch-dest": "empty",
-                                "sec-fetch-mode": "cors",
-                                "sec-fetch-site": "same-origin",
-                                "x-csrf-protection": "1"
+                                "x-csrf-protection": "1",
+                                "Referer": "https://www.midjourney.com/explore?tab=likes",
+                                "Referrer-Policy": "origin-when-cross-origin"
                             },
-                            "referrer": "https://www.midjourney.com/explore?tab=likes",
-                            "referrerPolicy": "origin-when-cross-origin",
                             "body": null,
-                            "method": "GET",
-                            "mode": "cors",
-                            "credentials": "include"
+                            "method": "GET"
                         });
 
                         let data = await response.json();
                         // log2({data});
-                        if (data.jobs.length == 0) break;
+                        if (data.jobs.length == 0) {
+                            log3("No likes returned.");
+                            break;
+                        }
                         numberOfLikesReturned = data.jobs.length;
                         // put all the returned data into the returnedData array
                         returnedData.push(...(data.jobs));
@@ -849,7 +842,7 @@ class PuppeteerClient {
                         if (loopCount > 100) {
                             break; // if we've returned more than 1,000,000 likes, there's probably something wrong, and there's gonna be problems
                         }
-                    } while (numberOfLikesReturned == 10000)
+                    } while (numberOfLikesReturned == 50)
                     return returnedData;
                 });
                 resolve(data);
