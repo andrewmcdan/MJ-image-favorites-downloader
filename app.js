@@ -48,7 +48,6 @@ require('winston-daily-rotate-file');
 const Transport = require('winston-transport');
 const util = require('util');
 const { spawn } = require('child_process');
-const { log } = require('console');
 
 let logLevel = process.env.mj_dl_server_log_level | 0;
 if (typeof logLevel === "string") logLevel = parseInt(logLevel);
@@ -793,21 +792,6 @@ class PuppeteerClient {
                 log6("Navigated to MJ home page.");
                 log6("Getting user's likes data.");
                 let data = await this.page.evaluate(async () => {
-                    const getUserUUID = async () => {
-                        let homePage = await fetch("https://www.midjourney.com/imagine");
-                        let homePageText = await homePage.text();
-                        let nextDataIndex = homePageText.indexOf("__NEXT_DATA__");
-                        let nextData = homePageText.substring(nextDataIndex);
-                        let startOfScript = nextData.indexOf("json\">");
-                        let endOfScript = nextData.indexOf("</script>");
-                        let script = nextData.substring(startOfScript + 6, endOfScript);
-                        let json = script.substring(script.indexOf("{"), script.lastIndexOf("}") + 1);
-                        let data = JSON.parse(json);
-                        imagineProps = data.props;
-                        let userUUID = data.props.initialAuthUser.midjourney_id;
-                        return userUUID;
-                    }
-                    let userUUID = await getUserUUID();
                     let numberOfLikesReturned = 0;
                     let page = 1;
                     let loopCount = 0;
@@ -830,17 +814,14 @@ class PuppeteerClient {
 
                         let data = await response.json();
                         // log2({data});
-                        if (data.jobs.length == 0) {
-                            log3("No likes returned.");
-                            break;
-                        }
+                        if (data.jobs.length == 0) break;
                         numberOfLikesReturned = data.jobs.length;
                         // put all the returned data into the returnedData array
                         returnedData.push(...(data.jobs));
                         page++;
                         loopCount++;
-                        if (loopCount > 100) {
-                            break; // if we've returned more than 1,000,000 likes, there's probably something wrong, and there's gonna be problems
+                        if (loopCount > 10000) {
+                            break; // if we've returned more than 500,000 likes, there's probably something wrong, and there's gonna be problems
                         }
                     } while (numberOfLikesReturned == 50)
                     return returnedData;
@@ -1563,23 +1544,23 @@ class DatabaseUpdateManager {
             for (let i = 0; i < imageData.length; i++) {
                 if (updateDB) await imageDB.insertImage(imageData[i], i);
             }
-            log2("Done updating database");
+            // log2("Done updating database");
         }).catch((err) => {
             log2(err);
             this.systemLogger.log("Error getting user's jobs data", err);
             log0(["DatabaseUpdateManager.run() error: Error getting user's jobs data", err]);
         }).finally(() => {
             log6("DatabaseUpdateManager.run() complete");
-            this.updateInProgress = false;
-            DatabaseUpdateManager.updateInProgress_static = false;
-            this.puppeteerClient.killBrowser();
-            this.start();
+            // this.updateInProgress = false;
+            // DatabaseUpdateManager.updateInProgress_static = false;
+            // this.puppeteerClient.killBrowser();
+            // this.start();
         });
     }
     async updateUsersLikes(){
         log5("DatabaseUpdateManager.updateUsersLikes() called");
         await this.puppeteerClient.getUsersLikesData().then(async (data) => {
-            log4(typeof data);
+            log4("typeof data: " + typeof data);
             log4("Size of data: ", data.length, "\nCalling buildImageData()");
             let imageData = buildImageData(data);
             log2("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
