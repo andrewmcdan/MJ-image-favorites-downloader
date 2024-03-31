@@ -5,7 +5,7 @@ This is a node.js application that helps you download all or some of your genera
 ### Slideshow Demo
 <p align="center">
   <a href="https://youtu.be/9X8lLNcTQQE">
-    <img src="https://i.ibb.co/Nsk7NCX/screen-capture.gif" width="480" alt="Midjourney Slideshow Demo" />
+    <img src="https://github.com/andrewmcdan/readme-assets/blob/main/Midjourney_Image_Favorites_Downloader_Slideshow.gif?raw=true" width="480" alt="Midjourney Slideshow Demo" />
   </a>
 </p>
 
@@ -15,6 +15,7 @@ Most of the intended functionality is working. There are a few quality of life g
 1. Automatic creation of database table with correct schema
 2. Easy configuration of database credentials
 3. AI upscaling currently not working
+4. "Tools" page currently out of date and not working
 
 ## Prerequisites
 1. Something that can run Node.js
@@ -120,6 +121,34 @@ As you can see above, this will set the server port, the logging level (0-6), en
 
 ## The Home Page
 When you point your browser at http://{ip-of-your-server}:3000 you'll be greeted with the somewhat simplistic interface to control the server. 
+
+<p align="center">
+  <img src="https://github.com/andrewmcdan/readme-assets/blob/main/mj-downloader.lan.png?raw=true" width="700" />
+</p>
+
+### "Status"
+Provides basic information about the server.
+### "Links"
+Provides links to:
+- Slide show page: This is the slide show that is demo'ed at the top of this ReadMe
+- Images page: Here you can select the images that you want the server to download
+- Tools: NOT WORKING
+- Status: This returns a JSON string that shows a bunch of info about the server
+### Config
+- Set Run Enabled: Download, DB Update (database update), upscale update. Each of these sets the enabled state for their respective feature. 
+### Triggers
+- Download Run: Trigger the download to run. This normally runs at 1AM, but you can trigger it manually here.
+- DB Update Run: Trigger the DB Update to run. This normally runs at midnight. Triggering it manually is useful to ensure that it has credentials stored for Midjourney. 
+- Upscale Run: NOT WORKING
+- Save Settings: NOT WORKING
+- Reset Select Count: Each image in the database get a count of the number of times it is selected for a slideshow. Click this button to reset all the selection counts.
+### Credentials
+When needed, you should enter you Midjourney / Discord credentials here, then click login. Look for a message from the server indicating that credentials are needed. Multifactor Authentication is supported.
+### Server Message Area
+Messages form the server will show up beneath everything else, as well on any slideshow instances. Deleting a message on the home page will remove them from all the slideshow instances. If you are running a slideshow on something with a mouse, you can delete them there.
+
+## SlideShows
+My ultimate goal with this project was to get the images from Midjourney to my TV as a slideshow. To that end, I also created a [slideshow manager for the Raspberry Pi.](https://github.com/andrewmcdan/mj-launcher)
 
 ## Issues and PR's
 
