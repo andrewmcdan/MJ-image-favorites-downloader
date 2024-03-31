@@ -17,6 +17,7 @@ Most of the intended functionality is working. There are a few quality of life g
 3. Customization of the output folder
 4. AI upscaling currently not working
 5. "Tools" page currently out of date and not working
+6. One day I might Docker-ize this app
 
 ## Prerequisites
 1. Something that can run Node.js
@@ -106,7 +107,7 @@ In order for this to work, you'll have to install xvfb with:
 sudo apt install xvfb
 ```
 
-The easiest way to run this application persistently is with PM2. [See the PM2 docs for more on how to set that up.](https://pm2.keymetrics.io/docs/usage/quick-start/) Once PM2 is set up, you can use a bash script to start the MJ Image Favorites Downloader app with all the necessary environment variables and xvfb command.
+The easiest way to run this application persistently is with PM2. [See the PM2 docs for more on how to set that up.](https://pm2.keymetrics.io/docs/usage/quick-start/) Once PM2 is set up, you can use a bash script to start the MJ Image Favorites Downloader app with all the necessary environment variables and xvfb command. Just save the bash script below, use PM2 to start that bash script, and then run "pm2 save" to make it persistent.
 
 ```bash
 #!/bin/bash
@@ -150,11 +151,18 @@ When needed, you should enter you Midjourney / Discord credentials here, then cl
 ### Server Message Area
 Messages form the server will show up beneath everything else, as well on any slideshow instances. Deleting a message on the home page will remove them from all the slideshow instances. If you are running a slideshow on something with a mouse, you can delete them there.
 
+## Images Page
+On the "Images" page, select the images you want to have downloaded, click "Mark Selected for Download", and then click "Update Metadata on Server". Do the same for the images you want to **not** have downloaded, but click "Mark Selected to NOT be Download". Once you've done this for all the images, and you have only a blank page, that means all of your images that you have generated or liked on Midjourney have been marked, either for download or not. At this point, you can either wait until the next so that the server has a chance to download all the images at night, or go back and click "Download Run" to trigger the downloads. 
+
+> Note: "Load All Images...." is not currently working.
+
 ## SlideShows
+The slideshow pulls a random image from the database on each iteration with a ***very strong***  inclination towards those images that have been selected the fewest number of times. This results in new additions to the slideshow being shown until their "selection count" reaches the same level as the existing images. If you find that you are only seeing the new images, and you want to see all the images in a slideshow, simply use the "Reset Select Count" button on the home page.
+
 My ultimate goal with this project was to get the images from Midjourney to my TV as a slideshow. To that end, I also created a [slideshow manager for the Raspberry Pi.](https://github.com/andrewmcdan/mj-launcher)
 
 ## Issues and PR's
-This was a weekend project, so there's no polish to it. If you want to submit an issue or PR, feel free. 
+This was a weekend project turned short-term-obsession, so there's no polish to it, and parts are a bit hacky. If you want to submit an issue or PR, feel free. 
 
 ## A note on Midjourney's ToS
 Midjourney's terms of service state that you are not allowed to access their service(s) with automated tools. So, the use of this project almost certainly violates their ToS and may get you banned. USE AT YOUR OWN RISK!!
