@@ -1530,7 +1530,7 @@ class DatabaseUpdateManager {
         this.updateInProgress = true;
         DatabaseUpdateManager.updateInProgress_static = true;
         log6("DatabaseUpdateManager.run() updateInProgress: " + this.updateInProgress);
-        await this.updateUsersJobs();
+        // await this.updateUsersJobs();
         await this.updateUsersLikes();
         log6("DatabaseUpdateManager.run() complete");
     }
