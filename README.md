@@ -14,8 +14,9 @@ This is a node.js application that helps you download all or some of your genera
 Most of the intended functionality is working. There are a few quality of life goals still to be attained, but this project is deployable. The following have not yet been implemented:
 1. Automatic creation of database table with correct schema
 2. Easy configuration of database credentials
-3. AI upscaling currently not working
-4. "Tools" page currently out of date and not working
+3. Customization of the output folder
+4. AI upscaling currently not working
+5. "Tools" page currently out of date and not working
 
 ## Prerequisites
 1. Something that can run Node.js
@@ -59,6 +60,8 @@ MJ Image Favorites Downloader expects to find a Postgres server with the followi
 > - password: 'mjImagesPassword',
 > - port: 9543,
 
+Finding the lines in the code to customize this shouldn't be too terribly difficult, but making this easier to configure is one of the quality of life goals, as mentioned above.
+
 You will have to create the database mjimages then you can use the following SQL to set up the schema:
 ```sql
 CREATE TABLE public.images (
@@ -87,7 +90,7 @@ CREATE INDEX temp_table_index_idx ON public.images USING btree (index);
 CREATE INDEX temp_table_upscale_location_storage_location_idx ON public.images USING btree (upscale_location, storage_location);
 ```
 
-At this point, if you are running this on Windows desktop or Linux desktop, "node app.js" then point your browser to the server: 
+At this point, if you are running this on Windows desktop or Linux desktop, run "node app.js" then point your browser to the server: 
 
 http://{ip-of-your-server}:3000
 
@@ -151,5 +154,7 @@ Messages form the server will show up beneath everything else, as well on any sl
 My ultimate goal with this project was to get the images from Midjourney to my TV as a slideshow. To that end, I also created a [slideshow manager for the Raspberry Pi.](https://github.com/andrewmcdan/mj-launcher)
 
 ## Issues and PR's
-
 This was a weekend project, so there's no polish to it. If you want to submit an issue or PR, feel free. 
+
+## A note on Midjourney's ToS
+Midjourney's terms of service state that you are not allowed to access their service(s) with automated tools. So, the use of this project almost certainly violates their ToS and may get you banned. USE AT YOUR OWN RISK!!
