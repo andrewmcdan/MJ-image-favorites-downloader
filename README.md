@@ -3,7 +3,12 @@
 This is a node.js application that helps you download all or some of your generated images and liked images from Midjourney. Although there are other ways to download Midjourney images, this provides a way to easily browse through all of your generated and liked images and select only the ones that you want to download. It is intended to run on something like Ubuntu Server in a headless environment, and it provides a web interface with a slideshow page.
 
 ### Slideshow Demo
-[![Demo Midjourney Slideshow Demo](https://github.com/andrewmcdan/MJ-image-favorites-downloader/blob/main/Midjourney_Image_Favorites_Downloader_Slideshow.gif?raw=true)](https://youtu.be/9X8lLNcTQQE)
+<p align="center">
+  <a href="https://youtu.be/9X8lLNcTQQE">
+    <img src="https://github.com/andrewmcdan/MJ-image-favorites-downloader/blob/main/Midjourney_Image_Favorites_Downloader_Slideshow.gif?raw=true" width="480" alt="Midjourney Slideshow Demo" />
+  </a>
+</p>
+
 
 ## State of the Project
 Most of the intended functionality is working. There are a few quality of life goals still to be attained, but this project is deployable. The following have not yet been implemented:
