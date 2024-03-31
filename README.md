@@ -5,7 +5,7 @@ This is a node.js application that helps you download all or some of your genera
 ### Slideshow Demo
 <p align="center">
   <a href="https://youtu.be/9X8lLNcTQQE">
-    <img src="https://github.com/andrewmcdan/MJ-image-favorites-downloader/blob/main/Midjourney_Image_Favorites_Downloader_Slideshow.gif?raw=true" width="480" alt="Midjourney Slideshow Demo" />
+    <img src="https://i.ibb.co/Nsk7NCX/screen-capture.gif" width="480" alt="Midjourney Slideshow Demo" />
   </a>
 </p>
 
@@ -117,6 +117,9 @@ xvfb-run -a --server-args="-screen 0 1920x1080x24 -ac -nolisten tcp -dpi 96 +ext
 ```
 
 As you can see above, this will set the server port, the logging level (0-6), enabled DB update, and enabled download verification on startup. "OMP_NUM_THREADS" sets the max number of threads for AI upscaling.
+
+## The Home Page
+When you point your browser at http://{ip-of-your-server}:3000 you'll be greeted with the somewhat simplistic interface to control the server. 
 
 ## Issues and PR's
 
