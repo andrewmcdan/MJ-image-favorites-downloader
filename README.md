@@ -159,7 +159,7 @@ On the "Images" page, select the images you want to have downloaded, click "Mark
 ## SlideShows
 The slideshow pulls a random image from the database on each iteration with a ***very strong***  inclination towards those images that have been selected the fewest number of times. This results in new additions to the slideshow being shown until their "selection count" reaches the same level as the existing images. If you find that you are only seeing the new images, and you want to see all the images in a slideshow, simply use the "Reset Select Count" button on the home page.
 
-My ultimate goal with this project was to get the images from Midjourney to my TV as a slideshow. To that end, I also created a [slideshow manager for the Raspberry Pi.](https://github.com/andrewmcdan/mj-launcher)
+My ultimate goal with this project was to get the images from Midjourney to my TV as a slideshow. To that end, I also created a [slideshow launcher for the Raspberry Pi.](https://github.com/andrewmcdan/mj-launcher)
 
 ## Issues and PR's
 This was a weekend project turned short-term-obsession, so there's no polish to it, and parts are a bit hacky. If you want to submit an issue or PR, feel free. 
