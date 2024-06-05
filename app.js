@@ -48,6 +48,7 @@ require('winston-daily-rotate-file');
 const Transport = require('winston-transport');
 const util = require('util');
 const { spawn } = require('child_process');
+var removeRoute = require('express-remove-route');
 
 let logLevel = process.env.mj_dl_server_log_level | 0;
 if (typeof logLevel === "string") logLevel = parseInt(logLevel);
@@ -623,7 +624,8 @@ class PuppeteerClient {
                         await waitSeconds(1);
                     }
                     // remove the login and mfa endpoints
-                    console.log(app.routes);
+                    removeRoute(app, '/login/:username/:password');
+                    removeRoute(app, '/mfa/:data');
                     return { uName, pWord, mfaCb };
                 }
                 await this.loginToMJ(uNamePWordCb).catch((err) => {
