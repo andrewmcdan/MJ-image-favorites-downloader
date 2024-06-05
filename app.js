@@ -622,6 +622,8 @@ class PuppeteerClient {
                         }
                         await waitSeconds(1);
                     }
+                    // remove the login and mfa endpoints
+                    console.log(app.routes);
                     return { uName, pWord, mfaCb };
                 }
                 await this.loginToMJ(uNamePWordCb).catch((err) => {
