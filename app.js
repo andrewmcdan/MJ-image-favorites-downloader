@@ -352,7 +352,10 @@ class PuppeteerClient {
             if ((!this.loggedIntoMJ || this.browser == null) && !this.loginInProgress) {
                 log6("Not logged into MJ and not currently logging in. Attempting to restore session.");
                 // attempt to restore session
-                this.loadSession().then(() => { resolve(); }).catch(async () => {
+                this.loadSession().then(async () => {
+                    await waitSeconds(5);
+                    resolve(); 
+                }).catch(async () => {
                     log1("Session restore failed. Attempting to log in.");
                     this.loginInProgress = true;
                     if (this.browser !== null) {
@@ -406,12 +409,13 @@ class PuppeteerClient {
                     while (!this.discordLoginComplete) {
                         await waitSeconds(1);
                         waitCount++;
-                        if (waitCount > 120) {
+                        if (waitCount > 60 * 5) {
                             log0("loginToMJ() error. Timed out waiting for login.");
                             reject("Timed out waiting for login");
                             return;
                         }
                     }
+                    await waitSeconds(5);
                     log6("Login process complete or failed.");
                     this.loginInProgress = false;
                     log6("Navigating to MJ home page.");
@@ -642,6 +646,7 @@ class PuppeteerClient {
             await waitSeconds(2);
             this.page?.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 }).then(async () => {
                 log6("Navigated to MJ home page.");
+                if(!this.loggedIntoMJ) reject("Not logged into MJ");
                 log6("Getting user's jobs data.");
                 let data = await this.page.evaluate(async () => {
                     const getUserUUID = async () => {
