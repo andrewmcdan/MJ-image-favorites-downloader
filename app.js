@@ -388,7 +388,7 @@ class PuppeteerClient {
                     });
 
                     log6("Navigating to MJ home page.");
-                    await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
+                    await this.page.goto('https://www.midjourney.com/', { waitUntil: 'networkidle2', timeout: 60000 });
                     log6("Navigated to MJ home page.");
                     // let html = await this.page.content();
                     await waitSeconds(5);  
