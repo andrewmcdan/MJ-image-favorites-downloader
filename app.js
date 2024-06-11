@@ -314,10 +314,10 @@ class PuppeteerClient {
             await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
             let discordPage = await this.browser.newPage();
             await discordPage.goto('https://discord.com/');
-            // await waitSeconds(1);
+            await waitSeconds(1);
             await this.page.setCookie(...this.mj_cookies);
             await discordPage.setCookie(...this.discord_cookies);
-            // await waitSeconds(1);
+            await waitSeconds(1);
             log6("Cookies set.");
             log6("Closing discord page.");
             await discordPage?.close();
@@ -325,7 +325,7 @@ class PuppeteerClient {
 
             log6("Navigating to MJ home page.");
             await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
-            // await waitSeconds(2);
+            await waitSeconds(2);
             if (this.page.url().includes("https://www.midjourney.com/imagine")) {
                 log6("Successfully navigated to MJ home page.");
                 log6("Session restore successful.");
@@ -387,8 +387,8 @@ class PuppeteerClient {
                     log6("Navigating to MJ home page.");
                     await this.page.goto('https://www.midjourney.com/home', { waitUntil: 'networkidle2', timeout: 60000 });
                     log6("Navigated to MJ home page.");
-                    let html = await this.page.content();
-                    // await waitSeconds(5);  
+                    // let html = await this.page.content();
+                    await waitSeconds(5);  
                     log6("Moving mouse to (0,0) and then to (100,100) to make sure the 'Sign In' button appears.")
                     await this.page.mouse.move(0, 0);
                     await this.page.mouse.move(100, 100);
@@ -401,7 +401,7 @@ class PuppeteerClient {
                         log0("loginToMJ() error. Sign In button not found.");
                         reject("Sign In button not found");
                     });
-                    // await waitSeconds(1);
+                    await waitSeconds(1);
                     let waitCount = 0;
                     while (!this.discordLoginComplete) {
                         await waitSeconds(1);
@@ -415,12 +415,12 @@ class PuppeteerClient {
                     log6("Login process complete or failed.");
                     this.loginInProgress = false;
                     log6("Navigating to MJ home page.");
-                    await this.page.goto('https://www.midjourney.com/imagine', { waitUntil: 'networkidle2', timeout: 60000 });
+                    await this.page.goto('https://www.midjourney.com/explore?tab=hot', { waitUntil: 'networkidle2', timeout: 60000 });
                     await waitSeconds(5);
                     log6("Navigated to MJ home page.");
                     log6("Checking to see if login was successful by checking the URL.");
                     this.pageURL = this.page.url();
-                    if (this.pageURL.includes("imagine") || this.pageURL.includes("explore")) {
+                    if (this.pageURL.includes("https://www.midjourney.com/imagine") || this.pageURL.includes("https://www.midjourney.com/explore")) {
                         log6("Login successful.");
                         this.loggedIntoMJ = true;
                         log6("Getting/saving cookies and local/session storage.");
@@ -623,9 +623,6 @@ class PuppeteerClient {
                         }
                         await waitSeconds(1);
                     }
-                    // remove the login and mfa endpoints
-                    removeRoute(app, '/login/:username/:password');
-                    removeRoute(app, '/mfa/:data');
                     return { uName, pWord, mfaCb };
                 }
                 await this.loginToMJ(uNamePWordCb).catch((err) => {
