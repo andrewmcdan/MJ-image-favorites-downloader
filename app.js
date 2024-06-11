@@ -419,7 +419,7 @@ class PuppeteerClient {
                     log6("Login process complete or failed.");
                     this.loginInProgress = false;
                     log6("Navigating to MJ home page.");
-                    await this.page.goto('https://www.midjourney.com/explore?tab=hot', { waitUntil: 'networkidle2', timeout: 60000 });
+                    // await this.page.goto('https://www.midjourney.com/explore?tab=hot', { waitUntil: 'networkidle2', timeout: 60000 });
                     await waitSeconds(5);
                     log6("Navigated to MJ home page.");
                     log6("Checking to see if login was successful by checking the URL.");
