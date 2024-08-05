@@ -50,12 +50,12 @@ const util = require("util");
 const { spawn } = require("child_process");
 var removeRoute = require("express-remove-route");
 
-let logLevel = process.env.mj_dl_server_log_level | 0;
+let logLevel = process.env.mj_dl_server_log_level ?? 0;
 if (typeof logLevel === "string") logLevel = parseInt(logLevel);
-let updateDB = process.env.mj_dl_server_updateDB | true;
+let updateDB = process.env.mj_dl_server_updateDB ?? true;
 if (typeof updateDB === "string") updateDB = updateDB === "true";
 let verifyDownloadsOnStartup =
-    process.env.mj_dl_server_verifyDlOnStartup | true;
+    process.env.mj_dl_server_verifyDlOnStartup ?? true;
 if (typeof verifyDownloadsOnStartup === "string")
     verifyDownloadsOnStartup = verifyDownloadsOnStartup === "true";
 
@@ -2634,7 +2634,7 @@ class DownloadManager {
             return true;
         }
         let success = true;
-        for (let i = 0; i < images.length; i++) {
+        for (const element of images) {
             while (this.concurrentDownloads >= 10) await waitSeconds(1);
             (async (image) => {
                 image = new ImageInfo(
@@ -2731,7 +2731,7 @@ class DownloadManager {
                         return;
                     }
                 }
-            })(images[i]);
+            })(element);
         }
         log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
         return success;
@@ -2798,8 +2798,8 @@ class DownloadManager {
             );
             if (images === undefined) continue;
             if (images === null) continue;
-            for (let p = 0; p < images.length; p++) {
-                let image = images[p];
+            for (const element of images) {
+                let image = element;
                 if (image === undefined) continue;
                 if (image === null) continue;
                 if (image.downloaded !== true) {
