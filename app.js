@@ -693,16 +693,7 @@ class PuppeteerClient {
         log6("Username and password typed.");
         await waitSeconds(1);
         await googleLoginPage.keyboard.press("Enter");
-        await waitSeconds(1);
-        log6("Waiting for authorize button.");
-        await googleLoginPage.waitForSelector(
-            'div[id="submit_approve_access"]',
-            { timeout: 60000 }
-        );
-        log6("Authorize button found. Clicking authorize button.");
-        await googleLoginPage.click('div[id="submit_approve_access"]');
-        await waitSeconds(3);
-        log6("Authorize button clicked.");
+        await waitSeconds(10);
         this.googleLoginComplete = true;
     }
 
