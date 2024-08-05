@@ -308,6 +308,7 @@ class PuppeteerClient {
         this.discord_localStorage = null;
         this.discord_sessionStorage = null;
         this.discordLoginComplete = false;
+        this.googleLoginComplete = false;
     }
 
     /**
@@ -523,7 +524,7 @@ class PuppeteerClient {
                                 reject("Continue with Google button not found");
                             });
                         let waitCount = 0;
-                        while (!this.discordLoginComplete) {
+                        while (!this.discordLoginComplete && !this.googleLoginComplete) {
                             await waitSeconds(1);
                             waitCount++;
                             if (waitCount > 60 * 5) {
