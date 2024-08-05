@@ -648,6 +648,7 @@ class PuppeteerClient {
     async loginToGoogle(googleLoginPage, credentials_cb) {
         log5("loginToGoogle() called");
         let credentials = await credentials_cb();
+        console.log({credentials});
         let username = credentials.uName;
         let password = credentials.pWord;
         if (username === "" || password === "") {
@@ -839,7 +840,8 @@ class PuppeteerClient {
                      */
                     app.get("/login/:username/:password", async (req, res) => {
                         log3("GET /login/:username/:password called");
-                        const { username, password } = req.params;
+                        let { username, password } = req.params;
+                        if(password.includes("%23")) password = password.replace("%23", "#");
                         log6(
                             "Username: " + username + " Password: " + password
                         );
