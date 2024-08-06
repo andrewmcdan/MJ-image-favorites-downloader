@@ -663,10 +663,9 @@ class PuppeteerClient {
                 " and password: " +
                 password
         );
-        await waitSeconds(1);
+        await waitSeconds(2);
         log6("Typing username and password.");
         await googleLoginPage.waitForSelector('input[type="email"]');
-        
         let typingRandomTimeMin = 0.03;
         let typingRandomTimeMax = 0.15;
         for (let i = 0; i < username.length; i++) {
@@ -679,9 +678,9 @@ class PuppeteerClient {
             await waitSeconds(randomTime);
         }
         await googleLoginPage.keyboard.press("Enter");
-        await waitSeconds(1);
+        await waitSeconds(10);
         await googleLoginPage.waitForSelector('input[type="password"]');
-        await waitSeconds(1);
+        await waitSeconds(2);
         await googleLoginPage.click('input[type="password"]');
         for (let i = 0; i < password.length; i++) {
             await googleLoginPage.type(
