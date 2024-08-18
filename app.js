@@ -1100,6 +1100,7 @@ class PuppeteerClient {
                 }
             }
             await waitSeconds(2);
+            let dataTemp = {};
             this.page
                 ?.goto("https://www.midjourney.com/imagine", {
                     waitUntil: "networkidle2",
@@ -1152,6 +1153,7 @@ class PuppeteerClient {
 
                             let data = await response.json();
                             // log2({data});
+                            dataTemp = data;
                             if (data.jobs.length == 0) break;
                             numberOfLikesReturned = data.jobs.length;
                             // put all the returned data into the returnedData array
@@ -1171,6 +1173,7 @@ class PuppeteerClient {
                     systemLogger.log(
                         "getUsersLikesData() error. Error: " + err
                     );
+                    systemLogger.log("dataTemp: " + JSON.stringify(dataTemp));
                     reject("Error: " + err);
                 });
         });
