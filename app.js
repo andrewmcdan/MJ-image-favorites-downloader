@@ -953,6 +953,32 @@ class PuppeteerClient {
                         let returnedData = [];
                         do {
                             // let response = await fetch("https://www.midjourney.com/api/pg/thomas-jobs?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
+                            /**
+                            fetch("https://www.midjourney.com/api/pg/thomas-jobs-update?user_id=f66ba656-fc1b-4366-8ec8-cf52cbc47309&page_size=1000&checkpoint=gAAAAABmwoA5r4mVf4U6tE79gbmtO-rRQ0vwCWzFVFH31F8BA2zymoFPiWF9_IRTx3V06qnbbaYVkK7q53EXDKpFuS1ENQ42m0MivaqVU20cw6eF2p3jXPqwFtjNgrx_gbx0tar2YHTX_ciz2YwkKI98keRwnQgj3l3p4y8JS4aVR2QZiDnodx4%3D", {
+  "headers": {
+    "accept": "* /*",
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache",
+    "content-type": "application/json",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Not)A;Brand\";v=\"99\", \"Google Chrome\";v=\"127\", \"Chromium\";v=\"127\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "x-csrf-protection": "1",
+    "cookie": "__stripe_mid=bbc83c6e-c5f2-49e9-bad1-4d56939faa84f17dd3; _ga=GA1.1.458766062.1715789235; AMP_MKTG_437c42b22c=JTdCJTdE; _gcl_au=1.1.1915153282.1724006364; darkMode=enabled; __stripe_sid=43b5c61f-c992-467d-a04a-292154a965896ce0eb; __Host-Midjourney.AuthUserToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0eXBlIjoiZmlyZWJhc2UiLCJpZFRva2VuIjoiZXlKaGJHY2lPaUpTVXpJMU5pSXNJbXRwWkNJNkltUTBNalk1WVRFM016QmxOVEEzTVRsbE5tSXhOakEyWlRReVl6TmhZak15WWpFeU9EQTBORGtpTENKMGVYQWlPaUpLVjFRaWZRLmV5SnVZVzFsSWpvaVlTNXRZMlF1SWl3aWNHbGpkSFZ5WlNJNkltaDBkSEJ6T2k4dmJHZ3pMbWR2YjJkc1pYVnpaWEpqYjI1MFpXNTBMbU52YlM5aEwwRkRaemh2WTB4SlExcFRlbXMwTlhCQ1UzQmhUR2w1UVZBNVdGTlliVmRsYTNwWU9Wb3RUVmw0TWs1eFoxVnRkMjFhTjNWQmFUZHlZVUU5Y3prMkxXTWlMQ0p0YVdScWIzVnlibVY1WDJsa0lqb2laalkyWW1FMk5UWXRabU14WWkwME16WTJMVGhsWXpndFkyWTFNbU5pWXpRM016QTVJaXdpYVhOeklqb2lhSFIwY0hNNkx5OXpaV04xY21WMGIydGxiaTVuYjI5bmJHVXVZMjl0TDJGMWRHaHFiM1Z5Ym1WNUlpd2lZWFZrSWpvaVlYVjBhR3B2ZFhKdVpYa2lMQ0poZFhSb1gzUnBiV1VpT2pFM01Ua3hOelExTWpJc0luVnpaWEpmYVdRaU9pSkVlV1psU25aS1pYWm5WbUZqTVd0T2NGWTVha3c1U1hZNE5IY3hJaXdpYzNWaUlqb2lSSGxtWlVwMlNtVjJaMVpoWXpGclRuQldPV3BNT1VsMk9EUjNNU0lzSW1saGRDSTZNVGN5TkRBeU1qYzJNeXdpWlhod0lqb3hOekkwTURJMk16WXpMQ0psYldGcGJDSTZJbUZ1WkhKbGQyMWpaR0Z1UUdkdFlXbHNMbU52YlNJc0ltVnRZV2xzWDNabGNtbG1hV1ZrSWpwMGNuVmxMQ0ptYVhKbFltRnpaU0k2ZXlKcFpHVnVkR2wwYVdWeklqcDdJbWR2YjJkc1pTNWpiMjBpT2xzaU1URXdNak16TkRZME5ERXhOekkwTVRZNU1EUTRJbDBzSW1ScGMyTnZjbVF1WTI5dElqcGJJakUzTkRJNU5UTTVNREEyT0RJM056STBPQ0pkTENKbGJXRnBiQ0k2V3lKaGJtUnlaWGR0WTJSaGJrQm5iV0ZwYkM1amIyMGlYWDBzSW5OcFoyNWZhVzVmY0hKdmRtbGtaWElpT2lKa2FYTmpiM0prTG1OdmJTSjlmUS5NcDgweGpuay1nMTdMeUxTdW1sQ2VRaXJfRUh1MUdhVXVKS2tIM3NKM1pBYVhQS3F2eFJzeHBXX1FVdWlHSUNtZXhaR3QzV0dzUUJPLTlNRUoyZVhaZkJIVF9UNGtfcGdTZ0xCdDkzVGFJWXRBQ3gzd1RGaEp3bThxRXVXWVFIUF9iRDFvVkdINjc0QTdrY2lra2dHaEg3NjJ2cGMxMTJUOXNoMVhPd3k4aW82TzZJcEROdEpEWF9nRmw0emw4ZXFMWGlUS3cwbmJPT3BOS1RvNTlPLVhPb1daRVo0bHByb190RXJzb2F4SUZuRWgtbHZsT2RpN1pDQlRGdGx3TjhVWF81eWtadWZqSFpDSUxqWUQ0bkdFLXRmSlZnOEppVzZabDQtZTU5Si1ya2Jqa3E1ZTFjMURybUQtN1BNRUFybnN1TlMyV2dHZWNCTlhsV0ZaZWNuZ2ciLCJyZWZyZXNoVG9rZW4iOiJBTWYtdkJ6bzRtYUlEUUhMektxS3REOUpTb2M0X0RGdXFzakp2YUpQSk9iQU95LTBWU2FEY0dGUVNRSmFXd1J3Vl9fc3hrNFhXNFlGR1hQazlUdm5jS2hLMEp0MVM5S0Y4UzRDVTJPa2loaHY2ZF9wang3anJ3cThVSGV5LTN3UGMwWm1pOWR3bi1PZ0xFOUhCRW0zVmhiWm9sQjVScVpHc2dvUTRESlM3Uk14N2hkVXUtUkRYWUxzdEV1ZGVKc0lqd19NQTQ3SmRXTU50Ynozd3pjOTI0WV9pLWVUQjNkTjNMcDVoSDJVSEhMcUFJTktXTUJRQmJ6b2c5Mkl3RVNmWkxCTEtWY3pUdW0xb2QtMXMtTDZPd19rTF9pTXdkMXMxaEk3MW82WE5KYjJMcmVQbnZvN0lKSlNWc3BTY0ZXSERCYXliX1phN1FsZiIsImlhdCI6MTcyNDAyMjc2M30.qk_nhNTSjO-2Ynj0H97_AslM6eFmPrKZpkuksC47dls; __cf_bm=xByCGjmELsDXZ9ZpACCfPzM3.Hv2pxU9XmMBTpzEtsE-1724022763-1.0.1.1-2XwmsB5.f7dHc5ljLUkq95z8JMQDagKcvQBWMD.EyTEARuKKuhcvvah0HvVi_1N8Nri80EBM2R1eCujwGZnHgw; AMP_437c42b22c=JTdCJTIyZGV2aWNlSWQlMjIlM0ElMjI3NzVjNzBiNC03NDNkLTQ2OWQtYWIwOC04OWQ3NzMzMWJlMjklMjIlMkMlMjJ1c2VySWQlMjIlM0ElMjJmNjZiYTY1Ni1mYzFiLTQzNjYtOGVjOC1jZjUyY2JjNDczMDklMjIlMkMlMjJzZXNzaW9uSWQlMjIlM0ExNzI0MDIxMjk3MDEyJTJDJTIyb3B0T3V0JTIyJTNBZmFsc2UlMkMlMjJsYXN0RXZlbnRUaW1lJTIyJTNBMTcyNDAyMjg0NjE5NCUyQyUyMmxhc3RFdmVudElkJTIyJTNBNDY0MCU3RA==; cf_clearance=9x71bDCGjoie3h3ETP_D7eXDbeKbUtlP7R6bv8PVl7g-1724022841-1.2.1.1-_D1xqJeq8ZUTMW.pdzHTGf.dj2Rqukh3NC0sNjbmj6wJ.jFeY6y1rOxCo5Q.5dnpkiO_o3uqL5glf32p5dn_mwDa.YMNdVzJik_mhMDjpbjGI1uve_ZeEXWsThaNujQk2dSqUKb.uzKEw5F9F5eQmQ4ltqio.LCwl4U5EnSmxawzHu2.KHimDRMbezDpiV1XUhS0MGScTFzW6MJACGj3ek5RXwP_5aPFoB6qvt.jJOV4Hyzkyd7.dV7s1kYfiGTfjciB3j2PXGzPdAbAK5XosQ5kOtJWI_URzeT4SpcxGvrnikvd2pEllehVd7DggJ0P9Rh8zQ3pDz7z4VaPbYrxf_pl8ETzoiEuCZ.hBzsWrpuBsOzGB20dEO63uKChj3nc; _ga_Q0DQ5L7K0D=GS1.1.1724021298.28.1.1724022847.0.0.0",
+    "Referer": "https://www.midjourney.com/imagine",
+    "Referrer-Policy": "origin-when-cross-origin"
+  },
+  "body": null,
+  "method": "GET"
+});
+                             */
+                            // read all cookies
+                            let cookies = document.cookie;
 
                             let response = await fetch(
                                 "https://www.midjourney.com/api/pg/thomas-jobs?user_id=" +
@@ -982,6 +1008,7 @@ class PuppeteerClient {
                                     method: "GET",
                                     mode: "cors",
                                     credentials: "include",
+                                    cookie: cookies,
                                 }
                             );
 
