@@ -946,7 +946,7 @@ class PuppeteerClient {
                                 data.props.initialAuthUser.midjourney_id;
                             return userUUID;
                         };
-                        let userUUID = await getUserUUID();
+                        let userUUID = "f66ba656-fc1b-4366-8ec8-cf52cbc47309";
                         let numberOfJobsReturned = 0;
                         let cursor = "";
                         let loopCount = 0;
