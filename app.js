@@ -1116,6 +1116,19 @@ class PuppeteerClient {
                         do {
                             // let response = await fetch("https://www.midjourney.com/api/pg/thomas-likes?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
 
+                            // fetch("https://www.midjourney.com/api/pg/user-likes?page=2&_ql=explore", {headers: {"sec-ch-ua":'"Not)A;Brand";v="99", "Google Chrome";v="127", "Chromium";v="127"',"sec-ch-ua-mobile": "?0",
+                                /*        "sec-ch-ua-platform": '"Windows"',
+                                        "x-csrf-protection": "1",
+                                        Referer:
+                                            "https://www.midjourney.com/explore?tab=likes",
+                                        "Referrer-Policy":
+                                            "origin-when-cross-origin",
+                                    },
+                                    body: null,
+                                    method: "GET",
+                                }
+                            );*/
+
                             let response = await fetch(
                                 "https://www.midjourney.com/api/pg/user-likes?page=" +
                                     page +
@@ -1123,7 +1136,7 @@ class PuppeteerClient {
                                 {
                                     headers: {
                                         "sec-ch-ua":
-                                            '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+                                            '"Google Chrome";v="127", "Not)A;Brand";v="99", "Chromium";v="123"',
                                         "sec-ch-ua-mobile": "?0",
                                         "sec-ch-ua-platform": '"Windows"',
                                         "x-csrf-protection": "1",
