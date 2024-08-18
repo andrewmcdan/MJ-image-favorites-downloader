@@ -911,7 +911,6 @@ class PuppeteerClient {
                 }
             }
             await waitSeconds(2);
-            let dataTemp = {};
             this.page
                 ?.goto("https://www.midjourney.com/imagine", {
                     waitUntil: "networkidle2",
@@ -1003,14 +1002,14 @@ class PuppeteerClient {
                                 break; // if we've returned more than 1,000,000 jobs, there's probably something wrong, and there's gonna be problems
                             }
                         } while (numberOfJobsReturned == 10000);
-                        return returnedData;
+                        return {returnedData,data};
                     });
-                    resolve(data);
+                    console.log(data.data);
+                    resolve(data.returnedData);
                 })
                 .catch((err) => {
                     log0("getUsersJobsData() error. Error: " + err);
                     systemLogger.log("getUsersJobsData() error. Error: " + err);
-                    console.log({dataTemp});
                     reject("Error: " + err);
                 });
         });
