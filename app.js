@@ -977,6 +977,7 @@ class PuppeteerClient {
                                         "sec-fetch-mode": "cors",
                                         "sec-fetch-site": "same-origin",
                                         "x-csrf-protection": "1",
+                                        "cookie": cookies,
                                     },
                                     referrer:
                                         "https://www.midjourney.com/imagine",
@@ -985,7 +986,6 @@ class PuppeteerClient {
                                     method: "GET",
                                     mode: "cors",
                                     credentials: "include",
-                                    cookie: cookies,
                                 }
                             );
 
