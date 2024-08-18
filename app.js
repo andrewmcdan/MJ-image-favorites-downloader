@@ -1031,10 +1031,9 @@ class PuppeteerClient {
                                 break; // if we've returned more than 1,000,000 jobs, there's probably something wrong, and there's gonna be problems
                             }
                         } while (numberOfJobsReturned == 10000);
-                        return {returnedData,data};
+                        return returnedData;
                     });
-                    console.log(data.data);
-                    resolve(data.returnedData);
+                    resolve(data);
                 })
                 .catch((err) => {
                     log0("getUsersJobsData() error. Error: " + err);
