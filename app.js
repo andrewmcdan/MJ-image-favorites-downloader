@@ -367,15 +367,15 @@ class PuppeteerClient {
                 waitUntil: "networkidle2",
                 timeout: 60000,
             });
-            let discordPage = await this.browser.newPage();
-            await discordPage.goto("https://discord.com/");
-            await waitSeconds(1);
-            await this.page.setCookie(...this.mj_cookies);
-            await discordPage.setCookie(...this.discord_cookies);
+            // let discordPage = await this.browser.newPage();
+            // await discordPage.goto("https://discord.com/");
+            // await waitSeconds(1);
+            // await this.page.setCookie(...this.mj_cookies);
+            // await discordPage.setCookie(...this.discord_cookies);
             await waitSeconds(1);
             log6("Cookies set.");
             log6("Closing discord page.");
-            await discordPage?.close();
+            // await discordPage?.close();
             log6("Discord page closed.");
 
             log6("Navigating to MJ home page.");
@@ -501,10 +501,11 @@ class PuppeteerClient {
                         );
                         await this.page.mouse.move(0, 0);
                         await this.page.mouse.move(100, 100);
+                        await this.page.mouse.click(100, 100);
                         await this.page.mouse.wheel({ deltaY: 100 });
-                        await waitSeconds(1);
+                        await waitSeconds(2);
                         await this.page.mouse.wheel({ deltaY: -200 });
-                        await waitSeconds(1);
+                        await waitSeconds(5);
                         log6("Clicking 'Log In' button.");
                         await this.page
                             .click("span ::-p-text(Log In)")
