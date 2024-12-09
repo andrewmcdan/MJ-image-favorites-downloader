@@ -304,10 +304,10 @@ class PuppeteerClient {
         this.mj_cookies = null;
         this.mj_localStorage = null;
         this.mj_sessionStorage = null;
-        this.discord_cookies = null;
-        this.discord_localStorage = null;
-        this.discord_sessionStorage = null;
-        this.discordLoginComplete = false;
+        // this.discord_cookies = null;
+        // this.discord_localStorage = null;
+        // this.discord_sessionStorage = null;
+        // this.discordLoginComplete = false;
         this.googleLoginComplete = false;
     }
 
@@ -327,12 +327,12 @@ class PuppeteerClient {
                 this.mj_cookies = sessionData.cookies;
                 this.mj_localStorage = sessionData.localStorage;
                 this.mj_sessionStorage = sessionData.sessionStorage;
-                sessionData = JSON.parse(
-                    fs.readFileSync("discordSession.json")
-                );
-                this.discord_cookies = sessionData.cookies;
-                this.discord_localStorage = sessionData.localStorage;
-                this.discord_sessionStorage = sessionData.sessionStorage;
+                // sessionData = JSON.parse(
+                //     fs.readFileSync("discordSession.json")
+                // );
+                // this.discord_cookies = sessionData.cookies;
+                // this.discord_localStorage = sessionData.localStorage;
+                // this.discord_sessionStorage = sessionData.sessionStorage;
                 log6("Session data loaded.");
             } else {
                 log0("LoadSession error. Session file not found.");
@@ -588,46 +588,46 @@ class PuppeteerClient {
                                 );
                             }
 
-                            log6(
-                                "Navigating to discord.com/channels/@me to get discord cookies and local/session storage."
-                            );
-                            let discordPage = await this.browser.newPage();
-                            await discordPage.goto(
-                                "https://discord.com/channels/@me"
-                            );
-                            await waitSeconds(2);
-                            log6(
-                                "Getting/saving cookies and local/session storage."
-                            );
-                            this.discord_cookies = await discordPage.cookies();
-                            this.discord_localStorage =
-                                await discordPage.evaluate(() => {
-                                    return window.localStorage;
-                                });
-                            this.discord_sessionStorage =
-                                await discordPage.evaluate(() => {
-                                    return window.sessionStorage;
-                                });
-                            try {
-                                log6("Writing discordSession.json file.");
-                                fs.writeFileSync(
-                                    "discordSession.json",
-                                    JSON.stringify({
-                                        cookies: this.discord_cookies,
-                                        localStorage: this.discord_localStorage,
-                                        sessionStorage:
-                                            this.discord_sessionStorage,
-                                    })
-                                );
-                            } catch (err) {
-                                log0(
-                                    "Error writing discordSession.json file. Error: " +
-                                        err
-                                );
-                            }
-                            await waitSeconds(15);
-                            log6("Closing discord page.");
-                            await discordPage?.close();
+                            // log6(
+                            //     "Navigating to discord.com/channels/@me to get discord cookies and local/session storage."
+                            // );
+                            // let discordPage = await this.browser.newPage();
+                            // await discordPage.goto(
+                            //     "https://discord.com/channels/@me"
+                            // );
+                            // await waitSeconds(2);
+                            // log6(
+                            //     "Getting/saving cookies and local/session storage."
+                            // );
+                            // this.discord_cookies = await discordPage.cookies();
+                            // this.discord_localStorage =
+                            //     await discordPage.evaluate(() => {
+                            //         return window.localStorage;
+                            //     });
+                            // this.discord_sessionStorage =
+                            //     await discordPage.evaluate(() => {
+                            //         return window.sessionStorage;
+                            //     });
+                            // try {
+                            //     log6("Writing discordSession.json file.");
+                            //     fs.writeFileSync(
+                            //         "discordSession.json",
+                            //         JSON.stringify({
+                            //             cookies: this.discord_cookies,
+                            //             localStorage: this.discord_localStorage,
+                            //             sessionStorage:
+                            //                 this.discord_sessionStorage,
+                            //         })
+                            //     );
+                            // } catch (err) {
+                            //     log0(
+                            //         "Error writing discordSession.json file. Error: " +
+                            //             err
+                            //     );
+                            // }
+                            // await waitSeconds(15);
+                            // log6("Closing discord page.");
+                            // await discordPage?.close();
                             resolve();
                         } else {
                             this.loggedIntoMJ = false;
@@ -3315,13 +3315,13 @@ app.get("/set-run-enabled/:dl/:db/:up", (req, res) => {
  * @returns {json} - the entries from the logger
  */
 app.get("/loggerGet/:entries/:remove", (req, res) => {
-    log3("GET /loggerGet/:entries/:remove");
+    // log3("GET /loggerGet/:entries/:remove");
     const { entries, remove } = req.params;
-    log6("entries: " + entries);
-    log6("remove: " + remove);
+    // log6("entries: " + entries);
+    // log6("remove: " + remove);
     if (remove === "true") log2("removing entries from log");
     let log = systemLogger.getRecentEntries(entries, remove === "true");
-    log6("log: " + log);
+    // log6("log: " + log);
     res.json(log);
 });
 

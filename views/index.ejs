@@ -56,7 +56,7 @@
     <button id="login" onclick="(()=>{
         let username = document.getElementById('username').value;
         let password = document.getElementById('password').value;
-        fetch('/login/'+username+'/'+password);
+        fetch('/login/'+username+'/'+password.replace(/#/g, '%23'));
     })()">Login</button><br />
     <label for="mfaCode">Discord MFA code:</label>
     <input type="text" id="mfaCode" name="mfaCode" value="">
