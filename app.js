@@ -2396,7 +2396,27 @@ class DownloadManager {
         );
         let response;
         try {
-            response = await fetch(url);
+            response = await fetch(url, {
+                "headers": {
+                    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                    "accept-language": "en-US,en;q=0.9",
+                    "cache-control": "no-cache",
+                    "pragma": "no-cache",
+                    "priority": "u=0, i",
+                    "sec-ch-ua": "\"Google Chrome\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+                    "sec-ch-ua-mobile": "?0",
+                    "sec-ch-ua-platform": "\"Windows\"",
+                    "sec-fetch-dest": "document",
+                    "sec-fetch-mode": "navigate",
+                    "sec-fetch-site": "none",
+                    "sec-fetch-user": "?1",
+                    "upgrade-insecure-requests": "1",
+                    "cookie": "__cf_bm=cabhCvzvClRCdlIXXK4rzo_IZ1Irt6xQ93ZwXOYqKgA-1733713128-1.0.1.1-SCwx5SLeWYh9Lr7kSbGynTNqVXyPpDZvB6PPM9NV.2zi7LFLSQ6lLRyKPaPRWEjmZo99cB21fco1QnLvdUb04w"
+                },
+                "referrerPolicy": "strict-origin-when-cross-origin",
+                "body": null,
+                "method": "GET"
+                });
         } catch (err) {
             log0([
                 "DownloadManager.downloadImage() error: Error downloading image",
