@@ -696,7 +696,10 @@ class PuppeteerClient {
         log6("Username and password typed.");
         await waitSeconds(1);
         await googleLoginPage.keyboard.press("Enter");
-        await waitSeconds(10);
+        await waitSeconds(1);
+        while(!this.googleLoginPage.isClosed()) {
+            await waitSeconds(1);
+        }
         this.googleLoginComplete = true;
     }
 
