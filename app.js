@@ -2650,7 +2650,7 @@ class DownloadManager {
                 this.concurrentDownloads++;
                 let imageResult;
                 try {
-                    imageResult = await this.downloadImage(image.urlAlt, image);
+                    imageResult = await this.downloadImage(image.urlFull, image);
                 } catch (err) {
                     log0([
                         "DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image",
