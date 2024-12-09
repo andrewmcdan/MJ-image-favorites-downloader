@@ -505,26 +505,27 @@ class PuppeteerClient {
                         await this.page.mouse.wheel({ deltaY: 100 });
                         await waitSeconds(2);
                         await this.page.mouse.wheel({ deltaY: -200 });
-                        await waitSeconds(5);
-                        log6("Clicking 'Log In' button.");
-                        await this.page
-                            .click("span ::-p-text(Log In)")
-                            .catch(() => {
-                                log0(
-                                    "loginToMJ() error. Log In button not found."
-                                );
-                                reject("Log In button not found");
-                            });
-                        await waitSeconds(1);
-                        await this.page
-                            .click("div ::-p-text(Continue with Google)")
-                            .catch(() => {
-                                log0(
-                                    "loginToMJ() error. Continue with Google button not found."
-                                );
-                                reject("Continue with Google button not found");
-                            });
-                        let waitCount = 0;
+                        await waitSeconds(60);
+                        log1("waiting for user to click \"log in\" and select google");
+                        // log6("Clicking 'Log In' button.");
+                        // await this.page
+                        //     .click("span ::-p-text(Log In)")
+                        //     .catch(() => {
+                        //         log0(
+                        //             "loginToMJ() error. Log In button not found."
+                        //         );
+                        //         reject("Log In button not found");
+                        //     });
+                        // await waitSeconds(1);
+                        // await this.page
+                        //     .click("div ::-p-text(Continue with Google)")
+                        //     .catch(() => {
+                        //         log0(
+                        //             "loginToMJ() error. Continue with Google button not found."
+                        //         );
+                        //         reject("Continue with Google button not found");
+                        //     });
+                        // let waitCount = 0;
                         while (!this.discordLoginComplete && !this.googleLoginComplete) {
                             await waitSeconds(1);
                             waitCount++;
