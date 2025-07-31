@@ -3615,7 +3615,7 @@ function buildImageData(data) {
                 new ImageInfo(
                     job.parent_id,
                     job.parent_grid,
-                    job.enqueue_time,
+                    new Date(job.enqueue_time),
                     "",
                     job.width,
                     job.height
