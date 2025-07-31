@@ -3612,7 +3612,7 @@ function buildImageData(data) {
                     job.parent_id,
                     job.parent_grid,
                     job.enqueue_time,
-                    job.full_command,
+                    "",
                     job.width,
                     job.height
                 )
