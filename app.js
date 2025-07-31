@@ -2317,7 +2317,7 @@ class DatabaseUpdateManualData {
 
     async update(jsonData) {
         log5("DatabaseUpdateManualData.update() called");
-        if (!jsonData || !Array.isArray(jsonData.data)) {
+        if (!jsonData || (!Array.isArray(jsonData.data) && !Array.isArray(json))) {
             log1("DatabaseUpdateManualData.update() warning: invalid data");
             return false;
         }
