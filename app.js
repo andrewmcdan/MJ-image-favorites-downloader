@@ -2323,7 +2323,8 @@ class DatabaseUpdateManualData {
         }
         let imageData;
         try {
-            imageData = buildImageData(jsonData.data);
+            if(jsonData.data) imageData = buildImageData(jsonData.data);
+            else imageData = buildImageData(jsonData);
         } catch (err) {
             log0(["DatabaseUpdateManualData.update() error: Error building image data", err]);
             this.systemLogger?.log("Error building image data", err);
