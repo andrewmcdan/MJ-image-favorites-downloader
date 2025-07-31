@@ -48,6 +48,10 @@
     <button onclick="(()=>{
         fetch('/resetSelectCount');
     })()">Reset Select Count</button><br /><br />
+
+    <label for="manualData">Manual DB Update JSON:</label><br />
+    <textarea id="manualData" rows="10" cols="80"></textarea><br />
+    <button onclick="submitManualData()">Submit Update Data</button><br /><br />
     <label>MJ / Discord login - </label>
     <label for="username">Discord Username:</label>
     <input type="text" id="username" name="username" value="">
@@ -130,6 +134,17 @@
                         // loggerText.scrollTop = loggerText.scrollHeight;
                     }
                 });
+        }
+
+        function submitManualData() {
+            let text = document.getElementById('manualData').value;
+            let json;
+            try { json = JSON.parse(text); } catch (e) { alert('Invalid JSON'); return; }
+            fetch('/updateDB_data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(json)
+            });
         }
 
         getLogsFromServer();

@@ -2302,6 +2302,46 @@ class DatabaseUpdateManager {
     }
 }
 
+class DatabaseUpdateManualData {
+    constructor(DatabaseManager = null, SystemLogger = null) {
+        log5("DatabaseUpdateManualData constructor called");
+        log6(
+            "DatabaseUpdateManualData constructor\nDatabaseManager: " +
+                DatabaseManager +
+                "\nSystemLogger: " +
+                SystemLogger
+        );
+        this.dbClient = DatabaseManager;
+        this.systemLogger = SystemLogger;
+    }
+
+    async update(jsonData) {
+        log5("DatabaseUpdateManualData.update() called");
+        if (!jsonData || !Array.isArray(jsonData.data)) {
+            log1("DatabaseUpdateManualData.update() warning: invalid data");
+            return false;
+        }
+        let imageData;
+        try {
+            imageData = buildImageData(jsonData.data);
+        } catch (err) {
+            log0(["DatabaseUpdateManualData.update() error: Error building image data", err]);
+            this.systemLogger?.log("Error building image data", err);
+            return false;
+        }
+        for (let i = 0; i < imageData.length; i++) {
+            try {
+                await this.dbClient.insertImage(imageData[i], i);
+            } catch (err) {
+                log0(["DatabaseUpdateManualData.update() error inserting image", err]);
+                this.systemLogger?.log("Error inserting image", err);
+            }
+        }
+        log6("DatabaseUpdateManualData.update() complete");
+        return true;
+    }
+}
+
 class DownloadManager {
     static downloadInProgress_static = false;
     constructor(
@@ -3094,6 +3134,10 @@ const databaseUpdateManager = new DatabaseUpdateManager(
     systemLogger,
     puppeteerClient
 );
+const databaseUpdateManualData = new DatabaseUpdateManualData(
+    imageDB,
+    systemLogger
+);
 const serverStatusMonitor = new ServerStatusMonitor(
     systemLogger,
     puppeteerClient,
@@ -3190,6 +3234,17 @@ app.get("/updateDB", async (req, res) => {
     log3("GET /updateDB");
     databaseUpdateManager.run();
     res.send("ok");
+});
+
+/**
+ * POST /updateDB_data
+ * Updates the database with json data provided by the user
+ */
+app.post("/updateDB_data", async (req, res) => {
+    log3("POST /updateDB_data");
+    const data = req.body;
+    const success = await databaseUpdateManualData.update(data);
+    res.json({ success });
 });
 
 /**
