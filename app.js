@@ -928,8 +928,8 @@ class PuppeteerClient {
                     let data = await this.page.evaluate(async () => {
                         let userUUID = "f66ba656-fc1b-4366-8ec8-cf52cbc47309";
                         let numberOfJobsReturned = 0;
-                        let cursor =
-                            "gAAAAABpMKZY7fekYoTWszkM7wX--qQsu0wv-VxG3MofCD5qIWq6v4Wr2yo2eLqD9LWX2DiT6ZO2A6-l9KeOwDwaP-AKl8_mALTADeDPpxFwDlURNTrQGbUQu3MSuAeC6jLE_MRCqgPNc-kAAb59IJBmbRpYy4M6NFMIN_9__kFV8G_3EYVNDiTHc62B-iMsa6nVpIsARygFvCcX8FppBKNa4ihsZqo6LcNF3W2ZA9Q_bSaEkAqzoIU%3D";
+                        let cursor ="";
+                            // "gAAAAABpMKZY7fekYoTWszkM7wX--qQsu0wv-VxG3MofCD5qIWq6v4Wr2yo2eLqD9LWX2DiT6ZO2A6-l9KeOwDwaP-AKl8_mALTADeDPpxFwDlURNTrQGbUQu3MSuAeC6jLE_MRCqgPNc-kAAb59IJBmbRpYy4M6NFMIN_9__kFV8G_3EYVNDiTHc62B-iMsa6nVpIsARygFvCcX8FppBKNa4ihsZqo6LcNF3W2ZA9Q_bSaEkAqzoIU%3D";
                         let loopCount = 0;
                         let returnedData = [];
                         do {
