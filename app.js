@@ -926,25 +926,26 @@ class PuppeteerClient {
                     if (!this.loggedIntoMJ) reject("Not logged into MJ");
                     log6("Getting user's jobs data.");
                     let data = await this.page.evaluate(async () => {
-                        let userUUID = __NEXT_DATA__.props.initialAuthUser.id;
+                        let userUUID = "f66ba656-fc1b-4366-8ec8-cf52cbc47309";
                         let numberOfJobsReturned = 0;
-                        let cursor = "";
+                        let cursor =
+                            "gAAAAABpMKZY7fekYoTWszkM7wX--qQsu0wv-VxG3MofCD5qIWq6v4Wr2yo2eLqD9LWX2DiT6ZO2A6-l9KeOwDwaP-AKl8_mALTADeDPpxFwDlURNTrQGbUQu3MSuAeC6jLE_MRCqgPNc-kAAb59IJBmbRpYy4M6NFMIN_9__kFV8G_3EYVNDiTHc62B-iMsa6nVpIsARygFvCcX8FppBKNa4ihsZqo6LcNF3W2ZA9Q_bSaEkAqzoIU%3D";
                         let loopCount = 0;
                         let returnedData = [];
                         do {
                             let cookies = document.cookie;
                             let response = await fetch(
-                                "https://www.midjourney.com/api/pg/thomas-jobs?user_id=" +
+                                "https://www.midjourney.com/api/imagine?user_id=" +
                                     userUUID +
                                     "&page_size=10000" +
                                     (cursor == "" ? "" : "&cursor=" + cursor),
                                 {
                                     headers: {
-                                        "accept": "*/*",
+                                        accept: "*/*",
                                         "accept-language": "en-US,en;q=0.9",
                                         "cache-control": "no-cache",
                                         "content-type": "application/json",
-                                        "pragma": "no-cache",
+                                        pragma: "no-cache",
                                         "sec-ch-ua":
                                             '"Chromium";v="127", "Google Chrome";v="127", "Not)A;Brand";v="127"',
                                         "sec-ch-ua-mobile": "?0",
@@ -953,9 +954,11 @@ class PuppeteerClient {
                                         "sec-fetch-mode": "cors",
                                         "sec-fetch-site": "same-origin",
                                         "x-csrf-protection": "1",
-                                        "cookie": cookies,
-                                        "Referer": "https://www.midjourney.com/imagine",
-                                        "Referrer-Policy": "origin-when-cross-origin",
+                                        cookie: cookies,
+                                        Referer:
+                                            "https://www.midjourney.com/imagine",
+                                        "Referrer-Policy":
+                                            "origin-when-cross-origin",
                                     },
                                     referrer:
                                         "https://www.midjourney.com/imagine",
