@@ -2349,6 +2349,9 @@ class DatabaseUpdateManager {
                 );
                 for (let i = 0; i < imageData.length; i++) {
                     if (updateDB) await imageDB.insertImage(imageData[i], i);
+                    this.systemLogger.log(
+                        `Inserting image ${i + 1} of ${imageData.length}: ${imageData[i].id}`
+                    );
                 }
                 log2("Done updating database");
             })
