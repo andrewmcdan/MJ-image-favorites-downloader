@@ -1168,10 +1168,10 @@ class PuppeteerClient {
                             let data = await response.json();
                             // log2({data});
                             dataTemp = data;
-                            if (data.jobs.length == 0) break;
-                            numberOfLikesReturned = data.jobs.length;
+                            if (data.length == 0) break;
+                            numberOfLikesReturned = data.length;
                             // put all the returned data into the returnedData array
-                            returnedData.push(...data.jobs);
+                            returnedData.push(...data);
                             page++;
                             loopCount++;
                             if (loopCount > 10000) {
