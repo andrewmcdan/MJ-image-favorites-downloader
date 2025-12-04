@@ -2339,6 +2339,9 @@ class DatabaseUpdateManager {
                     "\nCalling buildImageData()"
                 );
                 let imageData = buildImageData(data);
+                this.systemLogger.log(
+                    "imageData: " + JSON.stringify(imageData).substring(0, 5000)
+                );
                 log2(
                     "Size of data: ",
                     imageData.length,
