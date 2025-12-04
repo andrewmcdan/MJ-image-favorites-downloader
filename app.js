@@ -2283,7 +2283,7 @@ class DatabaseUpdateManager {
         log6("DatabaseUpdateManager.run() complete");
     }
     async updateUsersJobs() {
-        return;
+        // return;
         log5("DatabaseUpdateManager.updateUsersJobs() called");
         await this.puppeteerClient
             .getUsersJobsData()
