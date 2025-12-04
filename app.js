@@ -2311,8 +2311,11 @@ class DatabaseUpdateManager {
             .getUsersLikesData()
             .then(async (data) => {
                 log4("typeof data: " + typeof data);
-                systemLogger.log(
+                this.systemLogger.log(
                     "DatabaseUpdateManager.updateUsersLikes() - Type of data: " + typeof data
+                );
+                this.systemLogger.log(
+                    JSON.stringify(data).substring(0, 1000)
                 );
                 log4(
                     "Size of data: ",
