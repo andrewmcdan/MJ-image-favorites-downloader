@@ -2311,6 +2311,9 @@ class DatabaseUpdateManager {
             .getUsersLikesData()
             .then(async (data) => {
                 log4("typeof data: " + typeof data);
+                systemLogger.log(
+                    "DatabaseUpdateManager.updateUsersLikes() - Type of data: " + typeof data
+                );
                 log4(
                     "Size of data: ",
                     data.length,
