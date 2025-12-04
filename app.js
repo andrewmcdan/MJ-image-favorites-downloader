@@ -1397,6 +1397,9 @@ class Database {
 
         // if it doesn't exist, insert it
         image.processed = false;
+        if (image.grid_index === undefined || image.grid_index === null) {
+            image.grid_index = -1;
+        }
         let res;
         try {
             res = await this.dbClient.query(
