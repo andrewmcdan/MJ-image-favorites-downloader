@@ -827,6 +827,7 @@ class PuppeteerClient {
     getUsersJobsData() {
         log5("getUsersJobsData() called");
         return new Promise(async (resolve, reject) => {
+            resolve();
             if (!this.loggedIntoMJ || this.browser == null) {
                 log6("Not logged into MJ. Attempting to log in.");
                 let uNamePWordCb = async () => {
@@ -1117,7 +1118,7 @@ class PuppeteerClient {
                             );*/
 
                             let response = await fetch(
-                                "https://www.midjourney.com/api/pg/user-likes?page=" +
+                                "https://www.midjourney.com/api/explore-likes?page=" +
                                     page +
                                     "&_ql=explore",
                                 {

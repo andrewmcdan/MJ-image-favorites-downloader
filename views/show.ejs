@@ -162,6 +162,20 @@
         align-items: center;
         /* Centers vertically */
     }
+
+    #clock-overlay {
+        position: absolute;
+        top: 40px;
+        right: 20px;
+        padding: 8px 12px;
+        background-color: rgba(0, 0, 0, 0.6);
+        color: #ffffff;
+        font-size: 18px;
+        font-family: 'Courier New', monospace;
+        border-radius: 8px;
+        z-index: 1001;
+        letter-spacing: 1px;
+    }
 </style>
 
 <body>
@@ -180,6 +194,7 @@
         <label for="cdnSource">Use Midjourney CDN Source:</label>
         <input type="checkbox" id="cdnSource" name="cdnSource" value="cdnSource">
     </div>
+    <div id="clock-overlay"></div>
     <div id="main-container">
     </div>
     <div id="prompt-container" class="hidden">
@@ -265,6 +280,16 @@
             let updateIntervalParam = params.get('updateInterval');
             let showPromptParam = params.get('showPrompt');
             let disableFullscreen = params.get('disableFullscreen');
+            const clockElement = document.getElementById('clock-overlay');
+            function startClock() {
+                if (!clockElement) return;
+                const updateClock = () => {
+                    const now = new Date();
+                    clockElement.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                };
+                updateClock();
+                setInterval(updateClock, 1000);
+            }
             if (disableFullscreen === 'true') {
                 clearInterval(fullscreenCheckInterval);
             }
@@ -516,6 +541,7 @@
             updateImages();
             updateImages();
             updateImages();
+            startClock();
         })();
 
         const waitSeconds = (s) => { return new Promise((resolve, reject) => { setTimeout(() => { resolve(); }, s * 1000); }) }
