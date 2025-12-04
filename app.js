@@ -1384,6 +1384,9 @@ class Database {
         );
         // find if image exists in database
         // if it does, update it
+        this.systemLogger.log(
+            "Inserting image into database. Image ID: " + image.id
+        );
         let lookup = await this.lookupByUUID(image.id);
         if (lookup !== undefined) {
             image.processed = lookup.processed;
@@ -1399,6 +1402,16 @@ class Database {
         image.processed = false;
         if (image.grid_index === undefined || image.grid_index === null) {
             image.grid_index = -1;
+        }
+        if(image.parent_id === undefined || image.parent_id === null) {
+            // for grid images, set the parent_id to the id of the first image in the grid
+            image.parent_id = image.id + "_grid_0";
+        }
+        if(image.enqueue_time === undefined || image.enqueue_time === null) {
+            image.enqueue_time = new Date();
+        }
+        if(image.fullCommand === undefined || image.fullCommand === null) {
+            image.fullCommand = "";
         }
         let res;
         try {
