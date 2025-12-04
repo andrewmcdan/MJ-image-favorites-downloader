@@ -1088,7 +1088,7 @@ class PuppeteerClient {
             await waitSeconds(2);
             let dataTemp = {};
             this.page
-                ?.goto("https://www.midjourney.com/imagine", {
+                ?.goto("https://www.midjourney.com/explore?tab=likes", {
                     waitUntil: "networkidle2",
                     timeout: 60000,
                 })
@@ -1100,11 +1100,12 @@ class PuppeteerClient {
                         let page = 1;
                         let loopCount = 0;
                         let returnedData = [];
+                        try{
                         do {
                             // let response = await fetch("https://www.midjourney.com/api/pg/thomas-likes?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
 
                             // fetch("https://www.midjourney.com/api/pg/user-likes?page=2&_ql=explore", {headers: {"sec-ch-ua":'"Not)A;Brand";v="99", "Google Chrome";v="127", "Chromium";v="127"',"sec-ch-ua-mobile": "?0",
-                                /*        "sec-ch-ua-platform": '"Windows"',
+                            /*        "sec-ch-ua-platform": '"Windows"',
                                         "x-csrf-protection": "1",
                                         Referer:
                                             "https://www.midjourney.com/explore?tab=likes",
@@ -1114,6 +1115,26 @@ class PuppeteerClient {
                                     body: null,
                                     method: "GET",
                                 }
+                                    fetch("https://www.midjourney.com/api/explore-likes?page=2&_ql=explore", {
+  "headers": {
+    "accept": "* /*",
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Chromium\";v=\"142\", \"Google Chrome\";v=\"142\", \"Not_A Brand\";v=\"99\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "x-csrf-protection": "1",
+    "cookie": "AMP_MKTG_437c42b22c=JTdCJTdE; __Host-Midjourney.AuthUserTokenV3_r=AMf-vBwiRqwpqQyKo_cZZVFwfOpfVyvP_Ce9vJ4nak9uGe_0BhyBmblh6GlN5gVhSJAjdUlOPRw8wWhGHqCcpmyeaAaPRN3FGmBNZbm4o-uDrE6ehgl3x14MW84y8RQQbZNGdJACB3Z7_Quyobmbvjfkof0wZ5aP6fFuAmag4KoaXoYYBxP5OCDXR8t9s3uxP_0JcCFIpb_Lf8jIOpfhXuTvNvhILfmPXN4H2A_5_EpaU26P4_MufpqLoqLbeYEefE3aY1cVSjf4WfOyzSbgyzPM86HDZiNnQLL0VJK0Y5voOcb3lyJpX1OUwYt_0kzpOAMWoOT1eDCBYf7_aPJV8sxwqLHC3mCQz4FRv5_3NrfN_RcIecWcFP5XHkT4j0K1TWwyP5TyY61yyUFrQfWfQO5SZ3Mjb52Q2C5vcBhlCom_nu5tfetLPRA; _gcl_au=1.1.1438724462.1761669757; _cfuvid=fd_yd6r.Dqx3JJdcbgq__SQsj1U8SrEnZ4lx__yVtgg-1764626365878-0.0.1.1-604800000; __Host-Midjourney.AuthUserTokenV3_i=eyJhbGciOiJSUzI1NiIsImtpZCI6IjdjNzQ5NTFmNjBhMDE0NzE3ZjFlMzA4ZDZiMjgwZjQ4ZjFlODhmZGEiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiYS5tY2QuIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0xJQ1pTems0NXBCU3BhTGl5QVA5WFNYbVdla3pYOVotTVl4Mk5xZ1Vtd21aN3VBaTdyYUE9czk2LWMiLCJtaWRqb3VybmV5X2lkIjoiZjY2YmE2NTYtZmMxYi00MzY2LThlYzgtY2Y1MmNiYzQ3MzA5IiwiaXNzIjoiaHR0cHM6Ly9zZWN1cmV0b2tlbi5nb29nbGUuY29tL2F1dGhqb3VybmV5IiwiYXVkIjoiYXV0aGpvdXJuZXkiLCJhdXRoX3RpbWUiOjE3NDk3NzY1MTcsInVzZXJfaWQiOiJEeWZlSnZKZXZnVmFjMWtOcFY5akw5SXY4NHcxIiwic3ViIjoiRHlmZUp2SmV2Z1ZhYzFrTnBWOWpMOUl2ODR3MSIsImlhdCI6MTc2NDgxMTIyMCwiZXhwIjoxNzY0ODE0ODIwLCJlbWFpbCI6ImFuZHJld21jZGFuQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7Imdvb2dsZS5jb20iOlsiMTEwMjMzNDY0NDExNzI0MTY5MDQ4Il0sImRpc2NvcmQuY29tIjpbIjE3NDI5NTM5MDA2ODI3NzI0OCJdLCJlbWFpbCI6WyJhbmRyZXdtY2RhbkBnbWFpbC5jb20iXX0sInNpZ25faW5fcHJvdmlkZXIiOiJnb29nbGUuY29tIn19.hPbNA_cI5TeieP-V8tDo0KAppdsWUOldLfMiHXUlVBwqYjhKiBFNNf1yZ978t3NZWWz1VuseSPGD90R8BRtJJ9uws7mlqmjoRlQDt7FC-tkmtwUuNszxijtV3OqI6FSXIjtau1oJrW_2Pv7T0Dexwm-1VJMcjNPWpRRZVJ80s6Cj3Ac_YNeJmFo3JwNvNOaC7rKL-kVFlU2JUtIDDLco-SDRyf2Nuk-YWUql_xKkyeLTFDHc2WY1EOlWyYMEvvV43MJwjHpV12mdIgxBJm53S6I69aKi4Ob-SfcCKHOSj8acPq1DCwbMVD4AduVR8Ak1gIDX8XlkZs6SFduntjjUPw; GAESA=CqABMDAxNDc3ODI5NjZlMDI1NzdkZDIyMjIzMDliY2I3YjkwZDYzMjUyNzMxZWNlZDE1M2U2OTgxNWE5MTllNDBmOTIzMWYxNTMwYzkwODhkMmE1MTdlZWYxMWI2ODM4MjczNGZjNjU4NzcyM2VmMTNlODUzMTNiMTdmOTZkYzU3Njg1ZDk4M2ExN2QzOTZjZmYyY2ViMTIyMDkzYTk1Y2MzNxCzzMi3rjM; __cf_bm=xQ94qTV8HgDXSTZY9Lb0IsXXCvnWPxNvRcTFFT..TYY-1764812209-1.0.1.1-7CoofPOEft_j5.D9DXQJR42Rcy7YQC0goVuH5OiHDbjAKqwxJrEs.ej8pgX.KZPjwbsV7vxfqBHq7PxYLiC2dzmQ9YCx4WuWr4Qf90TFE7I; cf_clearance=ZEzWrM5QHyPCgIajT0xgHVgv1Cht1qvb2P2_FvV2uwM-1764812229-1.2.1.1-kzycTebumXpzdACaurZj1u0624rkTnBTANNYxK55Wo3vEqxHiRjaOqWB24axLv1nsFAOMV1ThPwIfPTYyqHY_ijL7xZEBei4jdYz62cOmPEQBJlwrJFLHv.T09nSHsvrINeOqQeo9cmCB7MwBr.oE6olBoIE55Zb67k9sddBrqutdAvIhKI4oKJpW4C2h6eUNig7sOrkLw3uUE0RFX1gfqSMY9c8w8v1mpiZKVQsm_I; _dd_s=logs=1&id=dba03420-c07f-42b9-b171-2d61ccb1ac65&created=1764811225601&expire=1764813142148; AMP_437c42b22c=JTdCJTIyZGV2aWNlSWQlMjIlM0ElMjJlYzNkN2QzYS0wYjg4LTQ2NjQtYTIyNS01NGM4MzE4MmJkYzQlMjIlMkMlMjJ1c2VySWQlMjIlM0ElMjJmNjZiYTY1Ni1mYzFiLTQzNjYtOGVjOC1jZjUyY2JjNDczMDklMjIlMkMlMjJzZXNzaW9uSWQlMjIlM0ExNzY0ODExMjI2MzQxJTJDJTIyb3B0T3V0JTIyJTNBZmFsc2UlMkMlMjJsYXN0RXZlbnRUaW1lJTIyJTNBMTc2NDgxMjI0NTI0MCUyQyUyMmxhc3RFdmVudElkJTIyJTNBMzg4MyU3RA==",
+    "Referer": "https://www.midjourney.com/explore?tab=likes"
+  },
+  "body": null,
+  "method": "GET"
+});
                             );*/
 
                             let response = await fetch(
@@ -1122,10 +1143,17 @@ class PuppeteerClient {
                                     "&_ql=explore",
                                 {
                                     headers: {
+                                        "accept-language": "en-US,en;q=0.9",
+                                        "cache-control": "no-cache",
+                                        "pragma": "no-cache",
+                                        "priority": "u=1, i",
                                         "sec-ch-ua":
-                                            '"Google Chrome";v="127", "Not)A;Brand";v="99", "Chromium";v="123"',
+                                            '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
                                         "sec-ch-ua-mobile": "?0",
                                         "sec-ch-ua-platform": '"Windows"',
+                                        "sec-fetch-dest": "empty",
+                                        "sec-fetch-mode": "cors",
+                                        "sec-fetch-site": "same-origin",
                                         "x-csrf-protection": "1",
                                         Referer:
                                             "https://www.midjourney.com/explore?tab=likes",
@@ -1150,8 +1178,19 @@ class PuppeteerClient {
                                 break; // if we've returned more than 500,000 likes, there's probably something wrong, and there's gonna be problems
                             }
                         } while (numberOfLikesReturned == 50);
+                    } catch (e) {
+                        return {error: "Error fetching likes data: " + e.toString()};
+                    }
                         return returnedData;
                     });
+                    if(data.error) {
+                        log0("getUsersLikesData() error. Error: " + data.error);
+                        systemLogger.log(
+                            "getUsersLikesData() error. Error: " + data.error
+                        );
+                        reject(data.error);
+                        return;
+                    }
                     resolve(data);
                 })
                 .catch((err) => {
