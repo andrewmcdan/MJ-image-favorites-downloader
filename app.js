@@ -827,7 +827,6 @@ class PuppeteerClient {
     getUsersJobsData() {
         log5("getUsersJobsData() called");
         return new Promise(async (resolve, reject) => {
-            resolve();
             if (!this.loggedIntoMJ || this.browser == null) {
                 log6("Not logged into MJ. Attempting to log in.");
                 let uNamePWordCb = async () => {
@@ -2229,6 +2228,7 @@ class DatabaseUpdateManager {
         log6("DatabaseUpdateManager.run() complete");
     }
     async updateUsersJobs() {
+        return;
         log5("DatabaseUpdateManager.updateUsersJobs() called");
         await this.puppeteerClient
             .getUsersJobsData()
