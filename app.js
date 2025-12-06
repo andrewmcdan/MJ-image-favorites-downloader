@@ -49,6 +49,7 @@ const Transport = require("winston-transport");
 const util = require("util");
 const { spawn } = require("child_process");
 var removeRoute = require("express-remove-route");
+const got = require("got");
 
 let logLevel = process.env.mj_dl_server_log_level ?? 0;
 if (typeof logLevel === "string") logLevel = parseInt(logLevel);
@@ -2522,11 +2523,19 @@ class DownloadManager {
                 origin: "https://www.midjourney.com",
                 "accept-encoding": "identity",
             };
-            response = await fetch(url, {
-                headers: requestHeaders,
-                body: null,
-                method: "GET",
-            });
+            // response = await fetch(url, {
+            //     headers: requestHeaders,
+            //     body: null,
+            //     method: "GET",
+            // });
+            response = await got(url, {
+                http2: true,
+                headers: {
+                    "user-agent": "...Chrome UA...",
+                    referer: "https://www.midjourney.com/",
+                    accept: "image/avif,image/webp,image/*,*/*;q=0.8",
+                },
+            }).buffer();
         } catch (err) {
             log0([
                 "DownloadManager.downloadImage() error: Error downloading image",
