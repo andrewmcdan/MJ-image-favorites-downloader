@@ -2510,65 +2510,57 @@ class DownloadManager {
                 "\nimage: " +
                 JSON.stringify(image)
         );
-        let response;
         let imageBuffer = null;
         let contentType = null;
         let contentLengthHeader = null;
-        let usedBrowserFallback = false;
+        let usedBrowser = false;
+
+        // Prefer Puppeteer (real browser stack) first
         try {
-            const requestHeaders = {
-                accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                "accept-language": "en-US,en;q=0.9",
-                "cache-control": "no-cache",
-                pragma: "no-cache",
-                "user-agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                referer: "https://www.midjourney.com/",
-                origin: "https://www.midjourney.com",
-                "accept-encoding": "identity",
-            };
-            response = await fetch(url, {
-                headers: requestHeaders,
-                body: null,
-                method: "GET",
-            });
+            const browserResult = await this.downloadImageWithBrowser(url);
+            imageBuffer = browserResult.buffer;
+            contentType = browserResult.headers["content-type"];
+            contentLengthHeader = browserResult.headers["content-length"];
+            usedBrowser = true;
         } catch (err) {
-            log0([
-                "DownloadManager.downloadImage() error: Error downloading image",
+            log1([
+                "DownloadManager.downloadImage() warning: Browser fetch failed, falling back to node fetch",
                 err,
-                image,
             ]);
-            this.systemLogger.log(
-                "Error downloading image: " + url + " Error: " + err
-            );
-            return { success: false, error: err };
         }
 
-        if (response && response.status === 403) {
-            log1([
-                "DownloadManager.downloadImage() warning: fetch returned 403. Falling back to Puppeteer fetch.",
-                url,
-            ]);
+        // Fallback to node fetch if browser fetch failed
+        if (!imageBuffer) {
+            let response;
             try {
-                const browserResult = await this.downloadImageWithBrowser(url);
-                imageBuffer = browserResult.buffer;
-                contentType = browserResult.headers["content-type"];
-                contentLengthHeader = browserResult.headers["content-length"];
-                usedBrowserFallback = true;
+                const requestHeaders = {
+                    accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                    "accept-language": "en-US,en;q=0.9",
+                    "cache-control": "no-cache",
+                    pragma: "no-cache",
+                    "user-agent":
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                    referer: "https://www.midjourney.com/",
+                    origin: "https://www.midjourney.com",
+                    "accept-encoding": "identity",
+                };
+                response = await fetch(url, {
+                    headers: requestHeaders,
+                    body: null,
+                    method: "GET",
+                });
             } catch (err) {
                 log0([
-                    "DownloadManager.downloadImage() error: Puppeteer fallback failed",
+                    "DownloadManager.downloadImage() error: Error downloading image",
                     err,
                     image,
                 ]);
-                return {
-                    success: false,
-                    error: "Puppeteer fallback failed: " + err,
-                };
+                this.systemLogger.log(
+                    "Error downloading image: " + url + " Error: " + err
+                );
+                return { success: false, error: err };
             }
-        }
 
-        if (!usedBrowserFallback) {
             if (!response.ok) {
                 log0([
                     "DownloadManager.downloadImage() error: Bad response code",
@@ -2593,7 +2585,10 @@ class DownloadManager {
                     error: "Bad content type: " + contentType,
                 };
             }
-            if (contentLengthHeader && parseInt(contentLengthHeader, 10) < 1000) {
+            if (
+                contentLengthHeader &&
+                parseInt(contentLengthHeader, 10) < 1000
+            ) {
                 log0([
                     "DownloadManager.downloadImage() error: Bad content length",
                     contentLengthHeader,
@@ -2605,6 +2600,13 @@ class DownloadManager {
                 };
             }
             imageBuffer = Buffer.from(await response.arrayBuffer());
+        }
+
+        if (!imageBuffer) {
+            return {
+                success: false,
+                error: "No image data received from browser or fetch",
+            };
         }
 
         log6("DownloadManager.downloadImage() Fetch successful");
@@ -2657,7 +2659,7 @@ class DownloadManager {
                     fileSize +
                     " != " +
                     contentLength +
-                    (usedBrowserFallback ? " (browser fallback used)" : ""),
+                    (usedBrowser ? " (browser used)" : ""),
                 image,
             ]);
             return {
