@@ -2538,6 +2538,9 @@ class DownloadManager {
                 err,
                 image,
             ]);
+            this.systemLogger.log(
+                "Error downloading image: " + url + " Error: " + err
+            );
             return { success: false, error: err };
         }
 
