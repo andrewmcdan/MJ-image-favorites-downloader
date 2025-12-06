@@ -2512,26 +2512,25 @@ class DownloadManager {
         let response;
         try {
             response = await fetch(url, {
-                "headers": {
-                    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                headers: {
+                    accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
                     "accept-language": "en-US,en;q=0.9",
                     "cache-control": "no-cache",
-                    "pragma": "no-cache",
-                    "priority": "u=0, i",
-                    "sec-ch-ua": "\"Google Chrome\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+                    pragma: "no-cache",
+                    priority: "i",
+                    "sec-ch-ua":
+                        '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
                     "sec-ch-ua-mobile": "?0",
-                    "sec-ch-ua-platform": "\"Windows\"",
-                    "sec-fetch-dest": "document",
-                    "sec-fetch-mode": "navigate",
-                    "sec-fetch-site": "none",
-                    "sec-fetch-user": "?1",
-                    "upgrade-insecure-requests": "1",
-                    "cookie": "__cf_bm=cabhCvzvClRCdlIXXK4rzo_IZ1Irt6xQ93ZwXOYqKgA-1733713128-1.0.1.1-SCwx5SLeWYh9Lr7kSbGynTNqVXyPpDZvB6PPM9NV.2zi7LFLSQ6lLRyKPaPRWEjmZo99cB21fco1QnLvdUb04w"
+                    "sec-ch-ua-platform": '"Windows"',
+                    "sec-fetch-dest": "image",
+                    "sec-fetch-mode": "no-cors",
+                    "sec-fetch-site": "same-site",
+                    cookie: "AMP_MKTG_437c42b22c=JTdCJTdE; _gcl_au=1.1.1438724462.1761669757; _cfuvid=fd_yd6r.Dqx3JJdcbgq__SQsj1U8SrEnZ4lx__yVtgg-1764626365878-0.0.1.1-604800000; cf_clearance=ZEzWrM5QHyPCgIajT0xgHVgv1Cht1qvb2P2_FvV2uwM-1764812229-1.2.1.1-kzycTebumXpzdACaurZj1u0624rkTnBTANNYxK55Wo3vEqxHiRjaOqWB24axLv1nsFAOMV1ThPwIfPTYyqHY_ijL7xZEBei4jdYz62cOmPEQBJlwrJFLHv.T09nSHsvrINeOqQeo9cmCB7MwBr.oE6olBoIE55Zb67k9sddBrqutdAvIhKI4oKJpW4C2h6eUNig7sOrkLw3uUE0RFX1gfqSMY9c8w8v1mpiZKVQsm_I; __cf_bm=WJ2RLZozjO3a5qMjoiTh6BPcad_kGYv592u6nZu4ByI-1765049102-1.0.1.1-mlFscV2.9wC31ULkPYNqHEVVuuOEzXu8tK29YqxtowTEAB_l53tfq5q.0z_nwsYhQXhTMTT3LG3NMaNhJM6joxI.Pmh7jp0TYc.plh_wuI8; AMP_437c42b22c=JTdCJTIyZGV2aWNlSWQlMjIlM0ElMjJlYzNkN2QzYS0wYjg4LTQ2NjQtYTIyNS01NGM4MzE4MmJkYzQlMjIlMkMlMjJ1c2VySWQlMjIlM0ElMjJmNjZiYTY1Ni1mYzFiLTQzNjYtOGVjOC1jZjUyY2JjNDczMDklMjIlMkMlMjJzZXNzaW9uSWQlMjIlM0ExNzY1MDQ5MTA3NDQwJTJDJTIyb3B0T3V0JTIyJTNBZmFsc2UlMkMlMjJsYXN0RXZlbnRUaW1lJTIyJTNBMTc2NTA0OTk0NTIxOSUyQyUyMmxhc3RFdmVudElkJTIyJTNBMzg2NyU3RA==",
+                    Referer: "https://www.midjourney.com/",
                 },
-                "referrerPolicy": "strict-origin-when-cross-origin",
-                "body": null,
-                "method": "GET"
-                });
+                body: null,
+                method: "GET",
+            });
         } catch (err) {
             log0([
                 "DownloadManager.downloadImage() error: Error downloading image",
