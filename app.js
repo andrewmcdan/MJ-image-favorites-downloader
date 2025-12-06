@@ -49,7 +49,6 @@ const Transport = require("winston-transport");
 const util = require("util");
 const { spawn } = require("child_process");
 var removeRoute = require("express-remove-route");
-const got = require("got");
 
 let logLevel = process.env.mj_dl_server_log_level ?? 0;
 if (typeof logLevel === "string") logLevel = parseInt(logLevel);
@@ -2445,6 +2444,7 @@ class DownloadManager {
         this.systemLogger = SystemLogger;
         this.start();
         this.verifyDownloadsInProgress = false;
+        this.downloadBrowser = null;
         log6("DownloadManager constructor complete");
     }
 
@@ -2511,6 +2511,10 @@ class DownloadManager {
                 JSON.stringify(image)
         );
         let response;
+        let imageBuffer = null;
+        let contentType = null;
+        let contentLengthHeader = null;
+        let usedBrowserFallback = false;
         try {
             const requestHeaders = {
                 accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -2523,19 +2527,11 @@ class DownloadManager {
                 origin: "https://www.midjourney.com",
                 "accept-encoding": "identity",
             };
-            // response = await fetch(url, {
-            //     headers: requestHeaders,
-            //     body: null,
-            //     method: "GET",
-            // });
-            response = await got(url, {
-                http2: true,
-                headers: {
-                    "user-agent": "...Chrome UA...",
-                    referer: "https://www.midjourney.com/",
-                    accept: "image/avif,image/webp,image/*,*/*;q=0.8",
-                },
-            }).buffer();
+            response = await fetch(url, {
+                headers: requestHeaders,
+                body: null,
+                method: "GET",
+            });
         } catch (err) {
             log0([
                 "DownloadManager.downloadImage() error: Error downloading image",
@@ -2548,46 +2544,74 @@ class DownloadManager {
             return { success: false, error: err };
         }
 
-        if (!response.ok) {
-            log0([
-                "DownloadManager.downloadImage() error: Bad response code",
-                response.status,
-                image,
+        if (response && response.status === 403) {
+            log1([
+                "DownloadManager.downloadImage() warning: fetch returned 403. Falling back to Puppeteer fetch.",
+                url,
             ]);
-            return {
-                success: false,
-                error: "Bad response code: " + response.status,
-            };
+            try {
+                const browserResult = await this.downloadImageWithBrowser(url);
+                imageBuffer = browserResult.buffer;
+                contentType = browserResult.headers["content-type"];
+                contentLengthHeader = browserResult.headers["content-length"];
+                usedBrowserFallback = true;
+            } catch (err) {
+                log0([
+                    "DownloadManager.downloadImage() error: Puppeteer fallback failed",
+                    err,
+                    image,
+                ]);
+                return {
+                    success: false,
+                    error: "Puppeteer fallback failed: " + err,
+                };
+            }
         }
-        if (response.headers.get("content-type") !== "image/png") {
-            log0([
-                "DownloadManager.downloadImage() error: Bad content type",
-                response.headers.get("content-type"),
-                image,
-            ]);
-            return {
-                success: false,
-                error: "Bad content type: " + response.headers["content-type"],
-            };
+
+        if (!usedBrowserFallback) {
+            if (!response.ok) {
+                log0([
+                    "DownloadManager.downloadImage() error: Bad response code",
+                    response.status,
+                    image,
+                ]);
+                return {
+                    success: false,
+                    error: "Bad response code: " + response.status,
+                };
+            }
+            contentType = response.headers.get("content-type");
+            contentLengthHeader = response.headers.get("content-length");
+            if (contentType && contentType !== "image/png") {
+                log0([
+                    "DownloadManager.downloadImage() error: Bad content type",
+                    contentType,
+                    image,
+                ]);
+                return {
+                    success: false,
+                    error: "Bad content type: " + contentType,
+                };
+            }
+            if (contentLengthHeader && parseInt(contentLengthHeader, 10) < 1000) {
+                log0([
+                    "DownloadManager.downloadImage() error: Bad content length",
+                    contentLengthHeader,
+                    image,
+                ]);
+                return {
+                    success: false,
+                    error: "Bad content length: " + contentLengthHeader,
+                };
+            }
+            imageBuffer = Buffer.from(await response.arrayBuffer());
         }
-        if (parseInt(response.headers.get("content-length"), 10) < 1000) {
-            log0([
-                "DownloadManager.downloadImage() error: Bad content length",
-                response.headers.get("content-length"),
-                image,
-            ]);
-            return {
-                success: false,
-                error:
-                    "Bad content length: " + response.headers["content-length"],
-            };
-        }
+
         log6("DownloadManager.downloadImage() Fetch successful");
 
-        let contentLength = parseInt(
-            response.headers.get("content-length"),
-            10
-        );
+        let contentLength = contentLengthHeader
+            ? parseInt(contentLengthHeader, 10)
+            : imageBuffer.length;
         log6("DownloadManager.downloadImage() contentLength: " + contentLength);
         let imageDate = new Date(image.enqueue_time);
         log6("DownloadManager.downloadImage() imageDate: " + imageDate);
@@ -2619,9 +2643,7 @@ class DownloadManager {
             );
             fs.unlinkSync(path.join(destFolder, destFileName));
         }
-        let data = await response.arrayBuffer();
-        data = Buffer.from(data);
-        fs.writeFileSync(path.join(destFolder, destFileName), data);
+        fs.writeFileSync(path.join(destFolder, destFileName), imageBuffer);
         let fileSize = 0;
         // await waitSeconds(0.5);
         let file = fs.statSync(path.join(destFolder, destFileName));
@@ -2634,7 +2656,8 @@ class DownloadManager {
                 "DownloadManager.downloadImage() error: File size mismatch: " +
                     fileSize +
                     " != " +
-                    contentLength,
+                    contentLength +
+                    (usedBrowserFallback ? " (browser fallback used)" : ""),
                 image,
             ]);
             return {
@@ -2658,6 +2681,35 @@ class DownloadManager {
         image.success = true;
         log6("DownloadManager.downloadImage() complete");
         return image;
+    }
+
+    async downloadImageWithBrowser(url) {
+        log5("DownloadManager.downloadImageWithBrowser() called");
+        // Prefer the main puppeteerClient browser if it exists so we reuse cookies / stealth settings
+        let browser =
+            (puppeteerClient && puppeteerClient.browser) || this.downloadBrowser;
+        if (!browser || !browser.isConnected()) {
+            log6("DownloadManager.downloadImageWithBrowser(): launching headless browser for downloads");
+            browser = await puppeteer.launch({
+                headless: "new",
+                args: ["--no-sandbox", "--disable-setuid-sandbox"],
+            });
+            this.downloadBrowser = browser;
+        }
+        const page = await browser.newPage();
+        try {
+            const resp = await page.goto(url, { waitUntil: "networkidle2" });
+            if (!resp || !resp.ok()) {
+                throw new Error(
+                    `Browser fetch failed with status ${resp?.status?.()}`
+                );
+            }
+            const buffer = await resp.buffer();
+            const headers = resp.headers();
+            return { buffer, headers };
+        } finally {
+            await page.close().catch(() => {});
+        }
     }
 
     start() {
