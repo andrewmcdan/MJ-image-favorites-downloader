@@ -372,7 +372,7 @@
                     return;
                 }
 
-                if(image.fullCommand.includes("--motion")) {
+                if(image.fullCommand.includes("--motion") || image.fullCommand.includes("--video")) {
                     return;
                 }
                 const imgWrapper = document.createElement('div');
