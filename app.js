@@ -185,13 +185,13 @@ class SystemLogger {
     }
 
     log(...message) {
-        log5("systemLogger.log called with message: " + message.join(" : "));
+        log5("systemLogger?.log called with message: " + message.join(" : "));
         winstonLogger?.log("error", message.join(" : "));
         let entry = {};
         entry.time = new Date();
         entry.message = message;
         entry.id = this.idIndex++;
-        log6("systemLogger.log entry: " + JSON.stringify(entry));
+        log6("systemLogger?.log entry: " + JSON.stringify(entry));
         this.logArr.push(entry);
     }
 
@@ -707,7 +707,7 @@ class PuppeteerClient {
             if (!this.loggedIntoMJ || this.browser == null) {
                 log6("Not logged into MJ. Attempting to log in.");
                 let uNamePWordCb = async () => {
-                    systemLogger.log("Not logged into MJ. Please send login credentials.");
+                    systemLogger?.log("Not logged into MJ. Please send login credentials.");
                     let uName = "";
                     let pWord = "";
                     let mfaCb = null;
@@ -726,7 +726,7 @@ class PuppeteerClient {
                         uName = username;
                         pWord = password;
                         mfaCb = async () => {
-                            systemLogger.log("MFA code requested. Please send MFA code.");
+                            systemLogger?.log("MFA code requested. Please send MFA code.");
                             let retData = "";
                             /**
                              * GET /mfa/:data
@@ -841,7 +841,7 @@ class PuppeteerClient {
                 })
                 .catch((err) => {
                     log0("getUsersJobsData() error. Error: " + err);
-                    systemLogger.log("getUsersJobsData() error. Error: " + err);
+                    systemLogger?.log("getUsersJobsData() error. Error: " + err);
                     reject("Error: " + err);
                 });
         });
@@ -853,7 +853,7 @@ class PuppeteerClient {
             if (!this.loggedIntoMJ || this.browser == null) {
                 log6("Not logged into MJ. Attempting to log in.");
                 let uNamePWordCb = async () => {
-                    systemLogger.log("Not logged into MJ. Please send login credentials.");
+                    systemLogger?.log("Not logged into MJ. Please send login credentials.");
                     let uName = "";
                     let pWord = "";
                     let mfaCb = null;
@@ -871,7 +871,7 @@ class PuppeteerClient {
                         uName = username;
                         pWord = password;
                         mfaCb = async () => {
-                            systemLogger.log("MFA code requested. Please send MFA code.");
+                            systemLogger?.log("MFA code requested. Please send MFA code.");
                             let retData = "";
                             /**
                              * GET /mfa/:data
@@ -1014,7 +1014,7 @@ class PuppeteerClient {
                     });
                     if (data.error) {
                         log0("getUsersLikesData() error. Error: " + data.error);
-                        systemLogger.log("getUsersLikesData() error. Error: " + data.error);
+                        systemLogger?.log("getUsersLikesData() error. Error: " + data.error);
                         reject(data.error);
                         return;
                     }
@@ -1022,8 +1022,8 @@ class PuppeteerClient {
                 })
                 .catch((err) => {
                     log0("getUsersLikesData() error. Error: " + err);
-                    systemLogger.log("getUsersLikesData() error. Error: " + err);
-                    systemLogger.log("dataTemp: " + JSON.stringify(dataTemp));
+                    systemLogger?.log("getUsersLikesData() error. Error: " + err);
+                    systemLogger?.log("dataTemp: " + JSON.stringify(dataTemp));
                     reject("Error: " + err);
                 });
         });
@@ -1171,7 +1171,7 @@ class Database {
         log6("insertImage()\nindex: " + index + "\nimage: " + JSON.stringify(image));
         // find if image exists in database
         // if it does, update it
-        this.systemLogger.log("Inserting image into database. Image ID: " + image.id);
+        this.systemLogger?.log("Inserting image into database. Image ID: " + image.id);
         if (image.id !== undefined) {
             let lookup = await this.lookupByUUID(image.id);
             if (lookup !== undefined) {
@@ -1746,7 +1746,7 @@ class DatabaseUpdateManager {
             })
             .catch((err) => {
                 log2(err);
-                this.systemLogger.log("Error getting user's jobs data", err);
+                this.systemLogger?.log("Error getting user's jobs data", err);
                 log0(["DatabaseUpdateManager.run() error: Error getting user's jobs data", err]);
             })
             .finally(() => {
@@ -1763,21 +1763,21 @@ class DatabaseUpdateManager {
             .getUsersLikesData()
             .then(async (data) => {
                 log4("typeof data: " + typeof data);
-                this.systemLogger.log("DatabaseUpdateManager.updateUsersLikes() - Type of data: " + typeof data);
-                this.systemLogger.log(JSON.stringify(data).substring(0, 1000));
+                this.systemLogger?.log("DatabaseUpdateManager.updateUsersLikes() - Type of data: " + typeof data);
+                this.systemLogger?.log(JSON.stringify(data).substring(0, 1000));
                 log4("Size of data: ", data.length, "\nCalling buildImageData()");
                 let imageData = buildImageData(data);
-                this.systemLogger.log("imageData: " + JSON.stringify(imageData).substring(0, 5000));
+                this.systemLogger?.log("imageData: " + JSON.stringify(imageData).substring(0, 5000));
                 log2("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
                 for (let i = 0; i < imageData.length; i++) {
                     if (updateDB) await imageDB.insertImage(imageData[i], i);
-                    this.systemLogger.log(`Inserting image ${i + 1} of ${imageData.length}: ${imageData[i].id}`);
+                    this.systemLogger?.log(`Inserting image ${i + 1} of ${imageData.length}: ${imageData[i].id}`);
                 }
                 log2("Done updating database");
             })
             .catch((err) => {
                 log2(err);
-                this.systemLogger.log("Error getting user's likes data", err);
+                this.systemLogger?.log("Error getting user's likes data", err);
                 log0(["DatabaseUpdateManager.run() error: Error getting user's likes data", err]);
             })
             .finally(() => {
@@ -1926,7 +1926,7 @@ class DownloadManager {
                 });
             } catch (err) {
                 log0(["DownloadManager.downloadImage() error: Error downloading image", err, image]);
-                this.systemLogger.log("Error downloading image: " + url + " Error: " + err);
+                this.systemLogger?.log("Error downloading image: " + url + " Error: " + err);
                 return { success: false, error: err };
             }
 
@@ -2088,7 +2088,7 @@ class DownloadManager {
             log2("Done downloading images");
         } else {
             log0("One or more errors occurred while downloading images");
-            this.systemLogger.log("One or more errors occurred while downloading images");
+            this.systemLogger?.log("One or more errors occurred while downloading images");
             DownloadError.sendErrorCountToSystemLogger();
             DownloadError.resetCount();
         }
@@ -2128,7 +2128,7 @@ class DownloadManager {
                     imageResult = await this.downloadImage(image.urlFull, image);
                 } catch (err) {
                     log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", err, image]);
-                    // this.systemLogger.log("Error downloading image", err, image);
+                    // this.systemLogger?.log("Error downloading image", err, image);
                     success = false;
                     new DownloadError("Error downloading image", err, image);
                     log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
@@ -2152,7 +2152,7 @@ class DownloadManager {
                         altImageResult = await this.downloadImage(url, image);
                     } catch (err) {
                         log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", err, image]);
-                        // this.systemLogger.log("Error downloading image", err, image);
+                        // this.systemLogger?.log("Error downloading image", err, image);
                         new DownloadError("Error downloading image", err, image);
                         success = false;
                         log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
@@ -2163,7 +2163,7 @@ class DownloadManager {
                         await this.dbClient.updateImage(altImageResult);
                     } else {
                         log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", altImageResult.error, image]);
-                        // this.systemLogger.log("Error downloading image", altImageResult.error, image);
+                        // this.systemLogger?.log("Error downloading image", altImageResult.error, image);
                         new DownloadError("Error downloading image", altImageResult.error, image);
                         success = false;
                         log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
@@ -2293,7 +2293,7 @@ class UpscaleManager {
             log2("Done upscaling images");
         } else {
             log0("One or more errors occurred while upscaling images");
-            this.systemLogger.log("One or more errors occurred while upscaling images");
+            this.systemLogger?.log("One or more errors occurred while upscaling images");
         }
         this.checkForFinishedJobs();
         this.start();
@@ -2694,7 +2694,7 @@ app.post("/logger", (req, res) => {
     log3("POST /logger");
     const { message } = req.body;
     log6("message: " + message);
-    systemLogger.log(message);
+    systemLogger?.log(message);
     res.send("ok");
 });
 
@@ -2895,7 +2895,7 @@ function saveSettings() {
     systemLogger?.log("Setting saved", new Date().toLocaleString());
 }
 
-systemLogger.log("Server started", new Date().toLocaleString());
+systemLogger?.log("Server started", new Date().toLocaleString());
 
 process.on("exit", (code) => {
     saveSettings();
