@@ -1632,7 +1632,6 @@ class ImageInfo {
     constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height, storage_location = "", upscale_location = "") {
         log5("ImageInfo constructor called");
         log6("ImageInfo constructor\nparent_id: " + parent_id + "\ngrid_index: " + grid_index + "\nenqueue_time: " + enqueue_time + "\nfullCommand: " + fullCommand + "\nwidth: " + width + "\nheight: " + height + "\nstorage_location: " + storage_location + "\nupscale_location: " + upscale_location);
-        this.id = null; // will be set as parent_id + "_" + grid_index
         this.parent_id = parent_id;
         this.grid_index = grid_index;
         this.enqueue_time = enqueue_time;
@@ -2858,18 +2857,10 @@ function buildImageData(data) {
         log6("Processing job: " + JSON.stringify(job));
         if (job.batch_size && job.batch_size == 4) {
             for (let i = 0; i < 4; i++) {
-                try{
                 imageData.push(new ImageInfo(job.id, i, job.enqueue_time, job.full_command, job.width, job.height));
-                }catch(err){
-                    log0(["buildImageData() error: Error creating ImageInfo object for job", err, job, i]);
-                }
             }
         } else {
-            try{
             imageData.push(new ImageInfo(job.id, job.parent_grid, new Date(job.enqueue_time), "", job.width, job.height));
-            }catch(err){
-                log0(["buildImageData() error: Error creating ImageInfo object for job", err, job]);
-            }
         }
     });
     return imageData;
