@@ -473,8 +473,8 @@
             // find image in array
             let image = ImageInfo.images.find((image) => image.index == imageIdNum);
 
-            menuItem1.innerHTML = "<a href='" + image.urlAlt + "' download>Download</a>";
-            menuItem2.innerHTML = "<a href='" + image.urlAlt + "' target='_blank'>Open In New Window / Tab</a>";
+            menuItem1.innerHTML = "<a href='" + image.urlFull + "' download>Download</a>";
+            menuItem2.innerHTML = "<a href='" + image.urlFull + "' target='_blank'>Open In New Window / Tab</a>";
 
         });
 
