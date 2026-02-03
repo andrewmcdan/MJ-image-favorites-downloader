@@ -371,6 +371,10 @@
                 if (image.processed == true) {
                     return;
                 }
+
+                if(image.fullCommand.contains("--motion")) {
+                    return;
+                }
                 const imgWrapper = document.createElement('div');
                 imgWrapper.style.display = 'inline-block'; // maintain inline layout
                 imgWrapper.style.verticalAlign = 'top'; // align at the top
