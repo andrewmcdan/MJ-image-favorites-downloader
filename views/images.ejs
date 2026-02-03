@@ -148,6 +148,12 @@
                 return this.parent_id + '_' + this.grid_index;
             }
             get urlFull() {
+                // if the fullCommand contains https://s.mj.run/ extract that url and return it
+                let regex = /(https:\/\/s\.mj\.run\/[a-zA-Z0-9_-]+)/;
+                let match = this.fullCommand.match(regex);
+                if (match) {
+                    return match[1];
+                }
                 return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.png`;
             }
             get urlSmall() {
