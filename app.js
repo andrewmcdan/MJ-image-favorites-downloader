@@ -2855,12 +2855,21 @@ function buildImageData(data) {
     log6("buildImageData()\ndata.length: " + data.length);
     let imageData = [];
     data.forEach((job) => {
+        log6("Processing job: " + JSON.stringify(job));
         if (job.batch_size && job.batch_size == 4) {
             for (let i = 0; i < 4; i++) {
+                try{
                 imageData.push(new ImageInfo(job.id, i, job.enqueue_time, job.full_command, job.width, job.height));
+                }catch(err){
+                    log0(["buildImageData() error: Error creating ImageInfo object for job", err, job, i]);
+                }
             }
         } else {
+            try{
             imageData.push(new ImageInfo(job.id, job.parent_grid, new Date(job.enqueue_time), "", job.width, job.height));
+            }catch(err){
+                log0(["buildImageData() error: Error creating ImageInfo object for job", err, job]);
+            }
         }
     });
     return imageData;
