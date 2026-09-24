@@ -2,7 +2,19 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { findMissingDownloadIds } = require("../src/services/download-verification");
+const path = require("node:path");
+const { findMissingDownloadIds, normalizeStoragePath } = require("../src/services/download-verification");
+
+test("storage paths are normalized for the host operating system", () => {
+    assert.equal(
+        normalizeStoragePath("output\\2024\\1\\2\\image.png"),
+        path.join("output", "2024", "1", "2", "image.png"),
+    );
+    assert.equal(
+        normalizeStoragePath("output/2024/1/2/image.png"),
+        path.join("output", "2024", "1", "2", "image.png"),
+    );
+});
 
 test("download verification returns only missing file IDs", async () => {
     const records = [

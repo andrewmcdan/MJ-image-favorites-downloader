@@ -1,13 +1,20 @@
 "use strict";
 
 const fs = require("fs");
+const path = require("path");
 
 const DEFAULT_VERIFY_CONCURRENCY = 64;
 
+function normalizeStoragePath(filePath) {
+    if (typeof filePath !== "string") return "";
+    return path.normalize(filePath.replace(/[\\/]+/g, path.sep));
+}
+
 async function isRegularFile(filePath) {
-    if (typeof filePath !== "string" || filePath.trim() === "") return false;
+    const normalizedPath = normalizeStoragePath(filePath);
+    if (normalizedPath.trim() === "") return false;
     try {
-        return (await fs.promises.stat(filePath)).isFile();
+        return (await fs.promises.stat(normalizedPath)).isFile();
     } catch {
         return false;
     }
@@ -36,4 +43,4 @@ async function findMissingDownloadIds(records, options = {}) {
     return missingIds;
 }
 
-module.exports = { DEFAULT_VERIFY_CONCURRENCY, findMissingDownloadIds, isRegularFile };
+module.exports = { DEFAULT_VERIFY_CONCURRENCY, findMissingDownloadIds, isRegularFile, normalizeStoragePath };

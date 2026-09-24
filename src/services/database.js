@@ -465,7 +465,7 @@ function createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 }) {
             try {
                 const res = await this.dbClient.query(`
                     UPDATE images
-                    SET downloaded = false, storage_location = ''
+                    SET downloaded = false
                     WHERE uuid = ANY($1::text[])
                 `, [uuids]);
                 return res.rowCount;
