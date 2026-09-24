@@ -185,7 +185,7 @@ class PuppeteerClient {
             { localStorageData: this.mj_localStorage, sessionStorageData: this.mj_sessionStorage },
         );
         await this.page.goto("https://www.midjourney.com/explore?tab=likes", {
-            waitUntil: "networkidle2",
+            waitUntil: "domcontentloaded",
             timeout: 60000,
         });
 
@@ -271,7 +271,7 @@ class PuppeteerClient {
 
                         log6("Navigating to MJ home page.");
                         await this.page.goto("https://www.midjourney.com/", {
-                            waitUntil: "networkidle2",
+                            waitUntil: "domcontentloaded",
                             timeout: 60000,
                         });
                         log6("Navigated to MJ home page.");
@@ -393,11 +393,17 @@ class PuppeteerClient {
                             log0("loginToMJ() error. Login failed.");
                             reject("Login failed");
                         }
+                    })
+                    .catch((error) => {
+                        this.loginInProgress = false;
+                        this.loggedIntoMJ = false;
+                        log0("loginToMJ() browser or navigation error: " + error.message);
+                        reject(error);
                     });
                 if (this.loggedIntoMJ) {
                     log2("Already logged into MJ");
                     await this.page.goto("https://www.midjourney.com/imagine", {
-                        waitUntil: "networkidle2",
+                        waitUntil: "domcontentloaded",
                         timeout: 60000,
                     });
                     resolve();
@@ -634,7 +640,7 @@ class PuppeteerClient {
             await waitSeconds(2);
             this.page
                 ?.goto("https://www.midjourney.com/imagine", {
-                    waitUntil: "networkidle2",
+                    waitUntil: "domcontentloaded",
                     timeout: 60000,
                 })
                 .then(async () => {
@@ -783,7 +789,7 @@ class PuppeteerClient {
             await waitSeconds(2);
             this.page
                 ?.goto("https://www.midjourney.com/explore?tab=likes", {
-                    waitUntil: "networkidle2",
+                    waitUntil: "domcontentloaded",
                     timeout: 60000,
                 })
                 .then(async () => {
@@ -850,7 +856,7 @@ class PuppeteerClient {
             if (this.loginInProgress) reject("Login in progress");
             log6("Navigating to MJ home page.");
             await this.page.goto("https://www.midjourney.com/imagine", {
-                waitUntil: "networkidle2",
+                waitUntil: "domcontentloaded",
                 timeout: 60000,
             });
             log6("Navigated to MJ home page.");
