@@ -2,15 +2,17 @@
     "name": "mj-image-favorites-downloader",
     "version": "0.0.1",
     "description": "A Midjourney image downloader webapp.",
-    "main": "app.js",
+    "main": "src/app.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "start": "node src/app.js",
+        "test": "node --test"
     },
     "author": "",
     "license": "ISC",
     "dependencies": {
         "ai-upscale-module": "file:../AI-Upscale-Module/",
         "axios": "^1.5.1",
+        "dotenv": "^17.4.2",
         "ejs": "^3.1.9",
         "express": "^4.18.2",
         "express-remove-route": "^1.0.0",

@@ -31,24 +31,33 @@
 const fs = require("fs");
 // const axios = require('axios');
 const path = require("path");
+const PROJECT_ROOT = path.resolve(__dirname, "..");
+require("dotenv").config({ path: path.join(PROJECT_ROOT, ".env"), quiet: true });
+process.chdir(PROJECT_ROOT);
 const express = require("express");
 const bodyParser = require("body-parser");
 const sharp = require("sharp");
-const PNG = require("pngjs").PNG;
 const app = express();
 const port = process.env.mj_dl_server_port | 3000;
 app.use(bodyParser.json({ limit: "100mb" }));
-const pgClient = require("pg");
 const puppeteer = require("puppeteer-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 puppeteer.use(StealthPlugin());
 const Upscaler = require("ai-upscale-module");
-const winston = require("winston");
-require("winston-daily-rotate-file");
-const Transport = require("winston-transport");
-const util = require("util");
-const { spawn } = require("child_process");
 var removeRoute = require("express-remove-route");
+const { registerRoutes } = require("./routes");
+const { ImageInfo } = require("./models/image-info");
+const { buildImageData: buildMidjourneyImageData, getObsoleteSingleOutputIds } = require("./midjourney/build-image-data");
+const { createLogging } = require("./logging");
+const { createDatabaseClass } = require("./services/database");
+const { validatePNG, waitSeconds } = require("./utils/runtime");
+const { loadSettings: loadSettingsFile, saveSettings: saveSettingsFile } = require("./settings");
+const { createPuppeteerDiagnostics, envFlag } = require("./puppeteer/diagnostics");
+const { cleanupChromeProcesses } = require("./puppeteer/process-cleanup");
+const { waitForLoginCompletion, triggerGoogleLogin, isAuthenticatedLikesProbe } = require("./puppeteer/login");
+
+const SETTINGS_PATH = path.join(PROJECT_ROOT, "settings.json");
+const MJ_SESSION_PATH = path.join(PROJECT_ROOT, "mjSession.json");
 
 let logLevel = process.env.mj_dl_server_log_level ?? 0;
 if (typeof logLevel === "string") logLevel = parseInt(logLevel);
@@ -59,89 +68,18 @@ if (typeof verifyDownloadsOnStartup === "string") verifyDownloadsOnStartup = ver
 
 let settings = {};
 
-const log_levels = {
-    error: 0,
-    warn: 1,
-    info: 2,
-    http: 3,
-    verbose: 4,
-    debug: 5,
-    silly: 6,
-};
-const log_level_names = Object.keys(log_levels);
-
-const logFileTransport = new winston.transports.DailyRotateFile({
-    filename: "log/%DATE%.log",
-    datePattern: "YYYY-MM-DD",
-    maxSize: "10m",
-    maxFiles: "1d",
+const { logger: winstonLogger, systemLogger, log0, log1, log2, log3, log4, log5, log6 } = createLogging({
+    logLevel,
+    updateDB,
+    verifyDownloadsOnStartup,
+    projectRoot: PROJECT_ROOT,
 });
-
-const winstonLogger = winston.createLogger({
-    level: log_level_names[logLevel],
-    format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.printf((info) => `${info.timestamp} ${info.level}: ${info.message}`),
-    ),
-    transports: [new winston.transports.Console(), logFileTransport],
-});
-
-winstonLogger[log_level_names[logLevel]](["Server Starting..."]);
-winstonLogger[log_level_names[logLevel]](["Log level set to " + log_level_names[logLevel]]);
-winstonLogger[log_level_names[logLevel]](["Update DB set to " + updateDB]);
-winstonLogger[log_level_names[logLevel]](["Verify Downloads on Startup set to " + verifyDownloadsOnStartup]);
-
-const logX_to_winston = (x, ...args) => {
-    if (args.every((arg) => typeof arg === "string")) {
-        winstonLogger[log_level_names[x]](args.join(" "));
-    } else {
-        winstonLogger[log_level_names[x]](JSON.stringify(args, null, 2));
-    }
-};
-
-/**
- * @var {function} log0 - Alias for winstonLogger.error()
- */
-let log0 = (...args) => {
-    logX_to_winston(0, ...args);
-};
-/**
- * @var {function} log1 - Alias for winstonLogger.warn()
- */
-let log1 = (...args) => {
-    logX_to_winston(1, ...args);
-};
-/**
- * @var {function} log2 - Alias for winstonLogger.info()
- */
-let log2 = (...args) => {
-    logX_to_winston(2, ...args);
-};
-/**
- * @var {function} log3 - Alias for winstonLogger.http()
- */
-let log3 = (...args) => {
-    logX_to_winston(3, ...args);
-};
-/**
- * @var {function} log4 - Alias for winstonLogger.verbose()
- */
-let log4 = (...args) => {
-    logX_to_winston(4, ...args);
-};
-/**
- * @var {function} log5 - Alias for winstonLogger.debug()
- */
-let log5 = (...args) => {
-    logX_to_winston(5, ...args);
-};
-/**
- * @var {function} log6 - Alias for winstonLogger.silly()
- */
-let log6 = (...args) => {
-    logX_to_winston(6, ...args);
-};
-
+const puppeteerDiagnostics = createPuppeteerDiagnostics({ projectRoot: PROJECT_ROOT, log: log0 });
+const cleanupOrphanedChrome = () =>
+    cleanupChromeProcesses({
+        enabled: envFlag("MJ_PUPPETEER_KILLALL_CHROME", true),
+        log: log1,
+    });
 class DB_Error extends Error {
     static count = 0;
     constructor(message) {
@@ -177,92 +115,6 @@ class DownloadError extends Error {
     }
 }
 
-class SystemLogger {
-    constructor() {
-        log5("SystemLogger constructor called");
-        this.logArr = [];
-        this.idIndex = 0;
-    }
-
-    log(...message) {
-        log5("systemLogger?.log called with message: " + message.join(" : "));
-        winstonLogger?.log("error", message.join(" : "));
-        let entry = {};
-        entry.time = new Date();
-        entry.message = message;
-        entry.id = this.idIndex++;
-        log6("systemLogger?.log entry: " + JSON.stringify(entry));
-        this.logArr.push(entry);
-    }
-
-    getLog() {
-        log5("systemLogger.getLog called");
-        return this.logArr;
-    }
-
-    clearLog() {
-        this.logArr = [];
-        log5("Cleared systemLogger log");
-    }
-
-    printLog() {
-        log5("systemLogger.printLog called");
-        console.log(this.logArr);
-    }
-
-    getMostRecentLog(remove = false) {
-        log5("systemLogger.getMostRecentLog called with remove = " + remove);
-        if (this.logArr.length === 0) return null;
-        log6("systemLogger.getMostRecentLog logArr: " + JSON.stringify(this.logArr));
-        let logTemp = this.logArr[this.logArr.length - 1];
-        if (remove) {
-            this.logArr.pop();
-        }
-        log6("systemLogger.getMostRecentLog logTemp: " + JSON.stringify(logTemp));
-        return logTemp;
-    }
-
-    getRecentEntries(numberOfEntries, remove = false) {
-        log5("systemLogger.getRecentEntries called with numberOfEntries = " + numberOfEntries + " and remove = " + remove);
-        let entries = [];
-        if (typeof numberOfEntries === "string") numberOfEntries = parseInt(numberOfEntries);
-        numberOfEntries = Math.min(numberOfEntries, this.logArr.length);
-        log6("systemLogger.getRecentEntries numberOfEntries = " + numberOfEntries);
-        if (remove) {
-            log1("Removing " + numberOfEntries + " entries from systemLogger");
-            for (let i = 0; i < numberOfEntries; i++) {
-                entries.push(this.getMostRecentLog(remove));
-            }
-        } else {
-            for (let i = 0; i < numberOfEntries; i++) {
-                entries.push(this.logArr[this.logArr.length - 1 - i]);
-            }
-        }
-        log6("systemLogger.getRecentEntries entries = " + JSON.stringify(entries));
-        return entries;
-    }
-
-    deleteEntry(id) {
-        log5("systemLogger.deleteEntry called with id = " + id);
-        if (typeof id === "string") id = parseInt(id);
-        for (let i = 0; i < this.logArr.length; i++) {
-            if (this.logArr[i].id === id) {
-                this.logArr.splice(i, 1);
-                log6("systemLogger.deleteEntry deleted entry with id = " + id);
-                return true;
-            }
-        }
-        log6("systemLogger.deleteEntry did not find entry with id = " + id);
-        return false;
-    }
-
-    getNumberOfEntries() {
-        log5("systemLogger.getNumberOfEntries called");
-        return this.logArr.length;
-    }
-}
-
-const systemLogger = new SystemLogger();
 
 class PuppeteerClient {
     constructor() {
@@ -288,81 +140,74 @@ class PuppeteerClient {
      */
     async loadSession() {
         log5("loadSession() called");
-        return new Promise(async (resolve, reject) => {
-            if (fs.existsSync("mjSession.json") && fs.existsSync("discordSession.json")) {
-                log6("Session files found. Loading session data.");
-                let sessionData = JSON.parse(fs.readFileSync("mjSession.json"));
-                this.mj_cookies = sessionData.cookies;
-                this.mj_localStorage = sessionData.localStorage;
-                this.mj_sessionStorage = sessionData.sessionStorage;
-                // sessionData = JSON.parse(
-                //     fs.readFileSync("discordSession.json")
-                // );
-                // this.discord_cookies = sessionData.cookies;
-                // this.discord_localStorage = sessionData.localStorage;
-                // this.discord_sessionStorage = sessionData.sessionStorage;
-                log6("Session data loaded.");
-            } else {
-                log0("LoadSession error. Session file not found.");
-                reject("Session file not found");
-                return;
-            }
+        if (!fs.existsSync(MJ_SESSION_PATH)) {
+            log0("LoadSession error. Session file not found.");
+            throw new Error("Session file not found");
+        }
+        log6("Session file found. Loading session data.");
+        const sessionData = JSON.parse(fs.readFileSync(MJ_SESSION_PATH, "utf8"));
+        this.mj_cookies = sessionData.cookies;
+        this.mj_localStorage = sessionData.localStorage;
+        this.mj_sessionStorage = sessionData.sessionStorage;
 
-            if (this.browser == null) {
-                log1("Browser is null. Launching new browser.");
-                this.browser = await puppeteer.launch({
-                    headless: false,
-                    defaultViewport: null,
-                    args: ["--enable-javascript"],
-                });
-                log6("Browser launched.");
-                this.browser.on("disconnected", () => {
-                    log6("Browser disconnected. Setting browser and page to null. Setting loggedIntoMJ to false. Setting loginInProgress to false. Killing all chrome processes.");
-                    this.browser = null;
-                    this.page = null;
-                    this.loggedIntoMJ = false;
-                    this.loginInProgress = false;
-                    spawn("killall", ["chrome"]);
-                });
-                this.page = (await this.browser.pages())[0];
-                log6("Page set.");
-            }
-
-            log6("Setting cookies.");
-            await this.page.goto("https://www.midjourney.com/imagine", {
-                waitUntil: "networkidle2",
-                timeout: 60000,
-            });
-            // let discordPage = await this.browser.newPage();
-            // await discordPage.goto("https://discord.com/");
-            // await waitSeconds(1);
-            // await this.page.setCookie(...this.mj_cookies);
-            // await discordPage.setCookie(...this.discord_cookies);
-            await waitSeconds(1);
-            log6("Cookies set.");
-            log6("Closing discord page.");
-            // await discordPage?.close();
-            log6("Discord page closed.");
-
-            log6("Navigating to MJ home page.");
-            await this.page.goto("https://www.midjourney.com/imagine", {
-                waitUntil: "networkidle2",
-                timeout: 60000,
-            });
-            await waitSeconds(2);
-            if (this.page.url().includes("https://www.midjourney.com/imagine")) {
-                log6("Successfully navigated to MJ home page.");
-                log6("Session restore successful.");
-                this.loggedIntoMJ = true;
-                resolve();
-            } else {
-                log6("Session restore failed.");
+        if (this.browser == null) {
+            log1("Browser is null. Launching new browser.");
+            this.browser = await puppeteer.launch(puppeteerDiagnostics.launchOptions({
+                headless: false,
+                defaultViewport: null,
+                args: ["--enable-javascript"],
+            }));
+            puppeteerDiagnostics.attachBrowser(this.browser);
+            this.browser.on("disconnected", () => {
+                log6("Browser disconnected. Clearing Puppeteer state.");
+                this.browser = null;
+                this.page = null;
                 this.loggedIntoMJ = false;
-                log0("loadSession() error. Session restore failed.");
-                reject("Session restore failed");
-            }
-            log6("loadSession() complete.");
+                this.loginInProgress = false;
+                cleanupOrphanedChrome();
+            });
+            this.page = (await this.browser.pages())[0];
+            puppeteerDiagnostics.attachPage(this.page);
+        }
+
+        log6("Restoring Midjourney cookies before navigation.");
+        if (Array.isArray(this.mj_cookies) && this.mj_cookies.length) await this.page.setCookie(...this.mj_cookies);
+        await this.page.goto("https://www.midjourney.com/explore?tab=likes", {
+            waitUntil: "domcontentloaded",
+            timeout: 60000,
         });
+        await this.page.evaluate(
+            ({ localStorageData, sessionStorageData }) => {
+                Object.entries(localStorageData || {}).forEach(([key, value]) => localStorage.setItem(key, value));
+                Object.entries(sessionStorageData || {}).forEach(([key, value]) => sessionStorage.setItem(key, value));
+            },
+            { localStorageData: this.mj_localStorage, sessionStorageData: this.mj_sessionStorage },
+        );
+        await this.page.goto("https://www.midjourney.com/explore?tab=likes", {
+            waitUntil: "networkidle2",
+            timeout: 60000,
+        });
+
+        const probe = await this.page.evaluate(async () => {
+            const response = await fetch("/api/explore-likes?page=1&_ql=explore", {
+                credentials: "include",
+                headers: { accept: "application/json", "x-csrf-protection": "1" },
+            });
+            if (!response.ok) return { ok: false, status: response.status, isArray: false };
+            try {
+                return { ok: true, status: response.status, isArray: Array.isArray(await response.json()) };
+            } catch {
+                return { ok: true, status: response.status, isArray: false };
+            }
+        });
+        if (!isAuthenticatedLikesProbe(probe)) {
+            this.loggedIntoMJ = false;
+            log0(`loadSession() error. Saved session rejected by Likes API (${probe?.status ?? "unknown"}).`);
+            throw new Error("Session restore failed");
+        }
+        this.loggedIntoMJ = true;
+        systemLogger?.log("Midjourney session restored from mjSession.json; interactive login skipped.");
+        log6("loadSession() complete.");
     }
 
     /**
@@ -389,37 +234,38 @@ class PuppeteerClient {
                             await this.browser.close();
                         }
                         log1("Launching new browser.");
-                        this.browser = await puppeteer.launch({
+                        this.browser = await puppeteer.launch(puppeteerDiagnostics.launchOptions({
                             headless: false,
                             defaultViewport: null,
                             args: ["--enable-javascript"],
-                        });
+                        }));
+                        puppeteerDiagnostics.attachBrowser(this.browser);
                         log6("Browser launched.");
                         this.page = (await this.browser.pages())[0];
+                        puppeteerDiagnostics.attachPage(this.page);
                         log6("Page set.");
 
                         log6("Setting up targetcreated event listener for discord.com/login.");
-                        this.browser.on("targetcreated", async (target) => {
-                            log6("Target created. Checking if target is discord.com/login.");
-                            const pageList = await this.browser.pages();
-                            let discordLoginPage = pageList[pageList.length - 1];
-                            if (discordLoginPage.url().includes("discord.com/login")) {
+                        const handledAuthPages = new WeakSet();
+                        const handleAuthTarget = async (target) => {
+                            const authPage = await target.page().catch(() => null);
+                            if (!authPage || handledAuthPages.has(authPage)) return;
+                            const authUrl = authPage.url();
+                            if (authUrl.includes("discord.com/login")) {
+                                handledAuthPages.add(authPage);
                                 log6("Target is discord.com/login. Logging into Discord.");
-                                await this.loginToDiscord(discordLoginPage, credentials_cb);
+                                await this.loginToDiscord(authPage, credentials_cb);
                             }
-                            let googleLoginPage = pageList[pageList.length - 1];
-                            if (googleLoginPage.url().includes("accounts.google.com")) {
-                                log6("Target is accounts.google.com. Logging into Google.");
-                                await this.loginToGoogle(googleLoginPage, credentials_cb);
-                            }
-                        });
+                        };
+                        this.browser.on("targetcreated", handleAuthTarget);
+                        this.browser.on("targetchanged", handleAuthTarget);
                         this.browser.on("disconnected", () => {
-                            log6("Browser disconnected. Setting browser and page to null. Setting loggedIntoMJ to false. Setting loginInProgress to false. Killing all chrome processes.");
+                            log6("Browser disconnected. Clearing Puppeteer state.");
                             this.browser = null;
                             this.page = null;
                             this.loggedIntoMJ = false;
                             this.loginInProgress = false;
-                            spawn("killall", ["chrome"]);
+                            cleanupOrphanedChrome();
                         });
 
                         log6("Navigating to MJ home page.");
@@ -437,35 +283,34 @@ class PuppeteerClient {
                         await this.page.mouse.wheel({ deltaY: 100 });
                         await waitSeconds(2);
                         await this.page.mouse.wheel({ deltaY: -200 });
-                        await waitSeconds(60);
-                        log1('waiting for user to click "log in" and select google');
-                        // log6("Clicking 'Log In' button.");
-                        // await this.page
-                        //     .click("span ::-p-text(Log In)")
-                        //     .catch(() => {
-                        //         log0(
-                        //             "loginToMJ() error. Log In button not found."
-                        //         );
-                        //         reject("Log In button not found");
-                        //     });
-                        // await waitSeconds(1);
-                        // await this.page
-                        //     .click("div ::-p-text(Continue with Google)")
-                        //     .catch(() => {
-                        //         log0(
-                        //             "loginToMJ() error. Continue with Google button not found."
-                        //         );
-                        //         reject("Continue with Google button not found");
-                        //     });
-                        // let waitCount = 0;
-                        while (!this.discordLoginComplete && !this.googleLoginComplete) {
-                            await waitSeconds(1);
-                            waitCount++;
-                            if (waitCount > 60 * 5) {
-                                log0("loginToMJ() error. Timed out waiting for login.");
-                                reject("Timed out waiting for login");
-                                return;
-                            }
+                        log1("Opening the Midjourney Google login flow.");
+                        const googleTargetPromise = this.browser.waitForTarget(
+                            (target) => target.url().includes("accounts.google.com"),
+                            { timeout: 60000 },
+                        );
+                        try {
+                            await triggerGoogleLogin(this.page, () => waitSeconds(2));
+                            log1("Waiting for the Google login window.");
+                            const googleTarget = await googleTargetPromise;
+                            const googleLoginPage = await googleTarget.page();
+                            if (!googleLoginPage) throw new Error("Google login target did not provide a page");
+                            puppeteerDiagnostics.attachPage(googleLoginPage);
+                            log1("Google login window detected. Supplying credentials.");
+                            await this.loginToGoogle(googleLoginPage, credentials_cb);
+                        } catch (error) {
+                            void googleTargetPromise.catch(() => {});
+                            log0("Google login flow failed: " + error.message);
+                            reject("Google login flow failed: " + error.message);
+                            return;
+                        }
+                        const loginCompleted = await waitForLoginCompletion({
+                            isComplete: () => Boolean(this.discordLoginComplete || this.googleLoginComplete),
+                            wait: () => waitSeconds(1),
+                        });
+                        if (!loginCompleted) {
+                            log0("loginToMJ() error. Timed out waiting for login.");
+                            reject("Timed out waiting for login");
+                            return;
                         }
                         await waitSeconds(5);
                         log6("Login process complete or failed.");
@@ -490,7 +335,7 @@ class PuppeteerClient {
                             try {
                                 log6("Writing mjSession.json file.");
                                 fs.writeFileSync(
-                                    "mjSession.json",
+                                    MJ_SESSION_PATH,
                                     JSON.stringify({
                                         cookies: this.mj_cookies,
                                         localStorage: this.mj_localStorage,
@@ -562,44 +407,44 @@ class PuppeteerClient {
 
     async loginToGoogle(googleLoginPage, credentials_cb) {
         log5("loginToGoogle() called");
-        let credentials = await credentials_cb();
-        console.log({ credentials });
-        let username = credentials.uName;
-        let password = credentials.pWord;
-        if (username === "" || password === "") {
-            log1("loginToGoogle() error. Username or password is empty.");
+        try {
+            const credentials = await credentials_cb();
+            const username = credentials.uName;
+            const password = credentials.pWord;
+            if (username === "" || password === "") {
+                log1("loginToGoogle() error. Username or password is empty.");
+                this.googleLoginComplete = false;
+                return;
+            }
+
+            log1("Google login: waiting for the email field.");
+            const emailSelector = 'input[type="email"], input#identifierId';
+            await googleLoginPage.waitForSelector(emailSelector, { visible: true, timeout: 60000 });
+            await googleLoginPage.click(emailSelector);
+            await googleLoginPage.type(emailSelector, username, { delay: 45 });
+            await googleLoginPage.keyboard.press("Enter");
+
+            log1("Google login: email submitted; waiting for the password field.");
+            const passwordSelector = 'input[type="password"]';
+            await googleLoginPage.waitForSelector(passwordSelector, { visible: true, timeout: 60000 });
+            await googleLoginPage.click(passwordSelector);
+            await googleLoginPage.type(passwordSelector, password, { delay: 45 });
+            await googleLoginPage.keyboard.press("Enter");
+
+            log1("Google login: password submitted; waiting for Midjourney redirect.");
+            const completed = await waitForLoginCompletion({
+                isComplete: () => googleLoginPage.isClosed() || !googleLoginPage.url().includes("accounts.google.com"),
+                wait: () => waitSeconds(1),
+            });
+            if (!completed) throw new Error("Timed out waiting for Google to return to Midjourney");
+            this.googleLoginComplete = true;
+            log1("Google login window completed.");
+        } catch (error) {
             this.googleLoginComplete = false;
-            return;
+            await puppeteerDiagnostics.capture(googleLoginPage, "google-login-error", error);
+            log0("loginToGoogle() error: " + error.message);
+            throw error;
         }
-        log6("Logging into Google with username: " + username + " and password: " + password);
-        await waitSeconds(2);
-        log6("Typing username and password.");
-        await googleLoginPage.waitForSelector('input[type="email"]');
-        let typingRandomTimeMin = 0.03;
-        let typingRandomTimeMax = 0.15;
-        for (let i = 0; i < username.length; i++) {
-            await googleLoginPage.type('input[type="email"]', username.charAt(i));
-            let randomTime = Math.random() * typingRandomTimeMin + typingRandomTimeMax;
-            await waitSeconds(randomTime);
-        }
-        await googleLoginPage.keyboard.press("Enter");
-        await waitSeconds(10);
-        await googleLoginPage.waitForSelector('input[type="password"]');
-        await waitSeconds(2);
-        await googleLoginPage.click('input[type="password"]');
-        for (let i = 0; i < password.length; i++) {
-            await googleLoginPage.type('input[type="password"]', password.charAt(i));
-            let randomTime = Math.random() * typingRandomTimeMin + typingRandomTimeMax;
-            await waitSeconds(randomTime);
-        }
-        log6("Username and password typed.");
-        await waitSeconds(1);
-        await googleLoginPage.keyboard.press("Enter");
-        await waitSeconds(1);
-        while (!googleLoginPage.isClosed()) {
-            await waitSeconds(1);
-        }
-        this.googleLoginComplete = true;
     }
 
     /**
@@ -618,7 +463,7 @@ class PuppeteerClient {
             this.discordLoginComplete = false;
             return;
         }
-        log6("Logging into Discord with username: " + username + " and password: " + password);
+        log6("Logging into Discord with the supplied credentials.");
         let MFA_cb = credentials.mfaCb;
         await waitSeconds(1);
         log6("Typing username and password.");
@@ -676,6 +521,10 @@ class PuppeteerClient {
 
     async killBrowser() {
         log5("killBrowser() called");
+        if (puppeteerDiagnostics.keepOpen) {
+            puppeteerDiagnostics.write("Keeping browser open because MJ_PUPPETEER_KEEP_OPEN is enabled");
+            return;
+        }
         if (this.browser !== null) {
             log6("Browser is not null. Closing browser.");
             await this.browser.close();
@@ -691,7 +540,7 @@ class PuppeteerClient {
             this.mj_localStorage = null;
             this.mj_sessionStorage = null;
             this.pageURL = null;
-            spawn("killall", ["chrome"]);
+            cleanupOrphanedChrome();
         }
     }
 
@@ -707,10 +556,14 @@ class PuppeteerClient {
             if (!this.loggedIntoMJ || this.browser == null) {
                 log6("Not logged into MJ. Attempting to log in.");
                 let uNamePWordCb = async () => {
-                    systemLogger?.log("Not logged into MJ. Please send login credentials.");
-                    let uName = "";
-                    let pWord = "";
+                    let uName = process.env.GOOGLE_LOGIN_EMAIL || "";
+                    let pWord = process.env.GOOGLE_LOGIN_PASSWORD || "";
                     let mfaCb = null;
+                    if (uName && pWord) {
+                        systemLogger?.log("Using Google login credentials from the environment.");
+                        return { uName, pWord, mfaCb };
+                    }
+                    systemLogger?.log("Not logged into MJ. Please send login credentials.");
                     /**
                      * GET /login/:username/:password
                      * Login endpoint for logging into Midjourney
@@ -722,7 +575,7 @@ class PuppeteerClient {
                         log3("GET /login/:username/:password called");
                         let { username, password } = req.params;
                         if (password.includes("%23")) password = password.replace("%23", "#");
-                        log6("Username: " + username + " Password: " + password);
+                        log6("Login credentials received.");
                         uName = username;
                         pWord = password;
                         mfaCb = async () => {
@@ -853,10 +706,14 @@ class PuppeteerClient {
             if (!this.loggedIntoMJ || this.browser == null) {
                 log6("Not logged into MJ. Attempting to log in.");
                 let uNamePWordCb = async () => {
-                    systemLogger?.log("Not logged into MJ. Please send login credentials.");
-                    let uName = "";
-                    let pWord = "";
+                    let uName = process.env.GOOGLE_LOGIN_EMAIL || "";
+                    let pWord = process.env.GOOGLE_LOGIN_PASSWORD || "";
                     let mfaCb = null;
+                    if (uName && pWord) {
+                        systemLogger?.log("Using Google login credentials from the environment.");
+                        return { uName, pWord, mfaCb };
+                    }
+                    systemLogger?.log("Not logged into MJ. Please send login credentials.");
                     /**
                      * GET /login/:username/:password
                      * Login endpoint for logging into Midjourney
@@ -867,7 +724,7 @@ class PuppeteerClient {
                     app.get("/login/:username/:password", async (req, res) => {
                         log3("GET /login/:username/:password called");
                         const { username, password } = req.params;
-                        log6("Username: " + username + " Password: " + password);
+                        log6("Login credentials received.");
                         uName = username;
                         pWord = password;
                         mfaCb = async () => {
@@ -923,7 +780,6 @@ class PuppeteerClient {
                 }
             }
             await waitSeconds(2);
-            let dataTemp = {};
             this.page
                 ?.goto("https://www.midjourney.com/explore?tab=likes", {
                     waitUntil: "networkidle2",
@@ -933,84 +789,37 @@ class PuppeteerClient {
                     log6("Navigated to MJ home page.");
                     log6("Getting user's likes data.");
                     let data = await this.page.evaluate(async () => {
-                        let numberOfLikesReturned = 0;
-                        let page = 1;
-                        let loopCount = 0;
-                        let returnedData = [];
-                        try {
-                            do {
-                                // let response = await fetch("https://www.midjourney.com/api/pg/thomas-likes?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
+                        const returnedData = [];
+                        const maxPages = 10000;
 
-                                // fetch("https://www.midjourney.com/api/pg/user-likes?page=2&_ql=explore", {headers: {"sec-ch-ua":'"Not)A;Brand";v="99", "Google Chrome";v="127", "Chromium";v="127"',"sec-ch-ua-mobile": "?0",
-                                /*        "sec-ch-ua-platform": '"Windows"',
-                                        "x-csrf-protection": "1",
-                                        Referer:
-                                            "https://www.midjourney.com/explore?tab=likes",
-                                        "Referrer-Policy":
-                                            "origin-when-cross-origin",
-                                    },
-                                    body: null,
-                                    method: "GET",
-                                }
-                                    fetch("https://www.midjourney.com/api/explore-likes?page=2&_ql=explore", {
-  "headers": {
-    "accept": "* /*",
-    "accept-language": "en-US,en;q=0.9",
-    "cache-control": "no-cache",
-    "pragma": "no-cache",
-    "priority": "u=1, i",
-    "sec-ch-ua": "\"Chromium\";v=\"142\", \"Google Chrome\";v=\"142\", \"Not_A Brand\";v=\"99\"",
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "\"Windows\"",
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-origin",
-    "x-csrf-protection": "1",
-    "cookie": "AMP_MKTG_437c42b22c=JTdCJTdE; __Host-Midjourney.AuthUserTokenV3_r=AMf-vBwiRqwpqQyKo_cZZVFwfOpfVyvP_Ce9vJ4nak9uGe_0BhyBmblh6GlN5gVhSJAjdUlOPRw8wWhGHqCcpmyeaAaPRN3FGmBNZbm4o-uDrE6ehgl3x14MW84y8RQQbZNGdJACB3Z7_Quyobmbvjfkof0wZ5aP6fFuAmag4KoaXoYYBxP5OCDXR8t9s3uxP_0JcCFIpb_Lf8jIOpfhXuTvNvhILfmPXN4H2A_5_EpaU26P4_MufpqLoqLbeYEefE3aY1cVSjf4WfOyzSbgyzPM86HDZiNnQLL0VJK0Y5voOcb3lyJpX1OUwYt_0kzpOAMWoOT1eDCBYf7_aPJV8sxwqLHC3mCQz4FRv5_3NrfN_RcIecWcFP5XHkT4j0K1TWwyP5TyY61yyUFrQfWfQO5SZ3Mjb52Q2C5vcBhlCom_nu5tfetLPRA; _gcl_au=1.1.1438724462.1761669757; _cfuvid=fd_yd6r.Dqx3JJdcbgq__SQsj1U8SrEnZ4lx__yVtgg-1764626365878-0.0.1.1-604800000; __Host-Midjourney.AuthUserTokenV3_i=eyJhbGciOiJSUzI1NiIsImtpZCI6IjdjNzQ5NTFmNjBhMDE0NzE3ZjFlMzA4ZDZiMjgwZjQ4ZjFlODhmZGEiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiYS5tY2QuIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0xJQ1pTems0NXBCU3BhTGl5QVA5WFNYbVdla3pYOVotTVl4Mk5xZ1Vtd21aN3VBaTdyYUE9czk2LWMiLCJtaWRqb3VybmV5X2lkIjoiZjY2YmE2NTYtZmMxYi00MzY2LThlYzgtY2Y1MmNiYzQ3MzA5IiwiaXNzIjoiaHR0cHM6Ly9zZWN1cmV0b2tlbi5nb29nbGUuY29tL2F1dGhqb3VybmV5IiwiYXVkIjoiYXV0aGpvdXJuZXkiLCJhdXRoX3RpbWUiOjE3NDk3NzY1MTcsInVzZXJfaWQiOiJEeWZlSnZKZXZnVmFjMWtOcFY5akw5SXY4NHcxIiwic3ViIjoiRHlmZUp2SmV2Z1ZhYzFrTnBWOWpMOUl2ODR3MSIsImlhdCI6MTc2NDgxMTIyMCwiZXhwIjoxNzY0ODE0ODIwLCJlbWFpbCI6ImFuZHJld21jZGFuQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7Imdvb2dsZS5jb20iOlsiMTEwMjMzNDY0NDExNzI0MTY5MDQ4Il0sImRpc2NvcmQuY29tIjpbIjE3NDI5NTM5MDA2ODI3NzI0OCJdLCJlbWFpbCI6WyJhbmRyZXdtY2RhbkBnbWFpbC5jb20iXX0sInNpZ25faW5fcHJvdmlkZXIiOiJnb29nbGUuY29tIn19.hPbNA_cI5TeieP-V8tDo0KAppdsWUOldLfMiHXUlVBwqYjhKiBFNNf1yZ978t3NZWWz1VuseSPGD90R8BRtJJ9uws7mlqmjoRlQDt7FC-tkmtwUuNszxijtV3OqI6FSXIjtau1oJrW_2Pv7T0Dexwm-1VJMcjNPWpRRZVJ80s6Cj3Ac_YNeJmFo3JwNvNOaC7rKL-kVFlU2JUtIDDLco-SDRyf2Nuk-YWUql_xKkyeLTFDHc2WY1EOlWyYMEvvV43MJwjHpV12mdIgxBJm53S6I69aKi4Ob-SfcCKHOSj8acPq1DCwbMVD4AduVR8Ak1gIDX8XlkZs6SFduntjjUPw; GAESA=CqABMDAxNDc3ODI5NjZlMDI1NzdkZDIyMjIzMDliY2I3YjkwZDYzMjUyNzMxZWNlZDE1M2U2OTgxNWE5MTllNDBmOTIzMWYxNTMwYzkwODhkMmE1MTdlZWYxMWI2ODM4MjczNGZjNjU4NzcyM2VmMTNlODUzMTNiMTdmOTZkYzU3Njg1ZDk4M2ExN2QzOTZjZmYyY2ViMTIyMDkzYTk1Y2MzNxCzzMi3rjM; __cf_bm=xQ94qTV8HgDXSTZY9Lb0IsXXCvnWPxNvRcTFFT..TYY-1764812209-1.0.1.1-7CoofPOEft_j5.D9DXQJR42Rcy7YQC0goVuH5OiHDbjAKqwxJrEs.ej8pgX.KZPjwbsV7vxfqBHq7PxYLiC2dzmQ9YCx4WuWr4Qf90TFE7I; cf_clearance=ZEzWrM5QHyPCgIajT0xgHVgv1Cht1qvb2P2_FvV2uwM-1764812229-1.2.1.1-kzycTebumXpzdACaurZj1u0624rkTnBTANNYxK55Wo3vEqxHiRjaOqWB24axLv1nsFAOMV1ThPwIfPTYyqHY_ijL7xZEBei4jdYz62cOmPEQBJlwrJFLHv.T09nSHsvrINeOqQeo9cmCB7MwBr.oE6olBoIE55Zb67k9sddBrqutdAvIhKI4oKJpW4C2h6eUNig7sOrkLw3uUE0RFX1gfqSMY9c8w8v1mpiZKVQsm_I; _dd_s=logs=1&id=dba03420-c07f-42b9-b171-2d61ccb1ac65&created=1764811225601&expire=1764813142148; AMP_437c42b22c=JTdCJTIyZGV2aWNlSWQlMjIlM0ElMjJlYzNkN2QzYS0wYjg4LTQ2NjQtYTIyNS01NGM4MzE4MmJkYzQlMjIlMkMlMjJ1c2VySWQlMjIlM0ElMjJmNjZiYTY1Ni1mYzFiLTQzNjYtOGVjOC1jZjUyY2JjNDczMDklMjIlMkMlMjJzZXNzaW9uSWQlMjIlM0ExNzY0ODExMjI2MzQxJTJDJTIyb3B0T3V0JTIyJTNBZmFsc2UlMkMlMjJsYXN0RXZlbnRUaW1lJTIyJTNBMTc2NDgxMjI0NTI0MCUyQyUyMmxhc3RFdmVudElkJTIyJTNBMzg4MyU3RA==",
-    "Referer": "https://www.midjourney.com/explore?tab=likes"
-  },
-  "body": null,
-  "method": "GET"
-});
-                            );*/
+                        for (let page = 1; page <= maxPages; page++) {
+                            const response = await fetch(`/api/explore-likes?page=${page}&_ql=explore`, {
+                                method: "GET",
+                                credentials: "include",
+                                headers: {
+                                    accept: "application/json",
+                                    "x-csrf-protection": "1",
+                                },
+                            });
 
-                                let response = await fetch("https://www.midjourney.com/api/explore-likes?page=" + page + "&_ql=explore", {
-                                    headers: {
-                                        "accept-language": "en-US,en;q=0.9",
-                                        "cache-control": "no-cache",
-                                        pragma: "no-cache",
-                                        priority: "u=1, i",
-                                        "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
-                                        "sec-ch-ua-mobile": "?0",
-                                        "sec-ch-ua-platform": '"Windows"',
-                                        "sec-fetch-dest": "empty",
-                                        "sec-fetch-mode": "cors",
-                                        "sec-fetch-site": "same-origin",
-                                        "x-csrf-protection": "1",
-                                        Referer: "https://www.midjourney.com/explore?tab=likes",
-                                        "Referrer-Policy": "origin-when-cross-origin",
-                                    },
-                                    body: null,
-                                    method: "GET",
-                                });
+                            if (!response.ok) {
+                                const responseText = await response.text();
+                                throw new Error(`Likes API returned ${response.status}: ${responseText.slice(0, 300)}`);
+                            }
 
-                                let data = await response.json();
-                                // log2({data});
-                                dataTemp = data;
-                                if (data.length == 0) break;
-                                numberOfLikesReturned = data.length;
-                                // put all the returned data into the returnedData array
-                                returnedData.push(...data);
-                                page++;
-                                loopCount++;
-                                if (loopCount > 10000) {
-                                    break; // if we've returned more than 500,000 likes, there's probably something wrong, and there's gonna be problems
-                                }
-                            } while (numberOfLikesReturned == 50);
-                        } catch (e) {
-                            return { error: "Error fetching likes data: " + e.toString() };
+                            const pageData = await response.json();
+                            if (!Array.isArray(pageData)) {
+                                throw new TypeError("Likes API response was not an array");
+                            }
+
+                            // Midjourney's likes pages are not guaranteed to contain 50
+                            // records. A short page can still be followed by more data, so
+                            // only an empty response marks the end of pagination.
+                            if (pageData.length === 0) return returnedData;
+                            returnedData.push(...pageData);
                         }
-                        return returnedData;
+
+                        throw new Error(`Likes API exceeded the ${maxPages}-page safety limit`);
                     });
                     if (data.error) {
                         log0("getUsersLikesData() error. Error: " + data.error);
@@ -1020,10 +829,10 @@ class PuppeteerClient {
                     }
                     resolve(data);
                 })
-                .catch((err) => {
+                .catch(async (err) => {
+                    await puppeteerDiagnostics.capture(this.page, "likes-sync-error", err);
                     log0("getUsersLikesData() error. Error: " + err);
                     systemLogger?.log("getUsersLikesData() error. Error: " + err);
-                    systemLogger?.log("dataTemp: " + JSON.stringify(dataTemp));
                     reject("Error: " + err);
                 });
         });
@@ -1134,549 +943,9 @@ class ServerStatusMonitor {
     }
 }
 
-class Database {
-    static DB_connected = false;
-    constructor() {
-        log5("Database constructor called");
-        this.dbClient = new pgClient.Client({
-            user: "mjuser",
-            host: "postgresql.lan",
-            database: "mjimages",
-            password: "mjImagesPassword",
-            port: 9543,
-        });
-        this.dbClient
-            .connect()
-            .then(() => {
-                log2("Connected to database");
-                Database.DB_connected = true;
-            })
-            .catch((err) => {
-                log0("Error connecting to database:", err);
-            });
-        this.dbClient.on("error", (err) => {
-            new DB_Error("Database error: " + err);
-            if (typeof err === "string" && err.includes("Connection terminated unexpectedly")) this.dbClient.connect();
-        });
-    }
+const Database = createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 });
 
-    /**
-     * Inserts an image into the database. If the image already exists, it will update the image.
-     * @param {ImageInfo} image
-     * @param {number} index
-     * @returns query response
-     */
-    insertImage = async (image, index) => {
-        log5("insertImage() called");
-        log6("insertImage()\nindex: " + index + "\nimage: " + JSON.stringify(image));
-        // find if image exists in database
-        // if it does, update it
-        this.systemLogger?.log("Inserting image into database. Image ID: " + image.id);
-        if (image.id !== undefined) {
-            let lookup = await this.lookupByUUID(image.id);
-            if (lookup !== undefined) {
-                image.processed = lookup.processed;
-                image.downloaded = lookup.downloaded;
-                image.doNotDownload = lookup.do_not_download;
-                image.storageLocation = lookup.storage_location;
-                image.upscale_location = lookup.upscale_location;
-                await this.updateImage(image);
-                return;
-            }
-        }else{
-            log0("insertImage() error: Image ID is undefined. Cannot insert image into database. Image: " + JSON.stringify(image));
-        }
 
-        // if it doesn't exist, insert it
-        image.processed = false;
-        if (image.grid_index === undefined || image.grid_index === null) {
-            image.grid_index = -1;
-        }
-        if (image.parent_id === undefined || image.parent_id === null) {
-            // for grid images, set the parent_id to the id of the first image in the grid
-            image.parent_id = image.id + "_grid_0";
-        }
-        if (image.enqueue_time === undefined || image.enqueue_time === null) {
-            image.enqueue_time = new Date();
-        }
-        if (image.fullCommand === undefined || image.fullCommand === null) {
-            image.fullCommand = "";
-        }
-        let res;
-        try {
-            res = await this.dbClient.query(
-                `INSERT INTO images (uuid, parent_uuid, grid_index, enqueue_time, full_command, width, height, storage_location, downloaded, do_not_download, processed, index, upscale_location) 
-             VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, null)`,
-                [
-                    image.id,
-                    image.parent_id,
-                    image.grid_index,
-                    image.enqueue_time,
-                    image.fullCommand,
-                    image.width,
-                    image.height,
-                    image.storageLocation,
-                    image.downloaded !== null && image.downloaded !== undefined ? image.downloaded : false,
-                    image.doNotDownload !== null && image.doNotDownload !== undefined ? image.doNotDownload : false,
-                    image.processed !== null && image.processed !== undefined ? image.processed : false,
-                    index,
-                ],
-            );
-        } catch (err) {
-            log0("insertImage() error: Error inserting image into database. Image ID: " + image.id + "Error: " + err);
-            new DB_Error("Error inserting image into database. Image ID: " + image.id + "Error: " + err);
-            return null;
-        }
-        log6("insertImage() complete");
-        return res;
-    };
-
-    /**
-     * Looks up an image in the database by uuid.
-     * @param {string} uuid
-     * @returns Query response. If the image is found, it will return the image. If the image is not found, it will return undefined.
-     */
-    lookupByUUID = async (uuid) => {
-        log5("lookupByUUID() called");
-        log6("lookupByUUID()\nuuid: " + uuid);
-        try {
-            const res = await this.dbClient.query(`SELECT * FROM images WHERE uuid = $1`, [uuid]);
-
-            if (res.rows.length > 0) {
-                if (res.rows.length > 1) log1("lookupByUUID() warning: Multiple images found in database. Image ID: " + uuid);
-                log6("lookupByUUID() complete");
-                return res.rows[0];
-            }
-            log1("lookupByUUID() Image not found in database. Image ID: " + uuid);
-            log6("lookupByUUID() complete");
-            return undefined;
-        } catch (err) {
-            log0("lookupByUUID() error: Error looking up image in database. Image ID: " + uuid + "Error: " + err);
-            new DB_Error("Error looking up image in database. Image ID: " + uuid);
-            log6("lookupByUUID() complete");
-            return null;
-        }
-    };
-
-    /**
-     * Get a random image from the database. If downloadedOnly is true, it will only return images that have been downloaded.
-     * @param {boolean} downloadedOnly
-     * @returns Query response. If the image is found, it will return the image. If the image is not found, it will return undefined.
-     */
-    getRandomImage = async (downloadedOnly = false) => {
-        log5("getRandomImage() called");
-        log6("getRandomImage()\ndownloadedOnly: " + downloadedOnly);
-        if (downloadedOnly === "true") downloadedOnly = true;
-        if (downloadedOnly === "false") downloadedOnly = false;
-        if (typeof downloadedOnly !== "boolean") downloadedOnly = false;
-        try {
-            let res;
-            if (downloadedOnly) {
-                res = await this.dbClient.query(`SELECT * FROM images WHERE downloaded = $1 AND do_not_download = $2 ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`, [true, false]);
-            } else {
-                res = await this.dbClient.query(`SELECT * FROM images ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`);
-            }
-            log6("getRandomImage() res.rows.length: " + res.rows.length + " res.rows: " + JSON.stringify(res.rows));
-            if (res.rows.length > 0) {
-                if (res.rows.length > 1) log1("getRandomImage() warning: Multiple images found in database.");
-                log6("getRandomImage() complete");
-                return res.rows[0];
-            }
-            log1("getRandomImage() Image not found in database.");
-            log6("getRandomImage() complete");
-            return undefined;
-        } catch (err) {
-            log0("getRandomImage() error: Error looking up random image in database. Error: " + err);
-            new DB_Error("Error looking up random image in database");
-            log6("getRandomImage() complete");
-            return null;
-        }
-    };
-
-    /**
-     * Look up images in the database by range of indexes.
-     * @param {number | string} indexStart
-     * @param {number | string} indexEnd
-     * @param {object} processedOnly { processed: false, enabled: false}
-     * @param {object} downloadedOnly { downloaded: false, enabled: false}
-     * @param {object} do_not_downloadOnly { do_not_download: false, enabled: false}
-     * @returns Query response. If the images are found, it will return the images. If the range is invalid, it will return null. If the images are not found, it will return undefined.
-     */
-    lookupImagesByIndexRange = async (indexStart, indexEnd, processedOnly = { processed: false, enabled: false }, downloadedOnly = { downloaded: false, enabled: false }, do_not_downloadOnly = { do_not_download: false, enabled: false }) => {
-        log5("lookupImagesByIndexRange() called");
-        log6("lookupImagesByIndexRange()\nindexStart: " + indexStart + "\nindexEnd: " + indexEnd + "\nprocessedOnly: " + JSON.stringify(processedOnly) + "\ndownloadedOnly: " + JSON.stringify(downloadedOnly) + "\ndo_not_downloadOnly: " + JSON.stringify(do_not_downloadOnly));
-        if (typeof indexStart === "number") indexStart = indexStart.toString();
-        if (typeof indexStart === "string") {
-            try {
-                indexStart = parseInt(indexStart);
-            } catch {
-                log1("lookupImagesByIndexRange() unable to parse indexStart. indexStart: " + indexStart);
-                log6("lookupImagesByIndexRange() complete");
-                return null;
-            }
-            indexStart = indexStart.toString();
-        } else {
-            log1("lookupImagesByIndexRange() unable to parse indexStart. indexStart: " + indexStart);
-            log6("lookupImagesByIndexRange() complete");
-            return null;
-        }
-        if (typeof indexEnd === "number") indexEnd = indexEnd.toString();
-        if (typeof indexEnd === "string") {
-            try {
-                indexEnd = parseInt(indexEnd);
-            } catch {
-                log1("lookupImagesByIndexRange() unable to parse indexEnd. indexEnd: " + indexEnd);
-                log6("lookupImagesByIndexRange() complete");
-                return null;
-            }
-            indexEnd = indexEnd.toString();
-        } else {
-            log1("lookupImagesByIndexRange() unable to parse indexEnd. indexEnd: " + indexEnd);
-            log6("lookupImagesByIndexRange() complete");
-            return null;
-        }
-        // at this point indexStart and indexEnd should be strings that are numbers. Anything else would have returned null
-        try {
-            let queryParts = ["SELECT * FROM images WHERE id >= $1 AND id < $2"];
-            let queryParams = [indexStart, indexEnd];
-
-            if (processedOnly.enabled === true) {
-                queryParts.push("AND processed = " + (processedOnly.processed === true ? "true" : "false"));
-                log6("lookupImagesByIndexRange() processedOnly enabled, processed: " + processedOnly.processed);
-            }
-            if (downloadedOnly.enabled === true) {
-                queryParts.push("AND downloaded = " + (downloadedOnly.downloaded === true ? "true" : "false"));
-                log6("lookupImagesByIndexRange() downloadedOnly enabled, downloaded: " + downloadedOnly.downloaded);
-            }
-            if (do_not_downloadOnly.enabled === true) {
-                queryParts.push("AND do_not_download = " + (do_not_downloadOnly.do_not_download === true ? "true" : "false"));
-                log6("lookupImagesByIndexRange() do_not_downloadOnly enabled, do_not_download: " + do_not_downloadOnly.do_not_download);
-            }
-
-            // log2(queryParts.join(' '), queryParams); // TODO: remove this
-
-            const res = await this.dbClient.query(queryParts.join(" "), queryParams);
-            log6("lookupImagesByIndexRange() res.rows.length: " + res.rows.length);
-            if (res.rows.length > 0) {
-                log6("lookupImagesByIndexRange() complete");
-                return res.rows;
-            }
-            log1("lookupImagesByIndexRange() Images not found in database. Image index range: " + indexStart + " to " + indexEnd);
-            log6("lookupImagesByIndexRange() complete");
-            return undefined;
-        } catch (err) {
-            log0("lookupImagesByIndexRange() error: Error looking up images in database. Image index range: " + indexStart + " to " + indexEnd + "Error: " + err);
-            new DB_Error("Error looking up images in database. Image index range: " + indexStart + " to " + indexEnd);
-            log6("lookupImagesByIndexRange() complete");
-            return null;
-        }
-    };
-
-    /**
-     * Look up image in the database by index.
-     * @param {number | string} index
-     * @param {object} processedOnly { processed: false, enabled: false}
-     * @param {object} downloadedOnly { downloaded: false, enabled: false}
-     * @param {object} do_not_downloadOnly { do_not_download: false, enabled: false}
-     * @returns Query response. If the image is found, it will return the image. If the image is not found, it will return undefined.
-     */
-    lookupImageByIndex = async (index, processedOnly = { processed: false, enabled: false }, downloadedOnly = { downloaded: false, enabled: false }, do_not_downloadOnly = { do_not_download: false, enabled: false }) => {
-        log5("lookupImageByIndex() called");
-        log6("lookupImageByIndex()\nindex: " + index + "\nprocessedOnly: " + JSON.stringify(processedOnly) + "\ndownloadedOnly: " + JSON.stringify(downloadedOnly) + "\ndo_not_downloadOnly: " + JSON.stringify(do_not_downloadOnly));
-        if (typeof index === "number") index = index.toString();
-        if (typeof index === "string") {
-            try {
-                index = parseInt(index);
-            } catch {
-                log1("lookupImageByIndex() unable to parse index. index: " + index);
-                log6("lookupImageByIndex() complete");
-                return null;
-            }
-            index = index.toString();
-        } else {
-            log1("lookupImageByIndex() unable to parse index. index: " + index);
-            log6("lookupImageByIndex() complete");
-            return null;
-        }
-        // at this point index should be a string that is a number. Anything else would have returned null
-        try {
-            let queryParts = ["SELECT * FROM images WHERE id = $1"];
-            let queryParams = [index];
-
-            if (processedOnly.enabled === true) {
-                queryParts.push("AND processed = " + (processedOnly.processed === true ? "true" : "false"));
-                log6("lookupImageByIndex() processedOnly enabled, processed: " + processedOnly.processed);
-            }
-            if (downloadedOnly.enabled === true) {
-                queryParts.push("AND downloaded = " + (downloadedOnly.downloaded === true ? "true" : "false"));
-                log6("lookupImageByIndex() downloadedOnly enabled, downloaded: " + downloadedOnly.downloaded);
-            }
-            if (do_not_downloadOnly.enabled === true) {
-                queryParts.push("AND do_not_download = " + (do_not_downloadOnly.do_not_download === true ? "true" : "false"));
-                log6("lookupImageByIndex() do_not_downloadOnly enabled, do_not_download: " + do_not_downloadOnly.do_not_download);
-            }
-
-            queryParts.push("LIMIT 1");
-
-            // log2(queryParts.join(' '), queryParams); // TODO: remove this
-
-            const res = await this.dbClient.query(queryParts.join(" "), queryParams);
-            if (res.rows.length == 1) {
-                log6("lookupImageByIndex() complete");
-                return res.rows[0];
-            } else if (res.rows.length > 1) {
-                new DB_Error("Error looking up image in database. Too many rows returned. Image index: " + index);
-            } else if (res.rows.length == 0) {
-                log1("lookupImageByIndex() Image not found in database. Image index: " + index);
-                log6("lookupImageByIndex() complete");
-                return undefined;
-            }
-            log1("lookupImageByIndex() Image not found in database. Image index: " + index);
-            log6("lookupImageByIndex() complete");
-            return undefined;
-        } catch (err) {
-            log0("lookupImageByIndex() error: Error looking up image in database. Image index: " + index + "Error: " + err);
-            new DB_Error("Error looking up image in database. Image index: " + index);
-            log6("lookupImageByIndex() complete");
-            return null;
-        }
-    };
-
-    /**
-     * Update an image in the database
-     * @param {ImageInfo} image
-     * @returns Query response
-     */
-    updateImage = async (image) => {
-        log5("updateImage() called");
-        log6("updateImage()\nimage: " + JSON.stringify(image));
-        try {
-            const res = await this.dbClient.query(
-                `UPDATE images SET 
-                parent_uuid = COALESCE($1, parent_uuid),
-                grid_index = COALESCE($2, grid_index),
-                enqueue_time = COALESCE($3, enqueue_time),
-                full_command = COALESCE($4, full_command),
-                width = COALESCE($5, width),
-                height = COALESCE($6, height),
-                storage_location = COALESCE($7, storage_location),
-                downloaded = COALESCE($8, downloaded),
-                do_not_download = COALESCE($9, do_not_download),
-                processed = COALESCE($10, processed),
-                upscale_location = COALESCE($11, upscale_location)
-                WHERE uuid = $12`,
-                [
-                    image.parent_id !== null && image.parent_id !== undefined ? image.parent_id : image.parent_uuid !== null && image.parent_uuid !== undefined ? image.parent_uuid : null,
-                    image.grid_index !== null && image.grid_index !== undefined ? image.grid_index : null,
-                    image.enqueue_time !== null && image.enqueue_time !== undefined ? image.enqueue_time : null,
-                    image.fullCommand !== null && image.fullCommand !== undefined ? image.fullCommand : null,
-                    image.width !== null && image.width !== undefined ? image.width : null,
-                    image.height !== null && image.height !== undefined ? image.height : null,
-                    image.storageLocation !== null && image.storageLocation !== undefined ? image.storageLocation : image.storage_location !== null && image.storage_location !== undefined ? image.storage_location : null,
-                    image.downloaded !== null && image.downloaded !== undefined ? image.downloaded : null,
-                    image.doNotDownload !== null && image.doNotDownload !== undefined ? image.doNotDownload : null,
-                    image.processed !== null && image.processed !== undefined ? image.processed : null,
-                    image.upscale_location !== null && image.upscale_location !== undefined ? image.upscale_location : null,
-                    image.id !== null && image.id !== undefined ? image.id : image.parent_uuid !== null && image.parent_uuid !== undefined && image.grid_index !== null && image.grid_index !== undefined ? image.parent_uuid + "_" + image.grid_index : null,
-                ],
-            );
-            log6("updateImage() complete");
-            return res;
-        } catch (err) {
-            log0("updateImage() error: Error updating image in database. Image ID: " + image.id + "Error: " + err);
-            new DB_Error("Error updating image in database. Image ID: " + image.id);
-            log6("updateImage() complete");
-            return null;
-        }
-    };
-    /**
-     * Delete an image in the database
-     * @param {string} uuid
-     * @returns Query response
-     */
-    deleteImage = async (uuid) => {
-        log5("deleteImage() called");
-        log6("deleteImage()\nuuid: " + uuid);
-        try {
-            const res = await this.dbClient.query(`DELETE FROM images WHERE uuid = $1`, [uuid]);
-            log6("deleteImage() complete");
-            return res;
-        } catch (err) {
-            log0("deleteImage() error: Error deleting image from database. Image ID: " + uuid + "Error: " + err);
-            new DB_Error("Error deleting image from database. Image ID: " + uuid);
-            log6("deleteImage() complete");
-            return null;
-        }
-    };
-    countImagesTotal = async () => {
-        log5("countImagesTotal() called");
-        try {
-            const res = await this.dbClient.query(`SELECT COUNT(*) FROM images`);
-            log6("countImagesTotal() complete");
-            return res.rows[0].count;
-        } catch (err) {
-            log0("countImagesTotal() error: Error counting images in database. Error: " + err);
-            new DB_Error("Error counting images in database");
-            log6("countImagesTotal() complete");
-            return null;
-        }
-    };
-    countImagesDownloaded = async () => {
-        log5("countImagesDownloaded() called");
-        try {
-            const res = await this.dbClient.query(`SELECT COUNT(*) FROM images WHERE downloaded = true`);
-            log6("countImagesDownloaded() complete");
-            return res.rows[0].count;
-        } catch (err) {
-            log0("countImagesDownloaded() error: Error counting downloaded images in database. Error: " + err);
-            new DB_Error("Error counting downloaded images in database");
-            log6("countImagesDownloaded() complete");
-            return null;
-        }
-    };
-    setImageProcessed = async (uuid, valueBool = true) => {
-        log5("setImageProcessed() called");
-        log6("setImageProcessed()\nuuid: " + uuid + "\nvalueBool: " + valueBool);
-        if (typeof valueBool === "string") valueBool = valueBool === "true";
-        if (typeof valueBool !== "boolean") {
-            log1("setImageProcessed() error: valueBool must be a boolean");
-            log6("setImageProcessed() complete");
-            return null;
-        }
-        try {
-            const res = await this.dbClient.query(`UPDATE images SET processed = $1 WHERE uuid = $2`, [valueBool, uuid]);
-            log6("setImageProcessed() complete");
-            return res;
-        } catch (err) {
-            log0("setImageProcessed() error: Error setting image processed in database. Image ID: " + uuid + "Error: " + err);
-            new DB_Error("Error setting image processed in database. Image ID: " + uuid);
-            log6("setImageProcessed() complete");
-            return null;
-        }
-    };
-    updateTimesSelectedPlusOne = async (uuid) => {
-        log5("updateTimesSelectedPlusOne() called");
-        log6("updateTimesSelectedPlusOne()\nuuid: " + uuid);
-        try {
-            // get times_selected for uuid
-            let res = await this.dbClient.query(`SELECT times_selected FROM images WHERE uuid = $1`, [uuid]);
-            let timesSelected = res.rows[0].times_selected;
-            log6("updateTimesSelectedPlusOne() timesSelected: " + timesSelected);
-            // add 1 to it
-            timesSelected++;
-            log6("updateTimesSelectedPlusOne() timesSelected: " + timesSelected);
-            // update times_selected for uuid
-            res = await this.dbClient.query(`UPDATE images SET times_selected = $1 WHERE uuid = $2`, [timesSelected, uuid]);
-            log6("updateTimesSelectedPlusOne() complete");
-        } catch (err) {
-            log0("updateTimesSelectedPlusOne() error: Error updating times_selected in database. Image ID: " + uuid + "Error: " + err);
-            new DB_Error("Error updating times_selected in database. Image ID: " + uuid);
-            log6("updateTimesSelectedPlusOne() complete");
-            return null;
-        }
-    };
-
-    setAllImagesSelectedCountZero = async () => {
-        log5("setAllImagesSelectedCountZero() called");
-        try {
-            const res = await this.dbClient.query(`UPDATE images SET times_selected = 0`);
-            log6("setAllImagesSelectedCountZero() complete");
-            return res;
-        } catch (err) {
-            log0("setAllImagesSelectedCountZero() error: Error setting all images selected count to zero. Error: " + err);
-            new DB_Error("Error setting all images selected count to zero");
-            log6("setAllImagesSelectedCountZero() complete");
-            return null;
-        }
-    };
-
-    getEntriesOrderedByEnqueueTime = async (limit = 100, offset = 0) => {
-        log5("getEntriesOrderedByEnqueueTime() called");
-        log6("getEntriesOrderedByEnqueueTime()\nlimit: " + limit + "\noffset: " + offset);
-        if (typeof limit === "string") {
-            try {
-                limit = parseInt(limit);
-            } catch {
-                limit = 100;
-            }
-        }
-        if (typeof offset === "string") {
-            try {
-                offset = parseInt(offset);
-            } catch {
-                offset = 0;
-            }
-        }
-        if (typeof limit !== "number") limit = 100;
-        if (typeof offset !== "number") offset = 0;
-        try {
-            const res = await this.dbClient.query(
-                `SELECT * FROM images 
-                ORDER BY enqueue_time DESC 
-                LIMIT $1 OFFSET $2`,
-                [limit, offset],
-            );
-            log6("getEntriesOrderedByEnqueueTime() res.rows.length: " + res.rows.length);
-            log6("getEntriesOrderedByEnqueueTime() complete");
-            return res.rows;
-        } catch (err) {
-            log0("getEntriesOrderedByEnqueueTime() error: Error getting entries ordered by enqueue_time. Error: " + err);
-            new DB_Error("Error getting entries ordered by enqueue_time");
-            log6("getEntriesOrderedByEnqueueTime() complete");
-            return null;
-        }
-    };
-}
-
-class ImageInfo {
-    constructor(parent_id, grid_index, enqueue_time, fullCommand, width, height, storage_location = "", upscale_location = "") {
-        log5("ImageInfo constructor called");
-        log6("ImageInfo constructor\nparent_id: " + parent_id + "\ngrid_index: " + grid_index + "\nenqueue_time: " + enqueue_time + "\nfullCommand: " + fullCommand + "\nwidth: " + width + "\nheight: " + height + "\nstorage_location: " + storage_location + "\nupscale_location: " + upscale_location);
-        this.parent_id = parent_id;
-        this.grid_index = grid_index;
-        this.enqueue_time = enqueue_time;
-        this.fullCommand = fullCommand;
-        // this.fullCommand = fullCommand.replace(/'/g, "\\'");
-        this.upscale_location = upscale_location;
-        this.width = width;
-        this.height = height;
-        this.storageLocation = storage_location;
-        this.downloaded = null;
-        this.doNotDownload = null;
-        this.processed = null;
-    }
-
-    toJSON() {
-        log5("ImageInfo toJSON() called");
-        let t = { ...this };
-        t.urlFull = this.urlFull;
-        t.urlSmall = this.urlSmall;
-        t.urlMedium = this.urlMedium;
-        t.urlAlt = this.urlAlt;
-        t.urlParentGrid = this.urlParentGrid;
-        log6("ImageInfo toJSON() complete");
-        return t;
-    }
-
-    get id() {
-        return this.parent_id + "_" + this.grid_index;
-    }
-    get urlFull() {
-        return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.png`;
-    }
-    get urlSmall() {
-        return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_32_N.webp`;
-    }
-    get urlMedium() {
-        return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_384_N.webp`;
-    }
-    get urlAlt() {
-        return `https://storage.googleapis.com/dream-machines-output/${this.parent_id}/0_${this.grid_index}.png`;
-    }
-    get urlParentGrid() {
-        return `https://cdn.midjourney.com/${this.parent_id}/grid_0.webp`;
-    }
-}
 
 class DatabaseUpdateManager {
     static updateInProgress_static = false;
@@ -1739,8 +1008,11 @@ class DatabaseUpdateManager {
                 log4("Size of data: ", data.length, "\nCalling buildImageData()");
                 let imageData = buildImageData(data);
                 log2("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
-                for (let i = 0; i < imageData.length; i++) {
-                    if (updateDB) await imageDB.insertImage(imageData[i], i);
+                if (updateDB) {
+                    const startedAt = Date.now();
+                    const removed = await imageDB.deleteObsoleteUnprocessedImages(getObsoleteSingleOutputIds(data));
+                    const result = await imageDB.bulkUpsertImages(imageData);
+                    this.systemLogger?.log(`Created-images database update complete: ${result.updated} rows in ${result.batches} batches, ${removed} obsolete rows removed (${Date.now() - startedAt} ms)`);
                 }
                 // log2("Done updating database");
             })
@@ -1764,14 +1036,13 @@ class DatabaseUpdateManager {
             .then(async (data) => {
                 log4("typeof data: " + typeof data);
                 this.systemLogger?.log("DatabaseUpdateManager.updateUsersLikes() - Type of data: " + typeof data);
-                this.systemLogger?.log(JSON.stringify(data).substring(0, 1000));
                 log4("Size of data: ", data.length, "\nCalling buildImageData()");
-                let imageData = buildImageData(data);
-                this.systemLogger?.log("imageData: " + JSON.stringify(imageData).substring(0, 5000));
+                let imageData = buildImageData(data, { likedOnly: true });
                 log2("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
-                for (let i = 0; i < imageData.length; i++) {
-                    if (updateDB) await imageDB.insertImage(imageData[i], i);
-                    this.systemLogger?.log(`Inserting image ${i + 1} of ${imageData.length}: ${imageData[i].id}`);
+                if (updateDB) {
+                    const startedAt = Date.now();
+                    const result = await imageDB.bulkUpsertImages(imageData);
+                    this.systemLogger?.log(`Liked-images database update complete: ${result.updated} rows in ${result.batches} batches (${Date.now() - startedAt} ms)`);
                 }
                 log2("Done updating database");
             })
@@ -1813,13 +1084,12 @@ class DatabaseUpdateManualData {
             this.systemLogger?.log("Error building image data", err);
             return false;
         }
-        for (let i = 0; i < imageData.length; i++) {
-            try {
-                await this.dbClient.insertImage(imageData[i], i);
-            } catch (err) {
-                log0(["DatabaseUpdateManualData.update() error inserting image", err]);
-                this.systemLogger?.log("Error inserting image", err);
-            }
+        try {
+            await this.dbClient.bulkUpsertImages(imageData);
+        } catch (err) {
+            log0(["DatabaseUpdateManualData.update() error inserting images", err]);
+            this.systemLogger?.log("Error inserting images", err);
+            return false;
         }
         log6("DatabaseUpdateManualData.update() complete");
         return true;
@@ -2019,13 +1289,15 @@ class DownloadManager {
         let browser = (puppeteerClient && puppeteerClient.browser) || this.downloadBrowser;
         if (!browser || !browser.isConnected()) {
             log6("DownloadManager.downloadImageWithBrowser(): launching headless browser for downloads");
-            browser = await puppeteer.launch({
+            browser = await puppeteer.launch(puppeteerDiagnostics.launchOptions({
                 headless: "new",
                 args: ["--no-sandbox", "--disable-setuid-sandbox"],
-            });
+            }));
+            puppeteerDiagnostics.attachBrowser(browser);
             this.downloadBrowser = browser;
         }
         const page = await browser.newPage();
+        puppeteerDiagnostics.attachPage(page);
         try {
             const resp = await page.goto(url, { waitUntil: "networkidle2" });
             if (!resp || !resp.ok()) {
@@ -2435,7 +1707,13 @@ const databaseUpdateManager = new DatabaseUpdateManager(imageDB, systemLogger, p
 const databaseUpdateManualData = new DatabaseUpdateManualData(imageDB, systemLogger);
 const serverStatusMonitor = new ServerStatusMonitor(systemLogger, puppeteerClient, downloadManager, imageDB, upscalerManager, databaseUpdateManager);
 
-if (!loadSettings()) {
+try {
+    settings = loadSettingsFile(SETTINGS_PATH);
+} catch (error) {
+    log0("Error loading settings file", error);
+    settings = null;
+}
+if (!settings) {
     systemLogger?.log("Settings file not found. Using default settings", new Date().toLocaleString());
     settings = {
         downloadLocation: "output",
@@ -2457,7 +1735,7 @@ updateDB = settings.updateDB;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 app.use(express.static("public"));
-app.use(express.static("./"));
+app.use(express.static(PROJECT_ROOT));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -2483,6 +1761,7 @@ app.listen(port, () => {
 });
 
 app.set("view engine", "ejs");
+app.set("views", path.join(PROJECT_ROOT, "views"));
 
 /****************************************************************************************
  * Server endpoints
@@ -2491,414 +1770,43 @@ app.set("view engine", "ejs");
  * GET /
  * Home page
  */
-app.get("/", (req, res) => {
-    log3("GET /");
-    res.render("index");
-});
-
-/**
- * GET /images
- * Images page for viewing images and selecting them for download
- */
-app.get("/images", (req, res) => {
-    log3("GET /images");
-    res.render("images");
-});
-
-app.get("/tools", (req, res) => {
-    log3("GET /tools");
-    res.render("tools");
-});
-
-/**
- * GET /updateDB
- * Endpoint for triggering an update of the database with the latest jobs from Midjourney
- * @returns {string} - "ok" once the update has been triggered
- */
-app.get("/updateDB", async (req, res) => {
-    log3("GET /updateDB");
-    databaseUpdateManager.run();
-    res.send("ok");
-});
-
-/**
- * POST /updateDB_data
- * Updates the database with json data provided by the user
- */
-app.post("/updateDB_data", async (req, res) => {
-    log3("POST /updateDB_data");
-    const data = req.body;
-    const success = await databaseUpdateManualData.update(data);
-    res.json({ success });
-});
-
-/**
- * GET /show
- * Shows a slideshow of images from the database
- */
-app.get("/show", (req, res) => {
-    log3("GET /show");
-    res.render("show");
-});
-
-/**
- * GET /show/:uuid
- * Shows a single image from the database
- * @param {string} uuid - the uuid of the image to show
- * @returns {string} - html that shows the image and is a link to another random image. JSON is also embedded in the html.
- */
-app.get("/show/:uuid", async (req, res) => {
-    log3("GET /show/:uuid");
-    const { uuid } = req.params;
-    if (uuid === "" || uuid === undefined) {
-        log6("uuid is empty or undefined. Rendering show.ejs");
-        res.render("show");
-    } else {
-        log4("looking up uuid: ", uuid);
-        const image = await imageDB.lookupByUUID(uuid);
-        log6("got image from DB. Converting to ImageInfo object");
-        const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height, image.storage_location, image.upscale_location);
-        log6("updating times selected");
-        imageDB.updateTimesSelectedPlusOne(uuid);
-        log6("Sending html with image and json embedded");
-        res.send(`<a href="/randomUUID"><img src="${imageInfo.urlFull}" /></a><script type="application/json">${JSON.stringify(imageInfo)}</script>`);
-    }
-});
-
-/**
- * GET /randomUUID
- * Redirects to a random image
- */
-app.get("/randomUUID/:dlOnly", async (req, res) => {
-    log3("GET /randomUUID");
-    const { dlOnly } = req.params;
-    log6("dlOnly: " + dlOnly);
-    let _dlOnly;
-    if (dlOnly === "true") _dlOnly = true;
-    else _dlOnly = false;
-    log6("_dlOnly: " + _dlOnly);
-    let imageInfo = null;
-    log6("Getting random image");
-    do {
-        imageInfo = await imageDB.getRandomImage(_dlOnly);
-    } while (imageInfo === undefined || imageInfo === null);
-    log6("Got random image");
-    log6("Redirecting to /show/" + imageInfo.uuid);
-    res.redirect(`/show/${imageInfo.uuid}`);
-});
-
-app.get("/randomUUID", async (req, res) => {
-    log3("GET /randomUUID");
-    res.redirect(`/randomUUID/false`);
-});
-
-/**
- * GET /available-folders
- * Gets a list of folders in the working directory
- */
-app.get("/available-folders", (req, res) => {
-    log3("GET /available-folders");
-    const folders = fs.readdirSync("./").filter((file) => fs.lstatSync(path.join("./", file)).isDirectory());
-    log6("Folders: " + folders);
-    res.json(folders);
-});
-
-/**
- * GET /set-download-location/:location
- * Sets the download location for the download manager
- */
-app.get("/set-download-location/:location", (req, res) => {
-    log3("GET /set-download-location/:location");
-    const { location } = req.params;
-    log6("location: " + location);
-    const success = downloadManager.setDownloadLocation(location);
-    log6("success: " + success);
-    res.json(success);
-});
-
-/**
- * GET /set-time-to-download/:time
- * Sets the time to download for the download manager
- */
-app.get("/set-time-to-download/:time", (req, res) => {
-    log3("GET /set-time-to-download/:time");
-    const { time } = req.params;
-    log6("time: " + time);
-    const success = downloadManager.setTimeToDownload(time);
-    res.json(success);
-});
-
-/**
- * GET /set-run-enabled/:enabled
- * Sets whether or not the download manager should run
- */
-app.get("/set-run-enabled/:dl/:db/:up", (req, res) => {
-    log3("GET /set-run-enabled/:dl/:db/:up");
-    const { dl, db, up } = req.params;
-    downloadManager.downloadRunEnabled = dl === "true";
-    databaseUpdateManager.runEnabled = db === "true";
-    upscalerManager.runEnabled = up === "true";
-
-    settings.dbUpdateRunEnabled = db === "true";
-    settings.downloadRunEnabled = dl === "true";
-    settings.upscaleRunEnabled = up === "true";
-
-    log6("downloadRunEnabled: " + downloadManager.downloadRunEnabled);
-    log6("dbUpdateRunEnabled: " + databaseUpdateManager.runEnabled);
-    log6("upscaleRunEnabled: " + upscalerManager.runEnabled);
-
-    res.json({
-        downloadRunEnabled: downloadManager.downloadRunEnabled,
-        dbUpdateRunEnabled: databaseUpdateManager.runEnabled,
-        upscaleRunEnabled: upscalerManager.runEnabled,
-    });
-});
-
-/**
- * GET /loggerGet/:entries/:remove
- * Gets the most recent entries from the logger
- * @param {number} entries - the number of entries to get
- * @param {boolean} remove - whether or not to remove the entries from the logger
- * @returns {json} - the entries from the logger
- */
-app.get("/loggerGet/:entries/:remove", (req, res) => {
-    // log3("GET /loggerGet/:entries/:remove");
-    const { entries, remove } = req.params;
-    // log6("entries: " + entries);
-    // log6("remove: " + remove);
-    if (remove === "true") log2("removing entries from log");
-    let log = systemLogger.getRecentEntries(entries, remove === "true");
-    // log6("log: " + log);
-    res.json(log);
-});
-
-/**
- * GET /loggerDelete/:id
- * Deletes an entry from the logger
- * @param {number} id - the id of the entry to delete
- */
-app.get("/loggerDelete/:id", (req, res) => {
-    log3("GET /loggerDelete/:id");
-    const { id } = req.params;
-    log6("id: " + id);
-    const success = systemLogger.deleteEntry(id);
-    res.json(success);
-});
-
-/**
- * POST /logger
- * Endpoint for logging messages to the logger
- * @param {string} message - the message to log *
- */
-app.post("/logger", (req, res) => {
-    log3("POST /logger");
-    const { message } = req.body;
-    log6("message: " + message);
-    systemLogger?.log(message);
-    res.send("ok");
-});
-
-app.get("/image/recent/:limit/:offset", async (req, res) => {
-    log3("GET /image/recent/:limit/:offset");
-    const { limit, offset } = req.params;
-    log6("limit: " + limit);
-    log6("offset: " + offset);
-    const data = await imageDB.getEntriesOrderedByEnqueueTime(limit, offset);
-    res.json(data);
-});
-
-app.get("/image/update/:id/:do_not_download", async (req, res) => {
-    log3("GET /image/update/:id/:do_not_download");
-    const { id, do_not_download } = req.params;
-    log6("id: " + id);
-    log6("do_not_download: " + do_not_download);
-    let image = await imageDB.lookupByUUID(id);
-    if (image === undefined) {
-        res.status(404).send("Image not found");
-        return;
-    }
-    const imageInfo = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
-    imageInfo.doNotDownload = do_not_download === "true";
-    imageInfo.processed = true;
-    await imageDB.updateImage(imageInfo);
-    res.json(imageInfo);
-});
-
-/**
- * GET /image/:imageUuid
- * Endpoint for getting an image from the database
- * @param {string} imageUuid - the uuid of the image to get
- * @param {number} width - the width to resize the image to
- * @param {number} height - the height to resize the image to
- * @returns {image} - the image
- */
-app.get("/image/:imageUuid", async (req, res) => {
-    log3("GET /image/:imageUuid");
-    const { imageUuid } = req.params;
-    const { width, height } = req.query;
-    log6("imageUuid: " + imageUuid);
-    log6("width: " + width);
-    log6("height: " + height);
-
-    const imagePath = path.join(__dirname, "output/all", imageUuid);
-    log6("imagePath: " + imagePath);
-
-    // Ensure the file exists
-    if (!fs.existsSync(imagePath)) {
-        res.status(404).send("Image not found");
-        log6("Image not found");
-        return;
-    }
-    try {
-        log6("Validating PNG");
-        const image = sharp(imagePath);
-
-        image.on("error", (error) => {
-            console.error("Error processing image: ", { error });
-            res.status(500).send("Server error");
-        });
-
-        // Resize the image if width or height are provided
-        if (width || height) {
-            const widthNum = width ? parseInt(width, 10) : null;
-            const heightNum = height ? parseInt(height, 10) : null;
-            image.resize(widthNum, heightNum, { fit: "inside" });
-        }
-
-        // Output the image
-        res.set("Content-Type", "image/jpg");
-        image.pipe(res);
-    } catch (error) {
-        console.error("Error processing image: ", { error });
-        res.status(500).send("Server error");
-    }
-});
-
-/**
- * GET /status
- * Endpoint for getting the status of the server
- * @returns {json} - the status of the server
- */
-app.get("/status", async (req, res) => {
-    log3("GET /status");
-    res.json(await serverStatusMonitor.checkServerStatus());
-});
-
-app.get("/downloadRun", async (req, res) => {
-    log3("GET /downloadRun");
-    res.send("ok");
-    await downloadManager.run();
-});
-
-app.get("/upscaleRun", async (req, res) => {
-    log3("GET /upscaleRun");
-    res.send("ok");
-    await upscalerManager.run();
-});
-
-app.get("/resetSelectCount", async (req, res) => {
-    log3("GET /resetSelectCount");
-    res.send("ok");
-    await imageDB.setAllImagesSelectedCountZero();
-});
-
-app.get("/saveSettings", async (req, res) => {
-    log3("GET /saveSettings");
-    res.send("ok");
-    saveSettings();
-});
-
-let restartShow = false;
-
-app.get("/showOptions", async (req, res) => {
-    log3("GET /showOptions");
-    res.json({
-        enableAutoAdjustUpdateInterval: false,
-        updateInterval: 12,
-        fadeDuration: 3.4,
-        timeToRestart: 60,
-        timeToRestartEnabled: true,
-        showPrompt: false,
-        restartShow: restartShow,
-    });
-    restartShow = false;
-});
-
-app.get("/restartShow", async (req, res) => {
-    log3("GET /restartShow");
-    res.send("ok");
-    restartShow = true;
+registerRoutes({
+    app,
+    projectRoot: PROJECT_ROOT,
+    databaseUpdateManager,
+    databaseUpdateManualData,
+    imageDB,
+    ImageInfo,
+    downloadManager,
+    upscalerManager,
+    settings,
+    systemLogger,
+    serverStatusMonitor,
+    saveSettings: persistSettings,
+    log2,
+    log3,
+    log4,
+    log6,
 });
 
 ////////////////////////////////////////////////////////////////////////////////////////
 /////  Utilities
 ////////////////////////////////////////////////////////////////////////////////////////
 
-function validatePNG(imagePath) {
-    log5("validatePNG() called");
-    return new Promise((resolve) => {
-        fs.createReadStream(imagePath)
-            .pipe(new PNG())
-            .on("parsed", function () {
-                resolve(true); // Valid PNG
-            })
-            .on("error", function (error) {
-                // console.error('Invalid PNG:', error);
-                resolve(false); // Invalid PNG
-            });
-    });
-}
 
-function buildImageData(data) {
-    log5("buildImageData() called");
-    log6("buildImageData()\ndata.length: " + data.length);
-    let imageData = [];
-    data.forEach((job) => {
-        log6("Processing job: " + JSON.stringify(job));
-        if (job.batch_size && job.batch_size == 4) {
-            for (let i = 0; i < 4; i++) {
-                imageData.push(new ImageInfo(job.id, i, job.enqueue_time, job.full_command, job.width, job.height));
-            }
-        } else {
-            imageData.push(new ImageInfo(job.id, job.parent_grid, new Date(job.enqueue_time), "", job.width, job.height));
-        }
-    });
-    return imageData;
-}
+const buildImageData = (data, options = {}) => buildMidjourneyImageData(data, { debug: log5, trace: log6, ...options });
 
-function waitSeconds(seconds) {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            resolve();
-        }, seconds * 1000);
-    });
-}
 
-function loadSettings() {
-    log5("loadSettings() called");
-    if (fs.existsSync("settings.json")) {
-        try {
-            settings = JSON.parse(fs.readFileSync("settings.json"));
-            return true;
-        } catch (err) {
-            log0(["loadSettings() error: Error loading settings file", err]);
-            return false;
-        }
-    } else {
-        return false;
-    }
-}
-
-function saveSettings() {
-    log5("saveSettings() called");
-    fs.writeFileSync("settings.json", JSON.stringify(settings, null, 4));
+function persistSettings() {
+    log5("persistSettings() called");
+    saveSettingsFile(SETTINGS_PATH, settings);
     systemLogger?.log("Setting saved", new Date().toLocaleString());
 }
 
 systemLogger?.log("Server started", new Date().toLocaleString());
 
 process.on("exit", (code) => {
-    saveSettings();
+    persistSettings();
     log2("exiting");
     imageDB.dbClient.end();
     systemLogger?.log("Server exited", new Date().toLocaleString());

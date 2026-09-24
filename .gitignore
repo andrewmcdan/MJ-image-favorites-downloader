@@ -3,6 +3,7 @@
 /output
 /zips
 node_modules/
+.env
 .vscode
 *Session.json
 /models
@@ -10,3 +11,4 @@ node_modules/
 /unzipped
 /upscaled
 /log
+/puppeteer-debug

@@ -23,6 +23,16 @@ Most of the intended functionality is working. There are a few quality of life g
 1. Something that can run Node.js
 2. A Postgres server
 
+## Project structure
+
+- `src/app.js` wires the application services together and starts Express.
+- `src/routes.js` contains the HTTP routes.
+- `src/services/` contains infrastructure such as PostgreSQL access.
+- `src/midjourney/` contains Midjourney API parsing and image-data conversion.
+- `src/models/` contains application data models.
+- `src/utils/` contains small shared runtime helpers.
+- `test/` contains Node's built-in test-runner tests.
+
 ## Usage
 
 As mentioned above, this application is meant to be run on something like Ubuntu Server, in a headless environment. It can be run on normal desktop environments, too, but you'll need to figure out the Postgres setup.
@@ -81,6 +91,7 @@ CREATE TABLE public.images (
 	times_selected int8 DEFAULT 0 NOT NULL,
 	processed bool DEFAULT false NOT NULL,
 	upscale_location varchar(2000) NULL,
+	liked bool DEFAULT false NOT NULL,
 	CONSTRAINT temp_table_pkey PRIMARY KEY (id, uuid)
 );
 CREATE INDEX temp_table_downloaded_do_not_download_processed_idx ON public.images USING btree (downloaded, do_not_download, processed);
@@ -89,9 +100,17 @@ CREATE INDEX temp_table_full_command_idx ON public.images USING btree (full_comm
 CREATE INDEX temp_table_grid_index_parent_uuid_idx ON public.images USING btree (grid_index, parent_uuid);
 CREATE INDEX temp_table_index_idx ON public.images USING btree (index);
 CREATE INDEX temp_table_upscale_location_storage_location_idx ON public.images USING btree (upscale_location, storage_location);
+CREATE INDEX images_unprocessed_enqueue_time_idx ON public.images (enqueue_time DESC, id DESC) WHERE processed = false;
+CREATE UNIQUE INDEX images_uuid_unique_idx ON public.images (uuid);
 ```
 
-At this point, if you are running this on Windows desktop or Linux desktop, run "node app.js" then point your browser to the server: 
+For an existing database created before liked-state tracking was added, run:
+
+```sql
+ALTER TABLE images ADD COLUMN IF NOT EXISTS liked boolean NOT NULL DEFAULT false;
+```
+
+At this point, if you are running this on Windows desktop or Linux desktop, run `npm start` then point your browser to the server:
 
 http://{ip-of-your-server}:3000
 
@@ -100,7 +119,7 @@ Port 3000 is the default but can be customized using an environment variable. Mo
 ## Linux headless
 MJ Image Favorites Downloader uses the npm package Puppeteer to interact with the Midjourney servers. Ubuntu Server requires that it be run with something like the line below so that Puppeteer works:
 ```
-xvfb-run -a --server-args="-screen 0 1280x800x24 -ac -nolisten tcp -dpi 96 +extension RANDR" node /full/path/to/app.js
+xvfb-run -a --server-args="-screen 0 1280x800x24 -ac -nolisten tcp -dpi 96 +extension RANDR" node /full/path/to/src/app.js
 ```
 In order for this to work, you'll have to install xvfb with:
 ```
@@ -118,8 +137,25 @@ export mj_dl_server_verifyDlOnStartup=true
 export OMP_NUM_THREADS=1
 
 cd /home/andrew/MJ-image-favorites-downloader/
-xvfb-run -a --server-args="-screen 0 1920x1080x24 -ac -nolisten tcp -dpi 96 +extension RANDR" node /home/andrew/MJ-image-favorites-downloader/app.js
+xvfb-run -a --server-args="-screen 0 1920x1080x24 -ac -nolisten tcp -dpi 96 +extension RANDR" node /home/andrew/MJ-image-favorites-downloader/src/app.js
 ```
+
+### Puppeteer diagnostics
+
+Copy `.env.example` to `.env` and set `GOOGLE_LOGIN_EMAIL` and `GOOGLE_LOGIN_PASSWORD`. The root `.env` file is ignored by Git. When both variables are present, database sync automatically opens Midjourney's login dialog, selects Google, and supplies the credentials; otherwise the dashboard's legacy credential form remains available as a fallback.
+
+To investigate browser failures without changing normal behavior, enable the opt-in diagnostics before starting the app:
+
+```powershell
+$env:MJ_PUPPETEER_DEBUG = "true"
+$env:MJ_PUPPETEER_DEVTOOLS = "true"
+$env:MJ_PUPPETEER_KEEP_OPEN = "true"
+npm start
+```
+
+`MJ_PUPPETEER_DEBUG` forwards Chromium output, records browser/page lifecycle events, and saves error metadata and screenshots under `puppeteer-debug/`. `MJ_PUPPETEER_DEVTOOLS` opens Chrome DevTools. `MJ_PUPPETEER_KEEP_OPEN` prevents the database-sync cleanup step from closing the browser so it can be inspected. Each variable is independent and disabled by default. The output directory can be changed with `MJ_PUPPETEER_DEBUG_DIR`.
+
+On Linux, the app retains its legacy orphan cleanup by running `killall chrome` after Puppeteer disconnects. It is skipped on Windows and its failures are handled without terminating Node. Set `MJ_PUPPETEER_KILLALL_CHROME=false` if the Linux host runs unrelated Chrome processes that must not be stopped.
 
 As you can see above, this will set the server port, the logging level (0-6), enabled DB update, and enabled download verification on startup. "OMP_NUM_THREADS" sets the max number of threads for AI upscaling.
 
