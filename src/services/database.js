@@ -3,6 +3,7 @@
 const pgClient = require("pg");
 const { normalizeReviewPagination, REVIEW_IMAGES_QUERY, BULK_REVIEW_UPDATE_QUERY } = require("./image-review-query");
 const { DEFAULT_UPSERT_BATCH_SIZE, BULK_UPSERT_IMAGES_QUERY, serializeImagesForUpsert, chunkItems } = require("./image-bulk-upsert");
+const { RANDOM_DOWNLOADED_IMAGE_QUERY, RANDOM_ANY_IMAGE_QUERY } = require("./slideshow-query");
 
 function createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 }) {
     class Database {
@@ -179,9 +180,9 @@ function createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 }) {
             try {
                 let res;
                 if (downloadedOnly) {
-                    res = await this.dbClient.query(`SELECT * FROM images WHERE downloaded = $1 AND do_not_download = $2 ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`, [true, false]);
+                    res = await this.dbClient.query(RANDOM_DOWNLOADED_IMAGE_QUERY);
                 } else {
-                    res = await this.dbClient.query(`SELECT * FROM images ORDER BY RANDOM() / (times_selected+1) DESC LIMIT 1`);
+                    res = await this.dbClient.query(RANDOM_ANY_IMAGE_QUERY);
                 }
                 log6("getRandomImage() res.rows.length: " + res.rows.length + " res.rows: " + JSON.stringify(res.rows));
                 if (res.rows.length > 0) {
