@@ -50,6 +50,7 @@ const { ImageInfo } = require("./models/image-info");
 const { buildImageData: buildMidjourneyImageData, getObsoleteSingleOutputIds } = require("./midjourney/build-image-data");
 const { createLogging } = require("./logging");
 const { createDatabaseClass } = require("./services/database");
+const { findMissingDownloadIds } = require("./services/download-verification");
 const { validatePNG, waitSeconds } = require("./utils/runtime");
 const { loadSettings: loadSettingsFile, saveSettings: saveSettingsFile } = require("./settings");
 const { createPuppeteerDiagnostics, envFlag } = require("./puppeteer/diagnostics");
@@ -1448,34 +1449,6 @@ class DownloadManager {
         return success;
     }
 
-    checkFileExistsPath(path) {
-        log6("DownloadManager.checkFileExistsPath() called");
-        log6("DownloadManager.checkFileExistsPath()\npath: " + path);
-        if (typeof path !== "string") {
-            log1("DownloadManager.checkFileExistsPath() warning: path is not a string. path: " + path);
-            log6("DownloadManager.checkFileExistsPath() complete");
-            return false;
-        }
-        if (path === "") {
-            log1("DownloadManager.checkFileExistsPath() warning: path is empty");
-            log6("DownloadManager.checkFileExistsPath() complete");
-            return false;
-        }
-        let stats;
-        try {
-            stats = fs.statSync(path);
-        } catch (err) {
-            log6("DownloadManager.checkFileExistsPath() complete. Error: " + err);
-            return false;
-        }
-        if (stats.isFile()) {
-            log6("DownloadManager.checkFileExistsPath() complete. File exists.");
-            return true;
-        }
-        log6("DownloadManager.checkFileExistsPath() complete. File does not exist.");
-        return false;
-    }
-
     async verifyDownloads() {
         log5("DownloadManager.verifyDownloads() called");
         if (this.verifyDownloadsInProgress) {
@@ -1483,34 +1456,27 @@ class DownloadManager {
             return;
         }
         this.verifyDownloadsInProgress = true;
-        let imageCount = await this.dbClient.countImagesTotal();
-        log6("Image count: " + imageCount);
-        let images = null;
-        for (let i = 0; i < imageCount; i += 100) {
-            images = await this.dbClient.lookupImagesByIndexRange(i, i + 100, { processed: true, enabled: true }, { downloaded: true, enabled: true }, { do_not_download: false, enabled: true });
-            if (images === undefined) continue;
-            if (images === null) continue;
-            for (const element of images) {
-                let image = element;
-                if (image === undefined) continue;
-                if (image === null) continue;
-                if (image.downloaded !== true) {
-                    log6("Image not downloaded. Skipping. Image: " + JSON.stringify(image));
-                    continue;
-                }
-                if (this.checkFileExistsPath(image.storage_location) === false) {
-                    image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
-                    image.downloaded = false;
-                    image.processed = true;
-                    image.storageLocation = "";
-                    log6("Image file does not exist. Updating database. Image: " + JSON.stringify(image));
-                    await this.dbClient.updateImage(image);
-                    log6("Done updating database");
-                }
-            }
+        const startedAt = performance.now();
+        try {
+            const downloads = await this.dbClient.getDownloadedFileReferences();
+            if (downloads === null) throw new Error("Unable to load downloaded file references");
+
+            log2(`Verifying ${downloads.length} downloaded files`);
+            const missingIds = await findMissingDownloadIds(downloads);
+            const updated = await this.dbClient.markDownloadsMissing(missingIds);
+            if (updated === null) throw new Error("Unable to update missing downloads");
+
+            const elapsedSeconds = ((performance.now() - startedAt) / 1000).toFixed(1);
+            log2(`Verified ${downloads.length} downloaded files in ${elapsedSeconds}s; ${updated} missing files queued for download`);
+            return { checked: downloads.length, missing: updated };
+        } catch (error) {
+            log0(["DownloadManager.verifyDownloads() error", error]);
+            this.systemLogger?.log("Unable to verify downloaded files: " + error.message);
+            return null;
+        } finally {
+            this.verifyDownloadsInProgress = false;
+            log6("DownloadManager.verifyDownloads() complete");
         }
-        this.verifyDownloadsInProgress = false;
-        log6("DownloadManager.verifyDownloads() complete");
     }
 }
 

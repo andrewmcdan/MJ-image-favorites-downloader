@@ -441,6 +441,40 @@ function createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 }) {
                 return null;
             }
         };
+
+        getDownloadedFileReferences = async () => {
+            log5("getDownloadedFileReferences() called");
+            try {
+                const res = await this.dbClient.query(`
+                    SELECT uuid, storage_location
+                    FROM images
+                    WHERE downloaded = true AND do_not_download = false
+                    ORDER BY id
+                `);
+                return res.rows;
+            } catch (err) {
+                log0("getDownloadedFileReferences() error: " + err);
+                new DB_Error("Error getting downloaded file references");
+                return null;
+            }
+        };
+
+        markDownloadsMissing = async (uuids) => {
+            if (!Array.isArray(uuids) || uuids.length === 0) return 0;
+            log5(`markDownloadsMissing() called for ${uuids.length} images`);
+            try {
+                const res = await this.dbClient.query(`
+                    UPDATE images
+                    SET downloaded = false, storage_location = ''
+                    WHERE uuid = ANY($1::text[])
+                `, [uuids]);
+                return res.rowCount;
+            } catch (err) {
+                log0("markDownloadsMissing() error: " + err);
+                new DB_Error("Error marking missing downloads");
+                return null;
+            }
+        };
         setImageProcessed = async (uuid, valueBool = true) => {
             log5("setImageProcessed() called");
             log6("setImageProcessed()\nuuid: " + uuid + "\nvalueBool: " + valueBool);
