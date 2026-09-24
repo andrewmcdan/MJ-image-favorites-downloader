@@ -33,11 +33,15 @@
 
         .image {
             position: absolute;
+            inset: 0;
             opacity: 1;
             transition: opacity 5s ease-in-out;
             object-fit: contain;
             width: 100%;
             height: 100%;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            will-change: opacity;
         }
 
         .hidden {
@@ -155,6 +159,8 @@
         }
 
         .image-container {
+            position: absolute;
+            inset: 0;
             display: flex;
             justify-content: center;
             /* Centers horizontally */
@@ -529,40 +535,14 @@
                 image2Container.appendChild(image2);
                 mainContainer.appendChild(image2Container);
 
-                let image3Container = document.createElement("div");
-                image3Container.className = "image-container";
-                let promptContainer3 = document.createElement("div");
-                promptContainer3.id = "prompt-container";
-                if (showPromptParam === "true") {
-                    promptContainer3.className = "";
-                } else {
-                    promptContainer3.className = "alwaysHidden";
-                }
-                let promptText5 = document.createElement("div");
-                promptText5.className = "lower-text";
-                let promptText6 = document.createElement("div");
-                promptText6.id = "prompt-text";
-                promptText5.appendChild(promptText6);
-                promptContainer3.appendChild(promptText5);
-                image3Container.appendChild(promptContainer3);
-                let image3 = document.createElement("img");
-                image3.className = "image hidden"; // Initially hidden
-                // image3.style.height = '100%';
-                image3Container.appendChild(image3);
-                mainContainer.appendChild(image3Container);
-
-                let currentImage = image1;
-                let nextImage = image2;
-                let prevImage = image3;
-
-                let imageEls = [image1, image2, image3];
-                let prompts = [promptText2, promptText4, promptText6];
+                let imageEls = [image1, image2];
+                let prompts = [promptText2, promptText4];
                 let promptContainers = [
                     promptContainer1,
                     promptContainer2,
-                    promptContainer3,
                 ];
-                let imageElsIndex = 0;
+                let visibleImageIndex = -1;
+                let updateInProgress = false;
 
                 let intervalId;
                 let updateInterval = 10;
@@ -587,38 +567,55 @@
                 let updateIntervalExceedCount = 0;
 
                 async function updateImages() {
+                    if (updateInProgress) return;
+                    updateInProgress = true;
                     let startTime = performance.now();
-                    let url = "/randomUUID/" + !allImages;
-                    let randomImage = await fetch(url);
-                    let randomImageText = await randomImage.text();
-                    let randomImageObj = JSON.parse(
-                        randomImageText.substring(
-                            randomImageText.indexOf("{"),
-                            randomImageText.lastIndexOf("}") + 1
-                        )
-                    );
-                    console.log(randomImageObj);
-                    let imageInfo = new ImageInfo(
-                        randomImageObj.parent_id,
-                        randomImageObj.grid_index,
-                        randomImageObj.enqueue_time,
-                        randomImageObj.fullCommand,
-                        randomImageObj.width,
-                        randomImageObj.height,
-                        randomImageObj.storageLocation,
-                        randomImageObj.upscale_location
-                    );
-                    while (!imageEls[imageElsIndex].complete)
-                        await waitSeconds(1);
-                    prompts[imageElsIndex].innerHTML = imageInfo.fullCommand;
-                    if (cdnSource) {
-                        imageEls[imageElsIndex++].src = imageInfo.urlFull;
-                    } else {
-                        imageEls[imageElsIndex++].src = imageInfo.localUrl;
-                    }
-                    ((imgEl, startTime) => {
-                        imgEl.onload = () => {
-                            let endTime = performance.now();
+                    try {
+                        const response = await fetch(
+                            "/api/slideshow/random/" + !allImages,
+                            { cache: "no-store" }
+                        );
+                        if (!response.ok) throw new Error(`Slideshow API returned ${response.status}`);
+                        const randomImageObj = await response.json();
+                        const imageInfo = new ImageInfo(
+                            randomImageObj.parent_id,
+                            randomImageObj.grid_index,
+                            randomImageObj.enqueue_time,
+                            randomImageObj.fullCommand,
+                            randomImageObj.width,
+                            randomImageObj.height,
+                            randomImageObj.storageLocation,
+                            randomImageObj.upscale_location
+                        );
+                        const nextIndex = visibleImageIndex < 0
+                            ? 0
+                            : (visibleImageIndex + 1) % imageEls.length;
+                        const nextImage = imageEls[nextIndex];
+                        const imageUrl = cdnSource ? imageInfo.urlFull : imageInfo.localUrl;
+
+                        // Load and decode off-screen before beginning the fade. decode()
+                        // prevents a large PNG decode from landing in an animation frame.
+                        nextImage.src = imageUrl;
+                        if (typeof nextImage.decode === "function") {
+                            await nextImage.decode();
+                        } else if (!nextImage.complete) {
+                            await new Promise((resolve, reject) => {
+                                nextImage.onload = resolve;
+                                nextImage.onerror = reject;
+                            });
+                        }
+
+                        prompts[nextIndex].textContent = imageInfo.fullCommand || "";
+                        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                        nextImage.classList.remove("hidden");
+                        promptContainers[nextIndex].classList.remove("hidden");
+                        if (visibleImageIndex >= 0) {
+                            imageEls[visibleImageIndex].classList.add("hidden");
+                            promptContainers[visibleImageIndex].classList.add("hidden");
+                        }
+                        visibleImageIndex = nextIndex;
+
+                        let endTime = performance.now();
                             if (
                                 endTime - startTime > updateInterval * 1000 &&
                                 enableAutoAdjustUpdateInterval !== "false"
@@ -641,15 +638,11 @@
                                     updateIntervalExceedCount = 0;
                                 }
                             }
-                        };
-                    })(imageEls[imageElsIndex - 1], startTime);
-
-                    if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
-                    promptContainers[imageElsIndex].classList.remove("hidden");
-                    imageEls[imageElsIndex++].classList.remove("hidden");
-                    if (imageElsIndex >= imageEls.length) imageElsIndex = 0;
-                    promptContainers[imageElsIndex].classList.add("hidden");
-                    imageEls[imageElsIndex].classList.add("hidden");
+                    } catch (error) {
+                        console.error("Unable to prepare the next slideshow image", error);
+                    } finally {
+                        updateInProgress = false;
+                    }
                 }
 
                 let cursorHideTimer;
@@ -691,9 +684,7 @@
                 }
 
                 // Start the interval with the initial value
-                setUpdateInterval(updateInterval);
-                updateImages();
-                updateImages();
+                if (!intervalId) setUpdateInterval(updateInterval);
                 updateImages();
                 startClock();
             })();
