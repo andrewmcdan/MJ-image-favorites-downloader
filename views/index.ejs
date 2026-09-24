@@ -1,79 +1,95 @@
-<html>
-
+<!doctype html>
+<html lang="en">
 <head>
-    <title>Home</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Midjourney Library Control Room</title>
+    <link rel="stylesheet" href="/index.css">
 </head>
-<style>
-    .hidden {
-        display: none;
-    }
-</style>
-
 <body>
-    <h1>Midjourney Images DB</h1>
-    <h2>Status</h2>
-    <p id="serverUp">The server is up.</p>
-    <p id="upTime"></p>
-    <p id="downloadedImagesCount"></p>
-    <h2>Links</h2>
-    <a href="/show">slide show</a><br />
-    <a href="/images">images</a><br />
-    <a href="/tools">tools</a><br />
-    <a href="/status">status</a><br />
-    <label>Set Run Enabled - </label>
-    <label for="download">Download:</label>
-    <input type="checkbox" id="download" name="download" value="false">
-    <label for="dbUpdate">DB Update:</label>
-    <input type="checkbox" id="dbUpdate" name="dbUpdate" value="false">
-    <label for="upscale">Upscale Update:</label>
-    <input type="checkbox" id="upscale" name="upscale" value="false">
-    <button id="setRunEnabled" onclick="(()=>{
-        let download = document.getElementById('download').checked;
-        let dbUpdate = document.getElementById('dbUpdate').checked;
-        let upscale = document.getElementById('upscale').checked;
-        fetch('/set-run-enabled/'+download+'/'+dbUpdate+'/'+upscale);
-    })()">SET</button><br />
-    <button onclick="(()=>{
-        fetch('/downloadRun');
-    })()">Download Run</button><br />
-    <button onclick="(()=>{
-        fetch('/updateDB');
-    })()">DB Update Run</button><br />
-    <button onclick="(()=>{
-        fetch('/upscaleRun');
-    })()">Upscale Run</button><br /><br />
-    <button onclick="(()=>{
-        fetch('/saveSettings');
-    })()">Save Settings</button><br />
-    <button onclick="(()=>{
-        fetch('/resetSelectCount');
-    })()">Reset Select Count</button><br /><br />
-
-    <label for="manualData">Manual DB Update JSON:</label><br />
-    <textarea id="manualData" rows="10" cols="80"></textarea><br />
-    <button onclick="submitManualData()">Submit Update Data</button><br /><br />
-    <label>MJ / Discord login - </label>
-    <label for="username">Discord Username:</label>
-    <input type="text" id="username" name="username" value="">
-    <label for="password">Discord Password:</label>
-    <input type="password" id="password" name="password" value="">
-    <button id="login" onclick="(()=>{
-        let username = document.getElementById('username').value;
-        let password = document.getElementById('password').value;
-        fetch('/login/'+username+'/'+password.replace(/#/g, '%23'));
-    })()">Login</button><br />
-    <label for="mfaCode">Discord MFA code:</label>
-    <input type="text" id="mfaCode" name="mfaCode" value="">
-    <button id="setmfaCode" onclick="(()=>{
-        let mfaCode = document.getElementById('mfaCode').value;
-        fetch('/mfa/'+mfaCode);
-    })()">Send MFA code</button><br /><br />
-    <div id="logger-container" class="hidden">
-        <div class="logger">
-            <div id="logger-text">
-            </div>
+<main class="shell">
+    <header class="hero">
+        <div>
+            <p class="eyebrow">Local image operations</p>
+            <h1>Midjourney library control room.</h1>
+            <p class="hero-copy">Review the collection, manage background jobs, and keep an eye on the downloader from one quiet workspace.</p>
         </div>
+        <div class="status-pill" aria-live="polite"><span class="status-dot"></span><span id="serverUp">The server is up.</span></div>
+    </header>
+
+    <div class="dashboard">
+        <div class="stack">
+            <section class="card">
+                <div class="card-header"><div><h2 class="card-title">System overview</h2><p class="card-kicker">Live health and library activity</p></div></div>
+                <div class="card-body"><div class="metrics">
+                    <div class="metric"><span class="metric-label">Uptime</span><p class="metric-value" id="upTime">Loading…</p></div>
+                    <div class="metric"><span class="metric-label">Downloaded</span><p class="metric-value" id="downloadedImagesCount">Loading…</p></div>
+                </div></div>
+            </section>
+
+            <section class="card">
+                <div class="card-header"><div><h2 class="card-title">Library</h2><p class="card-kicker">Browse, review, and present your collection</p></div></div>
+                <div class="card-body"><nav class="nav-grid" aria-label="Application pages">
+                    <a class="nav-card" href="/images"><span class="nav-icon">▦</span><span class="nav-name">Review images</span><span class="nav-detail">Choose what to download</span></a>
+                    <a class="nav-card" href="/show"><span class="nav-icon">▶</span><span class="nav-name">Start slideshow</span><span class="nav-detail">Present downloaded favorites</span></a>
+                    <a class="nav-card" href="/tools"><span class="nav-icon">⌁</span><span class="nav-name">Open tools</span><span class="nav-detail">Utilities and maintenance</span></a>
+                    <a class="nav-card" href="/status"><span class="nav-icon">{ }</span><span class="nav-name">Raw status</span><span class="nav-detail">Inspect server JSON</span></a>
+                </nav></div>
+            </section>
+
+            <details class="card">
+                <summary><span><strong class="card-title">Manual database update</strong><span class="card-kicker">Import a Midjourney JSON payload</span></span></summary>
+                <div class="card-body">
+                    <div class="field"><label for="manualData">Image data JSON</label><textarea id="manualData" spellcheck="false" placeholder="Paste a JSON array here…"></textarea></div>
+                    <div class="field-actions"><p class="hint">Data is submitted to this local server.</p><button class="button button-primary" type="button" onclick="submitManualData()">Submit data</button></div>
+                </div>
+            </details>
+
+            <details class="card">
+                <summary><span><strong class="card-title">Midjourney sign-in fallback</strong><span class="card-kicker">Used only when Google credentials are not configured in .env</span></span></summary>
+                <div class="card-body"><div class="field-grid">
+                    <div class="field"><label for="username">Discord username</label><input type="text" id="username" name="username" autocomplete="username"></div>
+                    <div class="field"><label for="password">Discord password</label><input type="password" id="password" name="password" autocomplete="current-password"></div>
+                    <div class="field"><label for="mfaCode">MFA code</label><input type="text" id="mfaCode" name="mfaCode" inputmode="numeric" autocomplete="one-time-code"></div>
+                    <div class="field-actions">
+                        <button class="button" id="setmfaCode" type="button" onclick="(()=>{let mfaCode=document.getElementById('mfaCode').value;fetch('/mfa/'+mfaCode);})()">Send MFA code</button>
+                        <button class="button button-primary" id="login" type="button" onclick="(()=>{let username=document.getElementById('username').value;let password=document.getElementById('password').value;fetch('/login/'+username+'/'+password.replace(/#/g,'%23'));})()">Sign in</button>
+                    </div>
+                </div></div>
+            </details>
+
+            <section id="logger-container" class="card hidden">
+                <div class="card-header"><div><h2 class="card-title">Recent events</h2><p class="card-kicker">Messages reported by the server</p></div></div>
+                <div class="card-body"><div class="logger"><div id="logger-text"></div></div></div>
+            </section>
+        </div>
+
+        <aside class="stack">
+            <section class="card">
+                <div class="card-header"><div><h2 class="card-title">Automation</h2><p class="card-kicker">Scheduled job switches</p></div></div>
+                <div class="card-body">
+                    <div class="toggle-list">
+                        <label class="toggle-row" for="download"><span class="toggle-copy"><strong>Downloads</strong><span>Fetch selected originals</span></span><span class="switch"><input type="checkbox" id="download" name="download" value="false"><span class="switch-track"></span></span></label>
+                        <label class="toggle-row" for="dbUpdate"><span class="toggle-copy"><strong>Database updates</strong><span>Sync Midjourney metadata</span></span><span class="switch"><input type="checkbox" id="dbUpdate" name="dbUpdate" value="false"><span class="switch-track"></span></span></label>
+                        <label class="toggle-row" for="upscale"><span class="toggle-copy"><strong>Upscaling</strong><span>Process the upscale queue</span></span><span class="switch"><input type="checkbox" id="upscale" name="upscale" value="false"><span class="switch-track"></span></span></label>
+                    </div>
+                    <div class="button-grid" style="margin-top:12px"><button class="button button-primary button-wide" id="setRunEnabled" type="button" onclick="(()=>{let download=document.getElementById('download').checked;let dbUpdate=document.getElementById('dbUpdate').checked;let upscale=document.getElementById('upscale').checked;fetch('/set-run-enabled/'+download+'/'+dbUpdate+'/'+upscale);})()">Apply automation settings</button></div>
+                </div>
+            </section>
+            <section class="card">
+                <div class="card-header"><div><h2 class="card-title">Run now</h2><p class="card-kicker">Trigger one-time maintenance jobs</p></div></div>
+                <div class="card-body"><div class="button-grid">
+                    <button class="button" type="button" onclick="fetch('/downloadRun')">Download run</button>
+                    <button class="button" type="button" onclick="fetch('/updateDB')">Database sync</button>
+                    <button class="button" type="button" onclick="fetch('/upscaleRun')">Upscale run</button>
+                    <button class="button" type="button" onclick="fetch('/resetSelectCount')">Reset slideshow</button>
+                    <button class="button button-wide" type="button" onclick="fetch('/saveSettings')">Save settings</button>
+                </div></div>
+            </section>
+        </aside>
     </div>
+</main>
 
     <script>
         (() => {
@@ -84,17 +100,17 @@
                 document.getElementById('download').checked = data.downloadManager.runEnabled;
                 document.getElementById('dbUpdate').checked = data.databaseUpdateManager.runEnabled;
                 document.getElementById('upscale').checked = data.upscalerManager.runEnabled;
-                document.getElementById('upTime').innerHTML = 'Up Time: ' + data.upTimeFormatted;
-                document.getElementById('downloadedImagesCount').innerHTML = 'Downloaded Images Count: ' + data.database.numberOfImagesDownloaded;
+                document.getElementById('upTime').textContent = data.upTimeFormatted;
+                document.getElementById('downloadedImagesCount').textContent = Number(data.database.numberOfImagesDownloaded).toLocaleString();
                 setInterval(() => {
                     fetch('/status').then((res) => {
                         return res.json();
                     }).then((data) => {
-                        document.getElementById('upTime').innerHTML = 'Up Time: ' + data.upTimeFormatted;
-                        document.getElementById('serverUp').innerHTML = 'The server is up.';
+                        document.getElementById('upTime').textContent = data.upTimeFormatted;
+                        document.getElementById('serverUp').textContent = 'The server is up.';
                     }).catch((err) => {
-                        document.getElementById('serverUp').innerHTML = 'The server is down.';
-                        document.getElementById('upTime').innerHTML = '';
+                        document.getElementById('serverUp').textContent = 'The server is down.';
+                        document.getElementById('upTime').textContent = 'Unavailable';
                     })
                 }, 5000);
             });
@@ -127,8 +143,8 @@
                                 if (i == 0) message += mes + " - ";
                                 else message += JSON.stringify(mes) + " - ";
                             });
-                            innerHTML += `<span style="color: #00ff00;">${timeStamp.toLocaleString()}</span> - <span style="color: #0000ff;">${message}</span> `;
-                            innerHTML += `<span style="color: red; text-decoration: underline;" onclick="loggerDelete(${data[i].id});getLogsFromServer();">Delete Log Entry</span><br><br>`;
+                            innerHTML += `<div><span class="log-time">${timeStamp.toLocaleString()}</span> · <span class="log-message">${message}</span> `;
+                            innerHTML += `<button class="log-delete" type="button" onclick="loggerDelete(${data[i].id});getLogsFromServer();">Delete</button></div>`;
                         }
                         loggerText.innerHTML = innerHTML;
                         // loggerText.scrollTop = loggerText.scrollHeight;

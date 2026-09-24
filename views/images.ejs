@@ -148,19 +148,13 @@
                 return this.parent_id + '_' + this.grid_index;
             }
             get urlFull() {
-                // if the fullCommand contains https://s.mj.run/ extract that url and return it
-                let regex = /(https:\/\/s\.mj\.run\/[a-zA-Z0-9_-]+)/;
-                let match = this.fullCommand.match(regex);
-                if (match) {
-                    return match[1];
-                }
                 return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.png`;
             }
             get urlSmall() {
                 return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_32_N.webp`;
             }
             get urlMedium() {
-                return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_384_N.webp`;
+                return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_384_N.webp?method=shortest`;
             }
             get urlAlt() {
                 return `https://storage.googleapis.com/dream-machines-output/${this.parent_id}/0_${this.grid_index}.png`;
@@ -203,35 +197,31 @@
 
             // update metadata
             let selectedImages = ImageInfo.images.filter((image) => image.currentlySelected && image.do_not_download != null);
-            let removalsInProgress = 0;
-            selectedImages.forEach(async (image) => {
-                removalsInProgress++;
-                let url = `/image/update/${image.id}/${image.do_not_download}`;
-                // console.log(url);
-                const response = await fetch(url);
-                const data = await response.json();
-                // console.log(data);
-                image.removeItem();
-                let i = ImageInfo.images.findIndex((img) => img.index == image.index);
-                if (i < ImageInfo.images.length) {
-                    ImageInfo.images.splice(i, 1);
-                }
-                removalsInProgress--;
-            });
-
-            let count = 0;
-            while (removalsInProgress > 0) {
-                await waitSeconds(1);
-                count++;
-                if (count > 300) {
-                    console.log('Timeout');
-                    break;
-                }
+            if (selectedImages.length === 0) {
+                removeOverlay();
+                return;
             }
-
-            removeOverlay();
-
-            loadImages();
+            try {
+                const response = await fetch('/image/update-bulk', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                        updates: selectedImages.map((image) => ({ id: image.id, doNotDownload: image.do_not_download }))
+                    })
+                });
+                if (!response.ok) throw new Error(`Bulk update failed with status ${response.status}`);
+                const result = await response.json();
+                const updatedIds = new Set(result.images.map((image) => image.uuid));
+                selectedImages.filter((image) => updatedIds.has(image.id)).forEach((image) => image.removeItem());
+                ImageInfo.images = ImageInfo.images.filter((image) => !updatedIds.has(image.id));
+                offset = Math.max(0, offset - updatedIds.size);
+                await loadImages();
+            } catch (error) {
+                console.error('Unable to update selected images:', error);
+                alert('The selected images could not be updated. Please try again.');
+            } finally {
+                removeOverlay();
+            }
         });
 
 
@@ -368,10 +358,6 @@
         function appendImages(images) {
             const container = document.getElementById('image-container');
             images.forEach(image => {
-                if (image.processed == true) {
-                    return;
-                }
-
                 if(image.fullCommand.includes("--motion") || image.fullCommand.includes("--video")) {
                     return;
                 }
@@ -381,13 +367,33 @@
                 // You can add more styling to imgWrapper if needed
 
                 const imgElement = document.createElement('img');
-                imgElement.src = image.urlFull;
                 imgElement.alt = 'Image';
+                imgElement.loading = 'lazy';
+                imgElement.decoding = 'async';
                 imgElement.style.width = 'calc((100vw - 18px) / 8)';
                 imgElement.style.margin = '0';
                 imgElement.style.padding = '0';
                 imgElement.style.border = '0';
                 imgElement.style.display = 'block';
+
+                let imageLoadAttempt = 0;
+                imgElement.addEventListener('error', () => {
+                    imageLoadAttempt++;
+                    if (imageLoadAttempt <= 2) {
+                        const separator = image.urlMedium.includes('?') ? '&' : '?';
+                        setTimeout(() => {
+                            imgElement.src = `${image.urlMedium}${separator}retry=${Date.now()}-${imageLoadAttempt}`;
+                        }, imageLoadAttempt * 750);
+                        return;
+                    }
+                    if (imageLoadAttempt === 3) {
+                        imgElement.src = image.urlFull;
+                        return;
+                    }
+                    imgElement.alt = 'Image unavailable';
+                    imgElement.classList.add('image-load-failed');
+                });
+                imgElement.src = image.urlMedium;
 
                 imgWrapper.id = "image#" + image.index;
 
