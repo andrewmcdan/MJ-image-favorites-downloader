@@ -51,6 +51,7 @@ const { buildImageData: buildMidjourneyImageData, getObsoleteSingleOutputIds } =
 const { createLogging } = require("./logging");
 const { createDatabaseClass } = require("./services/database");
 const { findMissingDownloadIds } = require("./services/download-verification");
+const { DEFAULT_DOWNLOAD_BATCH_SIZE, DEFAULT_DOWNLOAD_CONCURRENCY, runInConcurrentChunks } = require("./services/download-queue");
 const { validatePNG, waitSeconds } = require("./utils/runtime");
 const { loadSettings: loadSettingsFile, saveSettings: saveSettingsFile } = require("./settings");
 const { createPuppeteerDiagnostics, envFlag } = require("./puppeteer/diagnostics");
@@ -1357,12 +1358,22 @@ class DownloadManager {
         log6("DownloadManager.run() Verifying downloads");
         await this.verifyDownloads();
         this.concurrentDownloads = 0;
-        let imageCount = await this.dbClient.countImagesTotal();
-        log2("Image count: " + imageCount);
         let success = true;
-        for (let i = 0; i < imageCount; i += 100) {
-            if (!(await this.lookupAndDownloadImageByIndex(i))) success = false;
+        let lastId = 0;
+        let queuedCount = 0;
+        while (this.downloadRunEnabled) {
+            const images = await this.dbClient.getPendingDownloadsAfterId(lastId, DEFAULT_DOWNLOAD_BATCH_SIZE);
+            if (images === null) {
+                success = false;
+                break;
+            }
+            if (images.length === 0) break;
+
+            lastId = images[images.length - 1].id;
+            queuedCount += images.length;
+            if (!(await this.downloadPendingImages(images))) success = false;
         }
+        log2(`Processed ${queuedCount} queued downloads`);
         if (success) {
             log2("Done downloading images");
         } else {
@@ -1377,82 +1388,48 @@ class DownloadManager {
         log6("DownloadManager.run() complete");
     }
 
-    async lookupAndDownloadImageByIndex(index) {
-        log5("DownloadManager.lookupAndDownloadImageByIndex() called");
-        log6("DownloadManager.lookupAndDownloadImageByIndex()\nindex: " + index);
+    async downloadPendingImages(images) {
+        log5("DownloadManager.downloadPendingImages() called");
         if (!this.downloadRunEnabled) {
-            log1("DownloadManager.lookupAndDownloadImageByIndex() warning: Run is disabled. Run will not start.");
+            log1("DownloadManager.downloadPendingImages() warning: Run is disabled. Run will not start.");
             return true;
         }
-        let images = await this.dbClient.lookupImagesByIndexRange(index, index + 100, { processed: true, enabled: true }, { downloaded: false, enabled: true }, { do_not_download: false, enabled: true });
-        if (images === undefined) {
-            log6("DownloadManager.lookupAndDownloadImageByIndex() Image range not found in database. Image index range: " + index + " to " + (index + 100));
-            log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
-            return true;
-        }
-        if (images === null) {
-            log6("DownloadManager.lookupAndDownloadImageByIndex() Image range not found in database. Image index range: " + index + " to " + (index + 100));
-            log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
-            return true;
-        }
-        let success = true;
-        for (const element of images) {
-            while (this.concurrentDownloads >= 10) await waitSeconds(1);
-            (async (image) => {
-                image = new ImageInfo(image.parent_uuid, image.grid_index, image.enqueue_time, image.full_command, image.width, image.height);
+        const results = await runInConcurrentChunks(
+            images,
+            (image) => this.downloadPendingImage(image),
+            DEFAULT_DOWNLOAD_CONCURRENCY
+        );
+        log6("DownloadManager.downloadPendingImages() complete");
+        return results.every(Boolean);
+    }
 
-                this.concurrentDownloads++;
-                let imageResult;
-                try {
-                    imageResult = await this.downloadImage(image.urlFull, image);
-                } catch (err) {
-                    log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", err, image]);
-                    // this.systemLogger?.log("Error downloading image", err, image);
-                    success = false;
-                    new DownloadError("Error downloading image", err, image);
-                    log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
-                    return;
-                }
-                this.concurrentDownloads--;
+    async downloadPendingImage(imageRow) {
+        const image = new ImageInfo(imageRow.parent_uuid, imageRow.grid_index, imageRow.enqueue_time, imageRow.full_command, imageRow.width, imageRow.height);
+        this.concurrentDownloads++;
+        try {
+            let imageResult = await this.downloadImage(image.urlFull, image);
+            if (imageResult.success !== true) {
+                const retryUrl = typeof imageResult.error === "string" && imageResult.error.includes("File size mismatch")
+                    ? image.urlAlt
+                    : image.urlFull;
+                imageResult = await this.downloadImage(retryUrl, image);
+            }
 
-                if (imageResult.success === true) {
-                    await this.dbClient.updateImage(imageResult);
-                } else {
-                    // this.systemLogger?.log("Error downloading image", imageResult.error, image);
-                    new DownloadError("Error downloading image", imageResult.error, image);
-                    log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", imageResult.error, image]);
-                    let url = image.urlFull;
-                    if (typeof imageResult.error == "string" && imageResult.error.includes("File size mismatch")) {
-                        url = image.urlAlt;
-                    }
-                    this.concurrentDownloads++;
-                    let altImageResult;
-                    try {
-                        altImageResult = await this.downloadImage(url, image);
-                    } catch (err) {
-                        log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", err, image]);
-                        // this.systemLogger?.log("Error downloading image", err, image);
-                        new DownloadError("Error downloading image", err, image);
-                        success = false;
-                        log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
-                        return;
-                    }
-                    this.concurrentDownloads--;
-                    if (altImageResult.success === true) {
-                        await this.dbClient.updateImage(altImageResult);
-                    } else {
-                        log0(["DownloadManager.lookupAndDownloadImageByIndex() error: Error downloading image", altImageResult.error, image]);
-                        // this.systemLogger?.log("Error downloading image", altImageResult.error, image);
-                        new DownloadError("Error downloading image", altImageResult.error, image);
-                        success = false;
-                        log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
-                        return;
-                    }
-                }
-            })(element);
+            if (imageResult.success === true) {
+                const updateResult = await this.dbClient.updateImage(imageResult);
+                return updateResult !== null && updateResult.rowCount === 1;
+            }
+
+            log0(["DownloadManager.downloadPendingImage() error: Error downloading image", imageResult.error, image]);
+            new DownloadError("Error downloading image", imageResult.error, image);
+            return false;
+        } catch (err) {
+            log0(["DownloadManager.downloadPendingImage() error: Error downloading image", err, image]);
+            new DownloadError("Error downloading image", err, image);
+            return false;
+        } finally {
+            this.concurrentDownloads--;
         }
-        log6("DownloadManager.lookupAndDownloadImageByIndex() complete");
-        return success;
     }
 
     async verifyDownloads() {

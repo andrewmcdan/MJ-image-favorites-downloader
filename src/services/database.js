@@ -4,6 +4,7 @@ const pgClient = require("pg");
 const { normalizeReviewPagination, REVIEW_IMAGES_QUERY, BULK_REVIEW_UPDATE_QUERY } = require("./image-review-query");
 const { DEFAULT_UPSERT_BATCH_SIZE, BULK_UPSERT_IMAGES_QUERY, serializeImagesForUpsert, chunkItems } = require("./image-bulk-upsert");
 const { RANDOM_DOWNLOADED_IMAGE_QUERY, RANDOM_ANY_IMAGE_QUERY } = require("./slideshow-query");
+const { DEFAULT_DOWNLOAD_BATCH_SIZE, PENDING_DOWNLOADS_QUERY, normalizePositiveInteger } = require("./download-queue");
 
 function createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 }) {
     class Database {
@@ -439,6 +440,20 @@ function createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 }) {
                 log0("countImagesDownloaded() error: Error counting downloaded images in database. Error: " + err);
                 new DB_Error("Error counting downloaded images in database");
                 log6("countImagesDownloaded() complete");
+                return null;
+            }
+        };
+
+        getPendingDownloadsAfterId = async (lastId = 0, limit = DEFAULT_DOWNLOAD_BATCH_SIZE) => {
+            const safeLastId = Math.max(0, Number.parseInt(lastId, 10) || 0);
+            const safeLimit = normalizePositiveInteger(limit, DEFAULT_DOWNLOAD_BATCH_SIZE);
+            log5(`getPendingDownloadsAfterId() called after id ${safeLastId}, limit ${safeLimit}`);
+            try {
+                const res = await this.dbClient.query(PENDING_DOWNLOADS_QUERY, [safeLastId, safeLimit]);
+                return res.rows;
+            } catch (err) {
+                log0("getPendingDownloadsAfterId() error: " + err);
+                new DB_Error("Error getting pending downloads");
                 return null;
             }
         };
