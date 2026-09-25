@@ -53,7 +53,7 @@ function createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 }) {
             log6("insertImage()\nindex: " + index + "\nimage: " + JSON.stringify(image));
             // find if image exists in database
             // if it does, update it
-            this.systemLogger?.log("Inserting image into database. Image ID: " + image.id);
+            log6("Inserting image into database. Image ID: " + image.id);
             if (image.id !== undefined) {
                 let lookup = await this.lookupByUUID(image.id);
                 if (lookup !== undefined) {

@@ -222,7 +222,7 @@ class PuppeteerClient {
         }
         this.loggedIntoMJ = true;
         await this.saveMidjourneySession();
-        systemLogger?.log("Midjourney session restored from mjSession.json; interactive login skipped.");
+        log2("Midjourney session restored from mjSession.json; interactive login skipped.");
         log6("loadSession() complete.");
     }
 
@@ -568,7 +568,7 @@ class PuppeteerClient {
                     let pWord = process.env.GOOGLE_LOGIN_PASSWORD || "";
                     let mfaCb = null;
                     if (uName && pWord) {
-                        systemLogger?.log("Using Google login credentials from the environment.");
+                        log2("Using Google login credentials from the environment.");
                         return { uName, pWord, mfaCb };
                     }
                     systemLogger?.log("Not logged into MJ. Please send login credentials.");
@@ -718,7 +718,7 @@ class PuppeteerClient {
                     let pWord = process.env.GOOGLE_LOGIN_PASSWORD || "";
                     let mfaCb = null;
                     if (uName && pWord) {
-                        systemLogger?.log("Using Google login credentials from the environment.");
+                        log2("Using Google login credentials from the environment.");
                         return { uName, pWord, mfaCb };
                     }
                     systemLogger?.log("Not logged into MJ. Please send login credentials.");
@@ -1020,7 +1020,7 @@ class DatabaseUpdateManager {
                     const startedAt = Date.now();
                     const removed = await imageDB.deleteObsoleteUnprocessedImages(getObsoleteSingleOutputIds(data));
                     const result = await imageDB.bulkUpsertImages(imageData);
-                    this.systemLogger?.log(`Created-images database update complete: ${result.updated} rows in ${result.batches} batches, ${removed} obsolete rows removed (${Date.now() - startedAt} ms)`);
+                    log2(`Created-images database update complete: ${result.updated} rows in ${result.batches} batches, ${removed} obsolete rows removed (${Date.now() - startedAt} ms)`);
                 }
                 // log2("Done updating database");
             })
@@ -1043,14 +1043,13 @@ class DatabaseUpdateManager {
             .getUsersLikesData()
             .then(async (data) => {
                 log4("typeof data: " + typeof data);
-                this.systemLogger?.log("DatabaseUpdateManager.updateUsersLikes() - Type of data: " + typeof data);
                 log4("Size of data: ", data.length, "\nCalling buildImageData()");
                 let imageData = buildImageData(data, { likedOnly: true });
                 log2("Size of data: ", imageData.length, "\nDone building imageData\nUpdating database");
                 if (updateDB) {
                     const startedAt = Date.now();
                     const result = await imageDB.bulkUpsertImages(imageData);
-                    this.systemLogger?.log(`Liked-images database update complete: ${result.updated} rows in ${result.batches} batches (${Date.now() - startedAt} ms)`);
+                    log2(`Liked-images database update complete: ${result.updated} rows in ${result.batches} batches (${Date.now() - startedAt} ms)`);
                 }
                 log2("Done updating database");
             })
@@ -1699,7 +1698,7 @@ try {
     settings = null;
 }
 if (!settings) {
-    systemLogger?.log("Settings file not found. Using default settings", new Date().toLocaleString());
+    log1("Settings file not found. Using default settings", new Date().toLocaleString());
     settings = {
         downloadLocation: "output",
         timeToDownload: 0,
@@ -1785,14 +1784,14 @@ const buildImageData = (data, options = {}) => buildMidjourneyImageData(data, { 
 function persistSettings() {
     log5("persistSettings() called");
     saveSettingsFile(SETTINGS_PATH, settings);
-    systemLogger?.log("Setting saved", new Date().toLocaleString());
+    log2("Setting saved", new Date().toLocaleString());
 }
 
-systemLogger?.log("Server started", new Date().toLocaleString());
+log2("Server started", new Date().toLocaleString());
 
 process.on("exit", (code) => {
     persistSettings();
     log2("exiting");
     imageDB.dbClient.end();
-    systemLogger?.log("Server exited", new Date().toLocaleString());
+    log2("Server exited", new Date().toLocaleString());
 });
