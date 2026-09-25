@@ -20,6 +20,7 @@ class ImageInfo {
             ...this,
             urlFull: this.urlFull,
             urlJpeg: this.urlJpeg,
+            urlLargeJpeg: this.urlLargeJpeg,
             urlSmall: this.urlSmall,
             urlMedium: this.urlMedium,
             urlAlt: this.urlAlt,
@@ -37,6 +38,10 @@ class ImageInfo {
 
     get urlJpeg() {
         return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.jpeg`;
+    }
+
+    get urlLargeJpeg() {
+        return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}_2048_N.jpeg?method=width&qst=6`;
     }
 
     get urlSmall() {

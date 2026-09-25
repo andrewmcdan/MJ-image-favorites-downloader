@@ -99,6 +99,7 @@ test("prompt image references do not replace generated output URLs", () => {
     assert.equal(images[0].fullCommand, "https://s.mj.run/source-ref a robot");
     assert.equal(images[0].urlFull, "https://cdn.midjourney.com/generated-job-id/0_0.png");
     assert.equal(images[0].urlJpeg, "https://cdn.midjourney.com/generated-job-id/0_0.jpeg");
+    assert.equal(images[0].urlLargeJpeg, "https://cdn.midjourney.com/generated-job-id/0_0_2048_N.jpeg?method=width&qst=6");
 
     const imagesView = fs.readFileSync(path.join(__dirname, "..", "views", "images.ejs"), "utf8");
     assert.doesNotMatch(imagesView, /return match\[1\]/);

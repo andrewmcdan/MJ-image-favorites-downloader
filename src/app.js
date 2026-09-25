@@ -1423,7 +1423,14 @@ class DownloadManager {
         const image = new ImageInfo(imageRow.parent_uuid, imageRow.grid_index, imageRow.enqueue_time, imageRow.full_command, imageRow.width, imageRow.height);
         this.concurrentDownloads++;
         try {
-            const candidateUrls = [...new Set([image.urlJpeg, image.urlFull, image.urlAlt])];
+            // Older 4x upscales are recorded at their requested dimensions, but
+            // Midjourney now serves them through its capped 2048px JPEG URL.
+            // Try that URL first so a CDN 403 on the obsolete original URL does
+            // not prevent the valid legacy asset from being downloaded.
+            const isLegacyLargeUpscale = Number(image.width) > 2048 || Number(image.height) > 2048;
+            const candidateUrls = [...new Set(isLegacyLargeUpscale
+                ? [image.urlLargeJpeg, image.urlJpeg, image.urlFull, image.urlAlt]
+                : [image.urlJpeg, image.urlFull, image.urlAlt])];
             const failures = [];
             const attempts = DOWNLOAD_RETRY_DELAYS_SECONDS.length + 1;
             for (let attempt = 0; attempt < attempts; attempt++) {
