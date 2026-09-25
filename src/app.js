@@ -136,6 +136,19 @@ class PuppeteerClient {
         this.googleLoginComplete = false;
     }
 
+    async saveMidjourneySession() {
+        if (!this.page) return false;
+        this.mj_cookies = await this.page.cookies();
+        this.mj_localStorage = await this.page.evaluate(() => ({ ...window.localStorage }));
+        this.mj_sessionStorage = await this.page.evaluate(() => ({ ...window.sessionStorage }));
+        fs.writeFileSync(MJ_SESSION_PATH, JSON.stringify({
+            cookies: this.mj_cookies,
+            localStorage: this.mj_localStorage,
+            sessionStorage: this.mj_sessionStorage,
+        }));
+        return true;
+    }
+
     /**
      * Loads the session data from the session files and attempts to restore the session.
      * @returns {Promise<void>} - nothing
@@ -208,6 +221,7 @@ class PuppeteerClient {
             throw new Error("Session restore failed");
         }
         this.loggedIntoMJ = true;
+        await this.saveMidjourneySession();
         systemLogger?.log("Midjourney session restored from mjSession.json; interactive login skipped.");
         log6("loadSession() complete.");
     }
@@ -327,23 +341,9 @@ class PuppeteerClient {
                             log6("Login successful.");
                             this.loggedIntoMJ = true;
                             log6("Getting/saving cookies and local/session storage.");
-                            this.mj_cookies = await this.page.cookies();
-                            this.mj_localStorage = await this.page.evaluate(() => {
-                                return window.localStorage;
-                            });
-                            this.mj_sessionStorage = await this.page.evaluate(() => {
-                                return window.sessionStorage;
-                            });
                             try {
                                 log6("Writing mjSession.json file.");
-                                fs.writeFileSync(
-                                    MJ_SESSION_PATH,
-                                    JSON.stringify({
-                                        cookies: this.mj_cookies,
-                                        localStorage: this.mj_localStorage,
-                                        sessionStorage: this.mj_sessionStorage,
-                                    }),
-                                );
+                                await this.saveMidjourneySession();
                             } catch (err) {
                                 log0("Error writing mjSession.json file. Error: " + err);
                             }
@@ -1213,6 +1213,7 @@ class DownloadManager {
                 return {
                     success: false,
                     error: "Bad response code: " + response.status,
+                    status: response.status,
                 };
             }
             contentType = response.headers.get("content-type");
@@ -1426,6 +1427,7 @@ class DownloadManager {
             const failures = [];
             const attempts = DOWNLOAD_RETRY_DELAYS_SECONDS.length + 1;
             for (let attempt = 0; attempt < attempts; attempt++) {
+                let throttled = false;
                 for (const url of candidateUrls) {
                     const imageResult = await this.downloadImage(url, image);
                     if (imageResult.success === true) {
@@ -1433,8 +1435,13 @@ class DownloadManager {
                         return updateResult !== null && updateResult.rowCount === 1;
                     }
                     failures.push(`attempt ${attempt + 1} ${url}: ${imageResult.error}`);
+                    if (imageResult.status === 403 || imageResult.status === 429) {
+                        throttled = true;
+                        break;
+                    }
                 }
                 if (attempt < DOWNLOAD_RETRY_DELAYS_SECONDS.length) {
+                    if (throttled) log1(`Midjourney CDN throttled ${image.id}; retrying after ${DOWNLOAD_RETRY_DELAYS_SECONDS[attempt]} seconds`);
                     await waitSeconds(DOWNLOAD_RETRY_DELAYS_SECONDS[attempt]);
                 }
             }

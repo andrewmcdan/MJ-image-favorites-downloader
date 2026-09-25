@@ -23,7 +23,7 @@ test("pending download query selects eligible rows using keyset pagination", () 
 
 test("download queue uses conservative concurrency and bounded retry delays", () => {
     assert.equal(DEFAULT_DOWNLOAD_CONCURRENCY, 2);
-    assert.deepEqual(DOWNLOAD_RETRY_DELAYS_SECONDS, [5, 15]);
+    assert.deepEqual(DOWNLOAD_RETRY_DELAYS_SECONDS, [60, 300]);
 });
 
 test("positive integer normalization rejects invalid batch settings", () => {
