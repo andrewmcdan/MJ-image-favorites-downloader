@@ -96,7 +96,6 @@ CREATE TABLE public.images (
 );
 CREATE INDEX temp_table_downloaded_do_not_download_processed_idx ON public.images USING btree (downloaded, do_not_download, processed);
 CREATE INDEX temp_table_enqueue_time_idx ON public.images USING btree (enqueue_time);
-CREATE INDEX temp_table_full_command_idx ON public.images USING btree (full_command);
 CREATE INDEX temp_table_grid_index_parent_uuid_idx ON public.images USING btree (grid_index, parent_uuid);
 CREATE INDEX temp_table_index_idx ON public.images USING btree (index);
 CREATE INDEX temp_table_upscale_location_storage_location_idx ON public.images USING btree (upscale_location, storage_location);

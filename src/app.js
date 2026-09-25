@@ -1121,6 +1121,7 @@ class DownloadManager {
         this.start();
         this.verifyDownloadsInProgress = false;
         this.downloadBrowser = null;
+        this.downloadBrowserLaunchPromise = null;
         log6("DownloadManager constructor complete");
     }
 
@@ -1204,7 +1205,6 @@ class DownloadManager {
                 });
             } catch (err) {
                 log0(["DownloadManager.downloadImage() error: Error downloading image", err, image]);
-                this.systemLogger?.log("Error downloading image: " + url + " Error: " + err);
                 return { success: false, error: err };
             }
 
@@ -1296,17 +1296,32 @@ class DownloadManager {
         // Prefer the main puppeteerClient browser if it exists so we reuse cookies / stealth settings
         let browser = (puppeteerClient && puppeteerClient.browser) || this.downloadBrowser;
         if (!browser || !browser.isConnected()) {
-            log6("DownloadManager.downloadImageWithBrowser(): launching headless browser for downloads");
-            browser = await puppeteer.launch(puppeteerDiagnostics.launchOptions({
-                headless: "new",
-                args: ["--no-sandbox", "--disable-setuid-sandbox"],
-            }));
-            puppeteerDiagnostics.attachBrowser(browser);
-            this.downloadBrowser = browser;
+            if (!this.downloadBrowserLaunchPromise) {
+                log6("DownloadManager.downloadImageWithBrowser(): launching shared headless browser for downloads");
+                this.downloadBrowserLaunchPromise = puppeteer.launch(puppeteerDiagnostics.launchOptions({
+                    headless: "new",
+                    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+                })).then((launchedBrowser) => {
+                    puppeteerDiagnostics.attachBrowser(launchedBrowser);
+                    this.downloadBrowser = launchedBrowser;
+                    return launchedBrowser;
+                }).finally(() => {
+                    this.downloadBrowserLaunchPromise = null;
+                });
+            }
+            browser = await this.downloadBrowserLaunchPromise;
         }
         const page = await browser.newPage();
         puppeteerDiagnostics.attachPage(page);
         try {
+            try {
+                const sessionData = JSON.parse(fs.readFileSync(MJ_SESSION_PATH, "utf8"));
+                if (Array.isArray(sessionData.cookies) && sessionData.cookies.length) {
+                    await page.setCookie(...sessionData.cookies);
+                }
+            } catch (err) {
+                log1(["DownloadManager.downloadImageWithBrowser(): unable to load saved Midjourney cookies", err]);
+            }
             const resp = await page.goto(url, { waitUntil: "networkidle2" });
             if (!resp || !resp.ok()) {
                 throw new Error(`Browser fetch failed with status ${resp?.status?.()}`);
@@ -1407,21 +1422,21 @@ class DownloadManager {
         const image = new ImageInfo(imageRow.parent_uuid, imageRow.grid_index, imageRow.enqueue_time, imageRow.full_command, imageRow.width, imageRow.height);
         this.concurrentDownloads++;
         try {
-            let imageResult = await this.downloadImage(image.urlFull, image);
-            if (imageResult.success !== true) {
-                const retryUrl = typeof imageResult.error === "string" && imageResult.error.includes("File size mismatch")
-                    ? image.urlAlt
-                    : image.urlFull;
-                imageResult = await this.downloadImage(retryUrl, image);
+            const candidateUrls = [...new Set([image.urlFull, image.urlJpeg, image.urlAlt])];
+            const failures = [];
+            for (const url of candidateUrls) {
+                const imageResult = await this.downloadImage(url, image);
+                if (imageResult.success === true) {
+                    const updateResult = await this.dbClient.updateImage(imageResult);
+                    return updateResult !== null && updateResult.rowCount === 1;
+                }
+                failures.push(`${url}: ${imageResult.error}`);
             }
 
-            if (imageResult.success === true) {
-                const updateResult = await this.dbClient.updateImage(imageResult);
-                return updateResult !== null && updateResult.rowCount === 1;
-            }
-
-            log0(["DownloadManager.downloadPendingImage() error: Error downloading image", imageResult.error, image]);
-            new DownloadError("Error downloading image", imageResult.error, image);
+            const error = failures.join("; ");
+            log0(["DownloadManager.downloadPendingImage() error: All image URLs failed", error, image]);
+            this.systemLogger?.log(`Unable to download image ${image.id}: all ${candidateUrls.length} URL forms failed`);
+            new DownloadError("All image URLs failed", error, image);
             return false;
         } catch (err) {
             log0(["DownloadManager.downloadPendingImage() error: Error downloading image", err, image]);

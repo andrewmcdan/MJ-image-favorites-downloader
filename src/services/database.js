@@ -6,6 +6,8 @@ const { DEFAULT_UPSERT_BATCH_SIZE, BULK_UPSERT_IMAGES_QUERY, serializeImagesForU
 const { RANDOM_DOWNLOADED_IMAGE_QUERY, RANDOM_ANY_IMAGE_QUERY } = require("./slideshow-query");
 const { DEFAULT_DOWNLOAD_BATCH_SIZE, PENDING_DOWNLOADS_QUERY, normalizePositiveInteger } = require("./download-queue");
 
+const DROP_OBSOLETE_FULL_COMMAND_INDEX_QUERY = "DROP INDEX CONCURRENTLY IF EXISTS temp_table_full_command_idx";
+
 function createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 }) {
     class Database {
         static DB_connected = false;
@@ -20,9 +22,16 @@ function createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 }) {
             });
             this.dbClient
                 .connect()
-                .then(() => {
+                .then(async () => {
                     log2("Connected to database");
                     Database.DB_connected = true;
+                    try {
+                        await this.dbClient.query(DROP_OBSOLETE_FULL_COMMAND_INDEX_QUERY);
+                        log2("Removed obsolete full_command B-tree index if present");
+                    } catch (err) {
+                        log0("Unable to remove obsolete full_command index: " + err);
+                        new DB_Error("Error removing obsolete full_command index");
+                    }
                 })
                 .catch((err) => {
                     log0("Error connecting to database:", err);
@@ -584,4 +593,4 @@ function createDatabaseClass({ DB_Error, log0, log1, log2, log5, log6 }) {
     return Database;
 }
 
-module.exports = { createDatabaseClass };
+module.exports = { createDatabaseClass, DROP_OBSOLETE_FULL_COMMAND_INDEX_QUERY };

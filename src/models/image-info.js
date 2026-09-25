@@ -19,6 +19,7 @@ class ImageInfo {
         return {
             ...this,
             urlFull: this.urlFull,
+            urlJpeg: this.urlJpeg,
             urlSmall: this.urlSmall,
             urlMedium: this.urlMedium,
             urlAlt: this.urlAlt,
@@ -32,6 +33,10 @@ class ImageInfo {
 
     get urlFull() {
         return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.png`;
+    }
+
+    get urlJpeg() {
+        return `https://cdn.midjourney.com/${this.parent_id}/0_${this.grid_index}.jpeg`;
     }
 
     get urlSmall() {
