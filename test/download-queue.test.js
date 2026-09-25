@@ -2,6 +2,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
     PENDING_DOWNLOADS_QUERY,
     DEFAULT_DOWNLOAD_CONCURRENCY,
@@ -9,6 +11,8 @@ const {
     normalizePositiveInteger,
     runInConcurrentChunks,
 } = require("../src/services/download-queue");
+
+const appSource = fs.readFileSync(path.join(__dirname, "..", "src", "app.js"), "utf8");
 
 test("pending download query selects eligible rows using keyset pagination", () => {
     assert.match(PENDING_DOWNLOADS_QUERY, /processed = true/i);
@@ -24,6 +28,11 @@ test("pending download query selects eligible rows using keyset pagination", () 
 test("download queue uses conservative concurrency and bounded retry delays", () => {
     assert.equal(DEFAULT_DOWNLOAD_CONCURRENCY, 2);
     assert.deepEqual(DOWNLOAD_RETRY_DELAYS_SECONDS, [60, 300]);
+});
+
+test("download filenames exclude CDN query parameters", () => {
+    assert.match(appSource, /new URL\(url\)/);
+    assert.match(appSource, /parsedImageUrl\.pathname/);
 });
 
 test("positive integer normalization rejects invalid batch settings", () => {

@@ -1257,8 +1257,9 @@ class DownloadManager {
             log1("DownloadManager.downloadImage() warning: Destination folder does not exist. Creating it now. Folder: " + destFolder);
             fs.mkdirSync(destFolder, { recursive: true });
         }
-        let splitImage = url.split("/");
-        let destFileName = splitImage[splitImage.length - 2] + "-" + splitImage[splitImage.length - 1];
+        const parsedImageUrl = new URL(url);
+        const splitImage = parsedImageUrl.pathname.split("/").filter(Boolean);
+        const destFileName = splitImage[splitImage.length - 2] + "-" + splitImage[splitImage.length - 1];
         log6("DownloadManager.downloadImage() destFileName: " + destFileName);
 
         if (fs.existsSync(path.join(destFolder, destFileName))) {
