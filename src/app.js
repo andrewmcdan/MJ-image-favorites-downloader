@@ -51,7 +51,7 @@ const { buildImageData: buildMidjourneyImageData, getObsoleteSingleOutputIds } =
 const { createLogging } = require("./logging");
 const { createDatabaseClass } = require("./services/database");
 const { findMissingDownloadIds } = require("./services/download-verification");
-const { DEFAULT_DOWNLOAD_BATCH_SIZE, DEFAULT_DOWNLOAD_CONCURRENCY, runInConcurrentChunks } = require("./services/download-queue");
+const { DEFAULT_DOWNLOAD_BATCH_SIZE, DEFAULT_DOWNLOAD_CONCURRENCY, DOWNLOAD_RETRY_DELAYS_SECONDS, runInConcurrentChunks } = require("./services/download-queue");
 const { validatePNG, waitSeconds } = require("./utils/runtime");
 const { loadSettings: loadSettingsFile, saveSettings: saveSettingsFile } = require("./settings");
 const { createPuppeteerDiagnostics, envFlag } = require("./puppeteer/diagnostics");
@@ -1422,15 +1422,21 @@ class DownloadManager {
         const image = new ImageInfo(imageRow.parent_uuid, imageRow.grid_index, imageRow.enqueue_time, imageRow.full_command, imageRow.width, imageRow.height);
         this.concurrentDownloads++;
         try {
-            const candidateUrls = [...new Set([image.urlFull, image.urlJpeg, image.urlAlt])];
+            const candidateUrls = [...new Set([image.urlJpeg, image.urlFull, image.urlAlt])];
             const failures = [];
-            for (const url of candidateUrls) {
-                const imageResult = await this.downloadImage(url, image);
-                if (imageResult.success === true) {
-                    const updateResult = await this.dbClient.updateImage(imageResult);
-                    return updateResult !== null && updateResult.rowCount === 1;
+            const attempts = DOWNLOAD_RETRY_DELAYS_SECONDS.length + 1;
+            for (let attempt = 0; attempt < attempts; attempt++) {
+                for (const url of candidateUrls) {
+                    const imageResult = await this.downloadImage(url, image);
+                    if (imageResult.success === true) {
+                        const updateResult = await this.dbClient.updateImage(imageResult);
+                        return updateResult !== null && updateResult.rowCount === 1;
+                    }
+                    failures.push(`attempt ${attempt + 1} ${url}: ${imageResult.error}`);
                 }
-                failures.push(`${url}: ${imageResult.error}`);
+                if (attempt < DOWNLOAD_RETRY_DELAYS_SECONDS.length) {
+                    await waitSeconds(DOWNLOAD_RETRY_DELAYS_SECONDS[attempt]);
+                }
             }
 
             const error = failures.join("; ");

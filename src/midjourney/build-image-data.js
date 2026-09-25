@@ -12,6 +12,7 @@ function buildImageData(data, options = {}) {
     data.forEach((job) => {
         trace(`Processing job: ${JSON.stringify(job)}`);
         const normalizedJob = normalizeLikedJob(job);
+        if (isVideoJob(normalizedJob)) return;
         if (isVirtualUpsample(normalizedJob)) {
             const parentGrid = Number(normalizedJob.parentGrid);
             if (normalizedJob.parentId && Number.isInteger(parentGrid)) {
@@ -40,6 +41,12 @@ function buildImageData(data, options = {}) {
     return imageData;
 }
 
+function isVideoJob(job) {
+    return String(job?.jobType).toLowerCase().includes("video")
+        || String(job?.eventType).toLowerCase().includes("video")
+        || /--(?:motion\b|v(?:ersion)?[ =]+video\b)/i.test(String(job?.fullCommand || ""));
+}
+
 function isVirtualUpsample(job) {
     return String(job.jobType).includes("virtual_upsample") || String(job.eventType).includes("virtual");
 }
@@ -63,4 +70,4 @@ function getObsoleteSingleOutputIds(data) {
     });
 }
 
-module.exports = { buildImageData, getObsoleteSingleOutputIds, isVirtualUpsample };
+module.exports = { buildImageData, getObsoleteSingleOutputIds, isVirtualUpsample, isVideoJob };

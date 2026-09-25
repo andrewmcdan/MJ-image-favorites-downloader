@@ -1,7 +1,8 @@
 "use strict";
 
 const DEFAULT_DOWNLOAD_BATCH_SIZE = 100;
-const DEFAULT_DOWNLOAD_CONCURRENCY = 10;
+const DEFAULT_DOWNLOAD_CONCURRENCY = 2;
+const DOWNLOAD_RETRY_DELAYS_SECONDS = [5, 15];
 
 const PENDING_DOWNLOADS_QUERY = `
     SELECT *
@@ -9,6 +10,7 @@ const PENDING_DOWNLOADS_QUERY = `
     WHERE processed = true
       AND downloaded = false
       AND do_not_download = false
+      AND full_command !~* '--motion|--v[ =]+video'
       AND id > $1
     ORDER BY id ASC
     LIMIT $2`;
@@ -32,6 +34,7 @@ async function runInConcurrentChunks(items, worker, concurrency = DEFAULT_DOWNLO
 module.exports = {
     DEFAULT_DOWNLOAD_BATCH_SIZE,
     DEFAULT_DOWNLOAD_CONCURRENCY,
+    DOWNLOAD_RETRY_DELAYS_SECONDS,
     PENDING_DOWNLOADS_QUERY,
     normalizePositiveInteger,
     runInConcurrentChunks,

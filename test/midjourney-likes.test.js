@@ -10,7 +10,7 @@ const {
     normalizeLikedJob,
     promptToCommand,
 } = require("../src/midjourney/likes");
-const { buildImageData, getObsoleteSingleOutputIds } = require("../src/midjourney/build-image-data");
+const { buildImageData, getObsoleteSingleOutputIds, isVideoJob } = require("../src/midjourney/build-image-data");
 
 test("buildLikesUrl uses the current one-based likes endpoint", () => {
     assert.equal(buildLikesUrl(1), "/api/explore-likes?page=1&_ql=explore");
@@ -173,4 +173,19 @@ test("legacy virtual upscales resolve to their parent grid asset", () => {
     assert.equal(images[0].urlFull, "https://cdn.midjourney.com/source-job/0_2.png");
     assert.equal(images[0].urlMedium, "https://cdn.midjourney.com/source-job/0_2_384_N.webp?method=shortest");
     assert.deepEqual(getObsoleteSingleOutputIds([job]), ["virtual-job_0", "virtual-job_2"]);
+});
+
+test("video jobs are excluded from the still-image importer", () => {
+    const video = {
+        id: "video-job",
+        job_type: "video_generation",
+        prompt: "animate this --v video 1",
+        enqueue_time: "2026-09-25T00:00:00.000Z",
+        width: 624,
+        height: 624,
+    };
+
+    assert.equal(isVideoJob({ jobType: "video_generation" }), true);
+    assert.equal(isVideoJob({ fullCommand: "animate this --v video 1" }), true);
+    assert.deepEqual(buildImageData([video]), []);
 });

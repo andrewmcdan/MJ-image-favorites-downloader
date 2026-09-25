@@ -4,6 +4,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
     PENDING_DOWNLOADS_QUERY,
+    DEFAULT_DOWNLOAD_CONCURRENCY,
+    DOWNLOAD_RETRY_DELAYS_SECONDS,
     normalizePositiveInteger,
     runInConcurrentChunks,
 } = require("../src/services/download-queue");
@@ -12,10 +14,16 @@ test("pending download query selects eligible rows using keyset pagination", () 
     assert.match(PENDING_DOWNLOADS_QUERY, /processed = true/i);
     assert.match(PENDING_DOWNLOADS_QUERY, /downloaded = false/i);
     assert.match(PENDING_DOWNLOADS_QUERY, /do_not_download = false/i);
+    assert.match(PENDING_DOWNLOADS_QUERY, /full_command !~\*/i);
     assert.match(PENDING_DOWNLOADS_QUERY, /id > \$1/i);
     assert.match(PENDING_DOWNLOADS_QUERY, /ORDER BY id ASC/i);
     assert.match(PENDING_DOWNLOADS_QUERY, /LIMIT \$2/i);
     assert.doesNotMatch(PENDING_DOWNLOADS_QUERY, /OFFSET/i);
+});
+
+test("download queue uses conservative concurrency and bounded retry delays", () => {
+    assert.equal(DEFAULT_DOWNLOAD_CONCURRENCY, 2);
+    assert.deepEqual(DOWNLOAD_RETRY_DELAYS_SECONDS, [5, 15]);
 });
 
 test("positive integer normalization rejects invalid batch settings", () => {
