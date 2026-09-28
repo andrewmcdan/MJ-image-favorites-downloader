@@ -245,6 +245,7 @@ class PuppeteerClient {
                     .catch(async () => {
                         log1("Session restore failed. Attempting to log in.");
                         this.loginInProgress = true;
+                        try {
                         if (this.browser !== null) {
                             log6("Browser is not null. Closing browser.");
                             await this.browser.close();
@@ -393,6 +394,11 @@ class PuppeteerClient {
                             this.loggedIntoMJ = false;
                             log0("loginToMJ() error. Login failed.");
                             reject("Login failed");
+                        }
+                        } finally {
+                            // Every interactive-login exit path must release callers
+                            // waiting in getUsersJobsData/getUsersLikesData.
+                            this.loginInProgress = false;
                         }
                     })
                     .catch((error) => {
@@ -628,6 +634,7 @@ class PuppeteerClient {
                     log0("getUsersJobsData() error. Not logged into MJ. Error: " + err);
                     reject("Not logged into MJ. Error: " + err);
                 });
+                if (!this.loggedIntoMJ) return;
             }
             let waitCount = 0;
             while (this.loginInProgress) {
@@ -636,6 +643,7 @@ class PuppeteerClient {
                 if (waitCount > 60 * 5) {
                     log0("getUsersJobsData() error. Login in progress for too long");
                     reject("Login in progress for too long");
+                    return;
                 }
             }
             await waitSeconds(2);
@@ -777,6 +785,7 @@ class PuppeteerClient {
                     log0("getUsersLikesData() error. Not logged into MJ. Error: " + err);
                     reject("Not logged into MJ. Error: " + err);
                 });
+                if (!this.loggedIntoMJ) return;
             }
             let waitCount = 0;
             while (this.loginInProgress) {
@@ -785,6 +794,7 @@ class PuppeteerClient {
                 if (waitCount > 60 * 5) {
                     log0("getUsersLikesData() error. Login in progress for too long");
                     reject("Login in progress for too long");
+                    return;
                 }
             }
             await waitSeconds(2);

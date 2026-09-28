@@ -2,6 +2,10 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const { waitForLoginCompletion, triggerGoogleLogin, isAuthenticatedLikesProbe } = require("../src/puppeteer/login");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const appSource = fs.readFileSync(path.join(__dirname, "..", "src", "app.js"), "utf8");
 
 test("login wait completes after an asynchronous login signal", async () => {
     let attempts = 0;
@@ -58,4 +62,13 @@ test("saved sessions are accepted only when the Likes API returns an array", () 
     assert.equal(isAuthenticatedLikesProbe({ ok: true, status: 200, isArray: true }), true);
     assert.equal(isAuthenticatedLikesProbe({ ok: true, status: 200, isArray: false }), false);
     assert.equal(isAuthenticatedLikesProbe({ ok: false, status: 401, isArray: false }), false);
+});
+
+test("interactive login always releases its in-progress state", () => {
+    assert.match(appSource, /finally\s*\{[\s\S]*?this\.loginInProgress = false;/);
+});
+
+test("sync authentication timeout exits instead of continuing to log", () => {
+    assert.match(appSource, /getUsersJobsData\(\) error\. Login in progress for too long[\s\S]*?reject\("Login in progress for too long"\);\s*return;/);
+    assert.match(appSource, /getUsersLikesData\(\) error\. Login in progress for too long[\s\S]*?reject\("Login in progress for too long"\);\s*return;/);
 });
